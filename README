@@ -4,3 +4,8 @@ http://www.ietf.org/html.charters/nfsv4-charter.html
 http://www.ietf.org/mail-archive/web/nfsv4/index.html
 
 NOTE: The drafts contained here may change after they are posted to the IETF site. The ITEF site is always the definitive authority on content.
+
+SECRET NOTE: While these documents can serve as 5661bis, they are mainly being used to track changes to 5661 before the bis work starts. The issue board and the tasklist for 3530bis were cumbersome. The intent here is to make changes right away instead of issuing vague AIs.
+
+For comparative purposes, the orginal rfc5661.txt and rfc5661bis.txt are also stored here, mainly to show the set of diffs from the cuttin. (Although now I think of it, D'oh!, version control!)
+
