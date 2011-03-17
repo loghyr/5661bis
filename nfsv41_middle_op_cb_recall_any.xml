@@ -1,0 +1,173 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_CB_RECALL_ANY" title="Operation 8: CB_RECALL_ANY - Keep Any N Recallable Objects">
+    <section toc='exclude' anchor="ss:op_CB_RECALL_ANY:A" title="ARGUMENT">
+      <?rfc include='autogen/cb_recall_any_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_RECALL_ANY:R" title="RESULT">
+      <?rfc include='autogen/cb_recall_any_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_RECALL_ANY:D" title="DESCRIPTION">
+      <t>
+        The server may decide that it cannot hold all of the state for
+        recallable objects, such as delegations and layouts, without running
+        out of resources.  In such a case, while not optimal, the server is
+        free to recall individual objects to reduce the load.
+      </t>
+
+      <t>
+        Because the general purpose of such recallable objects as delegations
+        is to eliminate client interaction with the server, the server cannot
+        interpret lack of recent use as indicating that the object is no
+        longer useful.  The absence of visible use is consistent with a
+        delegation keeping potential operations from being sent to the
+        server.  In the case of layouts, while it is true that the usefulness
+        of a layout is indicated by the use of the layout when storage
+        devices receive I/O requests, because there is no mandate that a
+        storage device indicate to the metadata server any past or present
+        use of a layout, the metadata server is not likely to know which
+        layouts are good candidates to recall in response to low resources.
+      </t>
+
+      <t>
+        In order to implement an effective reclaim scheme for such objects,
+        the server's knowledge of available resources must be used to
+        determine when objects must be recalled with the clients selecting
+        the actual objects to be returned.
+      </t>
+
+      <t>
+        Server implementations may differ in their resource allocation
+        requirements.  For example, one server may share resources among all
+        classes of recallable objects, whereas another may use separate
+        resource pools for layouts and for delegations, or further separate
+        resources by types of delegations.
+      </t>
+
+      <t>
+        When a given resource pool is over-utilized, the server can send a
+        CB_RECALL_ANY to clients holding recallable objects of the types
+        involved, allowing it to keep a certain number of such objects and
+        return any excess.  A mask specifies which types of objects are to be
+        limited.  The client chooses, based on its own knowledge of current
+        usefulness, which of the objects in that class should be returned.
+      </t>
+
+      <t>
+        A number of bits are defined.  For some of these, ranges are defined
+        and it is up to the definition of the storage protocol to specify how
+        these are to be used.  There are ranges reserved for object-based
+        storage protocols and for other experimental storage protocols.  An
+        RFC defining such a storage protocol needs to specify how particular
+        bits within its range are to be used.  For example, it may specify a
+        mapping between attributes of the layout (read vs. write, size of
+        area) and the bit to be used, or it may define a field in the layout
+        where the associated bit position is made available by the server to
+        the client.
+      </t>
+
+      <t>
+        <list style='hanging'>
+          <t hangText='RCA4_TYPE_MASK_RDATA_DLG'><vspace />
+            The client is to return OPEN_DELEGATE_READ delegations on non-directory file objects.
+          </t>
+
+          <t hangText='RCA4_TYPE_MASK_WDATA_DLG'><vspace />
+            The client is to return OPEN_DELEGATE_WRITE delegations on regular
+            file objects.
+          </t>
+
+          <t hangText='RCA4_TYPE_MASK_DIR_DLG'><vspace />
+            The client is to return directory delegations.
+          </t>
+
+          <t hangText='RCA4_TYPE_MASK_FILE_LAYOUT'><vspace />
+            The client is to return layouts of type LAYOUT4_NFSV4_1_FILES.
+          </t>
+
+          <t hangText='RCA4_TYPE_MASK_BLK_LAYOUT'><vspace />
+            See <xref target="RFC5663" /> for a description.
+          </t>
+
+          <t hangText='RCA4_TYPE_MASK_OBJ_LAYOUT_MIN to RCA4_TYPE_MASK_OBJ_LAYOUT_MAX'><vspace />
+            See <xref target="RFC5664" /> for a description.
+          </t>
+
+          <t hangText='RCA4_TYPE_MASK_OTHER_LAYOUT_MIN to RCA4_TYPE_MASK_OTHER_LAYOUT_MAX'><vspace />
+            This range is reserved for telling the client to recall layouts of
+            experimental or site-specific layout types (see <xref target="ss:protocol_constants:l1" />).
+          </t>
+        </list>
+      </t>
+
+      <t>
+        When a bit is set in the type mask that corresponds to an undefined
+        type of recallable object, NFS4ERR_INVAL MUST be returned.  When a
+        bit is set that corresponds to a defined type of object but the
+        client does not support an object of the type, NFS4ERR_INVAL MUST NOT
+        be returned.  Future minor versions of NFSv4 may expand the set of
+        valid type mask bits.
+      </t>
+
+      <t>
+        CB_RECALL_ANY specifies a count of objects that the client may keep
+        as opposed to a count that the client must return.  This is to avoid
+        a potential race between a CB_RECALL_ANY that had a count of objects
+        to free with a set of client-originated operations to return layouts
+        or delegations.  As a result of the race, the client and server would
+        have differing ideas as to how many objects to return.  Hence, the
+        client could mistakenly free too many.
+      </t>
+
+      <t>
+        If resource demands prompt it, the server may send another
+        CB_RECALL_ANY with a lower count, even if it has not yet received an
+        acknowledgment from the client for a previous CB_RECALL_ANY with the
+        same type mask.  Although the possibility exists that these will be
+        received by the client in an order different from the order in which
+        they were sent, any such permutation of the callback stream is
+        harmless.  It is the job of the client to bring down the size of the
+        recallable object set in line with each CB_RECALL_ANY received, and
+        until that obligation is met, it cannot be cancelled or modified by
+        any subsequent CB_RECALL_ANY for the same type mask.  Thus, if the
+        server sends two CB_RECALL_ANYs, the effect will be the same as if
+        the lower count was sent, whatever the order of recall receipt.  Note
+        that this means that a server may not cancel the effect of a
+        CB_RECALL_ANY by sending another recall with a higher count.  When a
+        CB_RECALL_ANY is received and the count is already within the limit
+        set or is above a limit that the client is working to get down to,
+        that callback has no effect.
+      </t>
+
+      <t>
+        Servers are generally free to deny recallable objects when
+        insufficient resources are available.  Note that the effect of such a
+        policy is implicitly to give precedence to existing objects relative
+        to requested ones, with the result that resources might not be
+        optimally used.  To prevent this, servers are well advised to make
+        the point at which they start sending CB_RECALL_ANY callbacks
+        somewhat below that at which they cease to give out new delegations
+        and layouts.  This allows the client to purge its less-used objects
+        whenever appropriate and so continue to have its subsequent requests
+        given new resources freed up by object returns.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_RECALL_ANY:I" title="IMPLEMENTATION">
+      <t>
+        The client can choose to return any type of object specified by the
+        mask.  If a server wishes to limit the use of objects of a specific
+        type, it should only specify that type in the mask it sends.  Should
+        the client fail to return requested objects, it is up to the server
+        to handle this situation, typically by sending specific recalls
+        (i.e., sending CB_RECALL operations) to properly limit resource
+        usage.  The server should give the client enough time to return
+        objects before proceeding to specific recalls.  This time should not
+        be less than the lease period.
+      </t>
+    </section>
+  </section>
+

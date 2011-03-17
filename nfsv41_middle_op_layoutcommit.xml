@@ -1,0 +1,165 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_LAYOUTCOMMIT" title="Operation 49: LAYOUTCOMMIT - Commit Writes Made Using a Layout">
+    <section toc='exclude' anchor="ss:op_LAYOUTCOMMIT:A" title="ARGUMENT">
+      <?rfc include='autogen/layoutcommit_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LAYOUTCOMMIT:R" title="RESULT">
+      <?rfc include='autogen/layoutcommit_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LAYOUTCOMMIT:D" title="DESCRIPTION">
+      <t>
+        The LAYOUTCOMMIT operation commits changes in the layout represented
+        by the current filehandle, client ID (derived from the session ID in
+        the preceding SEQUENCE operation), byte-range, and stateid.  Since
+        layouts are sub-dividable, a smaller portion of a layout, retrieved
+        via LAYOUTGET, can be committed.  The byte-range being committed is
+        specified through the byte-range (loca_offset and loca_length).  This
+        byte-range MUST overlap with one or more existing layouts previously
+        granted via LAYOUTGET (<xref target="op_LAYOUTGET" />), each with an iomode of
+        LAYOUTIOMODE4_RW.  In the case where the iomode of any held layout
+        segment is not LAYOUTIOMODE4_RW, the server should return the error
+        NFS4ERR_BAD_IOMODE.  For the case where the client does not hold
+        matching layout segment(s) for the defined byte-range, the server
+        should return the error NFS4ERR_BAD_LAYOUT.
+      </t>
+
+      <t>
+        The LAYOUTCOMMIT operation indicates that the client has completed
+        writes using a layout obtained by a previous LAYOUTGET.  The client
+        may have only written a subset of the data range it previously
+        requested.  LAYOUTCOMMIT allows it to commit or discard provisionally
+        allocated space and to update the server with a new end-of-file.  The
+        layout referenced by LAYOUTCOMMIT is still valid after the operation
+        completes and can be continued to be referenced by the client ID,
+        filehandle, byte-range, layout type, and stateid.
+      </t>
+
+      <t>
+        If the loca_reclaim field is set to TRUE, this indicates that the
+        client is attempting to commit changes to a layout after the restart
+        of the metadata server during the metadata server's recovery grace
+        period (see <xref target="ss:parallel_nfs:RfMSR" />).  This type of request may be necessary
+        when the client has uncommitted writes to provisionally allocated
+        byte-ranges of a file that were sent to the storage devices before
+        the restart of the metadata server.  In this case, the layout
+        provided by the client MUST be a subset of a writable layout that the
+        client held immediately before the restart of the metadata server.
+        The value of the field loca_stateid MUST be a value that the metadata
+        server returned before it restarted.  The metadata server is free to
+        accept or reject this request based on its own internal metadata
+        consistency checks.  If the metadata server finds that the layout
+        provided by the client does not pass its consistency checks, it MUST
+        reject the request with the status NFS4ERR_RECLAIM_BAD.  The
+        successful completion of the LAYOUTCOMMIT request with loca_reclaim
+        set to TRUE does NOT provide the client with a layout for the file.
+        It simply commits the changes to the layout specified in the
+        loca_layoutupdate field.  To obtain a layout for the file, the client
+        must send a LAYOUTGET request to the server after the server's grace
+        period has expired.  If the metadata server receives a LAYOUTCOMMIT
+        request with loca_reclaim set to TRUE when the metadata server is not
+        in its recovery grace period, it MUST reject the request with the
+        status NFS4ERR_NO_GRACE.
+      </t>
+
+      <t>
+        Setting the loca_reclaim field to TRUE is required if and only if the
+        committed layout was acquired before the metadata server restart.  If
+        the client is committing a layout that was acquired during the
+        metadata server's grace period, it MUST set the "reclaim" field to
+        FALSE.
+      </t>
+
+      <t>
+        The loca_stateid is a layout stateid value as returned by previously
+        successful layout operations (see <xref target="ss:parallel_nfs:LS1" />).
+      </t>
+
+      <t>
+        The loca_last_write_offset field specifies the offset of the last
+        byte written by the client previous to the LAYOUTCOMMIT.  Note that
+        this value is never equal to the file's size (at most it is one byte
+        less than the file's size) and MUST be less than or equal to
+        NFS4_MAXFILEOFF.  Also, loca_last_write_offset MUST overlap the range
+        described by loca_offset and loca_length.  The metadata server may
+        use this information to determine whether the file's size needs to be
+        updated.  If the metadata server updates the file's size as the
+        result of the LAYOUTCOMMIT operation, it must return the new size
+        (locr_newsize.ns_size) as part of the results.
+      </t>
+
+      <t>
+        The loca_time_modify field allows the client to suggest a
+        modification time it would like the metadata server to set.  The
+        metadata server may use the suggestion or it may use the time of the
+        LAYOUTCOMMIT operation to set the modification time.  If the metadata
+        server uses the client-provided modification time, it should ensure
+        that time does not flow backwards.  If the client wants to force the
+        metadata server to set an exact time, the client should use a SETATTR
+        operation in a COMPOUND right after LAYOUTCOMMIT.  See <xref target="ss:parallel_nfs:CL" />
+        for more details.  If the client desires the resultant modification
+        time, it should construct the COMPOUND so that a GETATTR follows the
+        LAYOUTCOMMIT.
+      </t>
+
+      <t>
+        The loca_layoutupdate argument to LAYOUTCOMMIT provides a mechanism
+        for a client to provide layout-specific updates to the metadata
+        server.  For example, the layout update can describe what byte-ranges
+        of the original layout have been used and what byte-ranges can be
+        deallocated.  There is no NFSv4.1 file layout-specific layoutupdate4
+        structure.
+      </t>
+
+      <t>
+        The layout information is more verbose for block devices than for
+        objects and files because the latter two hide the details of block
+        allocation behind their storage protocols.  At the minimum, the
+        client needs to communicate changes to the end-of-file location back
+        to the server, and, if desired, its view of the file's modification
+        time.  For block/volume layouts, it needs to specify precisely which
+        blocks have been used.
+      </t>
+
+      <t>
+        If the layout identified in the arguments does not exist, the error
+        NFS4ERR_BADLAYOUT is returned.  The layout being committed may also
+        be rejected if it does not correspond to an existing layout with an
+        iomode of LAYOUTIOMODE4_RW.
+      </t>
+
+      <t>
+        On success, the current filehandle retains its value and the current
+        stateid retains its value.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LAYOUTCOMMIT:I" title="IMPLEMENTATION">
+      <t>
+        The client MAY also use LAYOUTCOMMIT with the loca_reclaim field set
+        to TRUE to convey hints to modified file attributes or to report
+        layout-type specific information such as I/O errors for object-based
+        storage layouts, as normally done during normal operation.  Doing so
+        may help the metadata server to recover files more efficiently after
+        restart.  For example, some file system implementations may require
+        expansive recovery of file system objects if the metadata server does
+        not get a positive indication from all clients holding a
+        LAYOUTIOMODE4_RW layout that they have successfully completed all
+        their writes.  Sending a LAYOUTCOMMIT (if required) and then
+        following with LAYOUTRETURN can provide such an indication and allow
+        for graceful and efficient recovery.
+      </t>
+
+      <t>
+        If loca_reclaim is TRUE, the metadata server is free to either
+        examine or ignore the value in the field loca_stateid.  The metadata
+        server implementation might or might not encode in its layout stateid
+        information that allows the metadate server to perform a consistency
+        check on the LAYOUTCOMMIT request.
+      </t>
+    </section>
+  </section>
+

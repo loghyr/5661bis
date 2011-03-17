@@ -1,0 +1,321 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_ACCESS" title="Operation 3: ACCESS - Check Access Rights">
+    <section toc='exclude' anchor="ss:op_ACCESS:A" title="ARGUMENT">
+      <?rfc include='autogen/access_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_ACCESS:R" title="RESULT">
+      <?rfc include='autogen/access_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_ACCESS:D" title="DESCRIPTION">
+      <t>
+        ACCESS determines the access rights that a user, as identified by the
+        credentials in the RPC request, has with respect to the file system
+        object specified by the current filehandle.  The client encodes the
+        set of access rights that are to be checked in the bit mask "access".
+        The server checks the permissions encoded in the bit mask.  If a
+        status of NFS4_OK is returned, two bit masks are included in the
+        response.  The first, "supported", represents the access rights for
+        which the server can verify reliably.  The second, "access",
+        represents the access rights available to the user for the filehandle
+        provided.  On success, the current filehandle retains its value.
+      </t>
+
+      <t>
+        Note that the reply's supported and access fields MUST NOT contain
+        more values than originally set in the request's access field.  For
+        example, if the client sends an ACCESS operation with just the
+        ACCESS4_READ value set and the server supports this value, the server
+        MUST NOT set more than ACCESS4_READ in the supported field even if it
+        could have reliably checked other values.
+      </t>
+
+      <t>
+        The reply's access field MUST NOT contain more values than the
+        supported field.
+      </t>
+
+      <t>
+        The results of this operation are necessarily advisory in nature.  A
+        return status of NFS4_OK and the appropriate bit set in the bit mask
+        do not imply that such access will be allowed to the file system
+        object in the future.  This is because access rights can be revoked
+        by the server at any time.
+      </t>
+
+      <t>
+        The following access permissions may be requested:
+      </t>
+
+      <t>
+        <list style='hanging'>
+          <t hangText='ACCESS4_READ'>
+            Read data from file or read a directory.
+          </t>
+
+          <t hangText='ACCESS4_LOOKUP'>
+            Look up a name in a directory (no meaning for non-directory objects).
+          </t>
+
+          <t hangText='ACCESS4_MODIFY'>
+            Rewrite existing file data or modify existing directory entries.
+          </t>
+
+          <t hangText='ACCESS4_EXTEND'>
+            Write new data or add directory entries.
+          </t>
+
+          <t hangText='ACCESS4_DELETE'>
+            Delete an existing directory entry.
+          </t>
+
+          <t hangText='ACCESS4_EXECUTE'>
+            Execute a regular file (no meaning for a directory).
+          </t>
+        </list>
+      </t>
+
+      <t>
+        On success, the current filehandle retains its value.
+      </t>
+
+      <t>
+        ACCESS4_EXECUTE is a challenging semantic to implement because NFS
+        provides remote file access, not remote execution.  This leads to the
+        following:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            Whether or not a regular file is executable ought to be the
+            responsibility of the NFS client and not the server.  And yet the
+            ACCESS operation is specified to seemingly require a server to own
+            that responsibility.
+          </t>
+
+          <t>
+            When a client executes a regular file, it has to read the file
+            from the server.  Strictly speaking, the server should not allow
+            the client to read a file being executed unless the user has read
+            permissions on the file.  Requiring explicit read permissions on
+            executable files in order to access them over NFS is not going to
+            be acceptable to some users and storage administrators.
+            Historically, NFS servers have allowed a user to READ a file if
+            the user has execute access to the file.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        As a practical example, the UNIX specification <xref target="openg_access" /> states that an
+        implementation claiming conformance to UNIX may indicate in the
+        access() programming interface's result that a privileged user has
+        execute rights, even if no execute permission bits are set on the
+        regular file's attributes.  It is possible to claim conformance to
+        the UNIX specification and instead not indicate execute rights in
+        that situation, which is true for some operating environments.
+        Suppose the operating environments of the client and server are
+        implementing the access() semantics for privileged users differently,
+        and the ACCESS operation implementations of the client and server
+        follow their respective access() semantics.  This can cause undesired
+        behavior:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            Suppose the client's access() interface returns X_OK if the user
+            is privileged and no execute permission bits are set on the
+            regular file's attribute, and the server's access() interface does
+            not return X_OK in that situation.  Then the client will be unable
+            to execute files stored on the NFS server that could be executed
+            if stored on a non-NFS file system.
+          </t>
+
+          <t>
+            Suppose the client's access() interface does not return X_OK if
+            the user is privileged, and no execute permission bits are set on
+            the regular file's attribute, and the server's access() interface
+            does return X_OK in that situation.  Then:
+
+            <list style='symbols'>
+              <t>
+                The client will be able to execute files stored on the NFS
+                server that could be executed if stored on a non-NFS file
+                system, unless the client's execution subsystem also checks for
+                execute permission bits.
+              </t>
+
+              <t>
+                Even if the execution subsystem is checking for execute
+                permission bits, there are more potential issues.  For example,
+                suppose the client is invoking access() to build a "path search
+                table" of all executable files in the user's "search path",
+                where the path is a list of directories each containing
+                executable files.  Suppose there are two files each in separate
+                directories of the search path, such that files have the same
+                component name.  In the first directory the file has no execute
+                permission bits set, and in the second directory the file has
+                execute bits set.  The path search table will indicate that the
+                first directory has the executable file, but the execute
+                subsystem will fail to execute it.  The command shell might
+                fail to try the second file in the second directory.  And even
+                if it did, this is a potential performance issue.  Clearly, the
+                desired outcome for the client is for the path search table to
+                not contain the first file.
+              </t>
+            </list>
+          </t>
+        </list>
+      </t>
+
+      <t>
+        To deal with the problems described above, the "smart client, stupid
+        server" principle is used.  The client owns overall responsibility
+        for determining execute access and relies on the server to parse the
+        execution permissions within the file's mode, acl, and dacl
+        attributes.  The rules for the client and server follow:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            If the client is sending ACCESS in order to determine if the user
+            can read the file, the client SHOULD set ACCESS4_READ in the
+            request's access field.
+          </t>
+
+          <t>
+            If the client's operating environment only grants execution to the
+            user if the user has execute access according to the execute
+            permissions in the mode, acl, and dacl attributes, then if the
+            client wants to determine execute access, the client SHOULD send
+            an ACCESS request with ACCESS4_EXECUTE bit set in the request's
+            access field.
+          </t>
+
+          <t>
+            If the client's operating environment grants execution to the user
+            even if the user does not have execute access according to the
+            execute permissions in the mode, acl, and dacl attributes, then if
+            the client wants to determine execute access, it SHOULD send an
+            ACCESS request with both the ACCESS4_EXECUTE and ACCESS4_READ bits
+            set in the request's access field.  This way, if any read or
+            execute permission grants the user read or execute access (or if
+            the server interprets the user as privileged), as indicated by the
+            presence of ACCESS4_EXECUTE and/or ACCESS4_READ in the reply's
+            access field, the client will be able to grant the user execute
+            access to the file.
+          </t>
+
+          <t>
+            If the server supports execute permission bits, or some other
+            method for denoting executability (e.g., the suffix of the name of
+            the file might indicate execute), it MUST check only execute
+            permissions, not read permissions, when determining whether or not
+            the reply will have ACCESS4_EXECUTE set in the access field.  The
+            server MUST NOT also examine read permission bits when determining
+            whether or not the reply will have ACCESS4_EXECUTE set in the
+            access field.  Even if the server's operating environment would
+            grant execute access to the user (e.g., the user is privileged),
+            the server MUST NOT reply with ACCESS4_EXECUTE set in reply's
+            access field unless there is at least one execute permission bit
+            set in the mode, acl, or dacl attributes.  In the case of acl and
+            dacl, the "one execute permission bit" MUST be an ACE4_EXECUTE bit
+            set in an ALLOW ACE.
+          </t>
+
+          <t>
+            If the server does not support execute permission bits or some
+            other method for denoting executability, it MUST NOT set
+            ACCESS4_EXECUTE in the reply's supported and access fields.  If
+            the client set ACCESS4_EXECUTE in the ACCESS request's access
+            field, and ACCESS4_EXECUTE is not set in the reply's supported
+            field, then the client will have to send an ACCESS request with
+            the ACCESS4_READ bit set in the request's access field.
+          </t>
+
+          <t>
+            If the server supports read permission bits, it MUST only check
+            for read permissions in the mode, acl, and dacl attributes when it
+            receives an ACCESS request with ACCESS4_READ set in the access
+            field.  The server MUST NOT also examine execute permission bits
+            when determining whether the reply will have ACCESS4_READ set in
+            the access field or not.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        Note that if the ACCESS reply has ACCESS4_READ or ACCESS_EXECUTE set,
+        then the user also has permissions to OPEN (<xref target="op_OPEN" />) or READ
+        (<xref target="op_READ" />) the file.  In other words, if the client sends an
+        ACCESS request with the ACCESS4_READ and ACCESS_EXECUTE set in the
+        access field (or two separate requests, one with ACCESS4_READ set and
+        the other with ACCESS4_EXECUTE set), and the reply has just
+        ACCESS4_EXECUTE set in the access field (or just one reply has
+        ACCESS4_EXECUTE set), then the user has authorization to OPEN or READ
+        the file.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_ACCESS:I" title="IMPLEMENTATION">
+      <t>
+        In general, it is not sufficient for the client to attempt to deduce
+        access permissions by inspecting the uid, gid, and mode fields in the
+        file attributes or by attempting to interpret the contents of the ACL
+        attribute.  This is because the server may perform uid or gid mapping
+        or enforce additional access-control restrictions.  It is also
+        possible that the server may not be in the same ID space as the
+        client.  In these cases (and perhaps others), the client cannot
+        reliably perform an access check with only current file attributes.
+      </t>
+
+      <t>
+        In the NFSv2 protocol, the only reliable way to determine whether an
+        operation was allowed was to try it and see if it succeeded or
+        failed.  Using the ACCESS operation in the NFSv4.1 protocol, the
+        client can ask the server to indicate whether or not one or more
+        classes of operations are permitted.  The ACCESS operation is
+        provided to allow clients to check before doing a series of
+        operations that will result in an access failure.  The OPEN operation
+        provides a point where the server can verify access to the file
+        object and a method to return that information to the client.  The
+        ACCESS operation is still useful for directory operations or for use
+        in the case that the UNIX interface access() is used on the client.
+      </t>
+
+      <t>
+        The information returned by the server in response to an ACCESS call
+        is not permanent.  It was correct at the exact time that the server
+        performed the checks, but not necessarily afterwards.  The server can
+        revoke access permission at any time.
+      </t>
+
+      <t>
+        The client should use the effective credentials of the user to build
+        the authentication information in the ACCESS request used to
+        determine access rights.  It is the effective user and group
+        credentials that are used in subsequent READ and WRITE operations.
+      </t>
+
+      <t>
+        Many implementations do not directly support the ACCESS4_DELETE
+        permission.  Operating systems like UNIX will ignore the
+        ACCESS4_DELETE bit if set on an access request on a non-directory
+        object.  In these systems, delete permission on a file is determined
+        by the access permissions on the directory in which the file resides,
+        instead of being determined by the permissions of the file itself.
+        Therefore, the mask returned enumerating which access rights can be
+        determined will have the ACCESS4_DELETE value set to 0.  This
+        indicates to the client that the server was unable to check that
+        particular access right.  The ACCESS4_DELETE bit in the access mask
+        returned will then be ignored by the client.
+      </t>
+    </section>
+  </section>
+

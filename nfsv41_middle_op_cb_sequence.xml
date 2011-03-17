@@ -1,0 +1,107 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_CB_SEQUENCE" title="Operation 11: CB_SEQUENCE - Supply Backchannel Sequencing and Control">
+    <section toc='exclude' anchor="ss:op_CB_SEQUENCE:A" title="ARGUMENT">
+      <?rfc include='autogen/cb_sequence_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_SEQUENCE:R" title="RESULT">
+      <?rfc include='autogen/cb_sequence_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_SEQUENCE:D" title="DESCRIPTION">
+      <t>
+        The CB_SEQUENCE operation is used to manage operational accounting
+        for the backchannel of the session on which a request is sent.  The
+        contents include the session ID to which this request belongs, the
+        slot ID and sequence ID used by the server to implement session
+        request control and exactly once semantics, and exchanged slot ID
+        maxima that are used to adjust the size of the reply cache.  In each
+        CB_COMPOUND request, CB_SEQUENCE MUST appear once and MUST be the
+        first operation.  The error NFS4ERR_SEQUENCE_POS MUST be returned
+        when CB_SEQUENCE is found in any position in a CB_COMPOUND beyond the
+        first.  If any other operation is in the first position of
+        CB_COMPOUND, NFS4ERR_OP_NOT_IN_SESSION MUST be returned.
+      </t>
+
+      <t>
+        See <xref target="ss:op_SEQUENCE:D" /> for a description of how slots are processed.
+      </t>
+
+      <t>
+        If csa_cachethis is TRUE, then the server is requesting that the
+        client cache the reply in the callback reply cache.  The client MUST
+        cache the reply (see <xref target="ss:core_infrastructure:ORC" />).
+      </t>
+
+      <t>
+        The csa_referring_call_lists array is the list of COMPOUND requests,
+        identified by session ID, slot ID, and sequence ID.  These are
+        requests that the client previously sent to the server.  These
+        previous requests created state that some operation(s) in the same
+        CB_COMPOUND as the csa_referring_call_lists are identifying.  A
+        session ID is included because leased state is tied to a client ID,
+        and a client ID can have multiple sessions.  See <xref target="ss:core_infrastructure:RSCR" />.
+      </t>
+
+      <t>
+        The value of the csa_sequenceid argument relative to the cached
+        sequence ID on the slot falls into one of three cases.
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            If the difference between csa_sequenceid and the client's cached
+            sequence ID at the slot ID is two (2) or more, or if
+            csa_sequenceid is less than the cached sequence ID (accounting for
+            wraparound of the unsigned sequence ID value), then the client
+            MUST return NFS4ERR_SEQ_MISORDERED.
+          </t>
+
+          <t>
+            If csa_sequenceid and the cached sequence ID are the same, this is
+            a retry, and the client returns the CB_COMPOUND request's cached
+            reply.
+          </t>
+
+          <t>
+            If csa_sequenceid is one greater (accounting for wraparound) than
+            the cached sequence ID, then this is a new request, and the slot's
+            sequence ID is incremented.  The operations subsequent to
+            CB_SEQUENCE, if any, are processed.  If there are no other
+            operations, the only other effects are to cache the CB_SEQUENCE
+            reply in the slot, maintain the session's activity, and when the
+            server receives the CB_SEQUENCE reply, renew the lease of state
+            related to the client ID.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        If the server reuses a slot ID and sequence ID for a completely
+        different request, the client MAY treat the request as if it is a
+        retry of what it has already executed.  The client MAY however detect
+        the server's illegal reuse and return NFS4ERR_SEQ_FALSE_RETRY.
+      </t>
+
+      <t>
+        If CB_SEQUENCE returns an error, then the state of the slot (sequence
+        ID, cached reply) MUST NOT change.  See <xref target="ss:core_infrastructure:ORC" /> for the
+        conditions when the error NFS4ERR_RETRY_UNCACHED_REP might be
+        returned.
+      </t>
+
+      <t>
+        The client returns two "highest_slotid" values: csr_highest_slotid
+        and csr_target_highest_slotid.  The former is the highest slot ID the
+        client will accept in a future CB_SEQUENCE operation, and SHOULD NOT
+        be less than the value of csa_highest_slotid (but see
+        <xref target="ss:core_infrastructure:SIaRC" /> for an exception).  The latter is the highest slot
+        ID the client would prefer the server use on a future CB_SEQUENCE
+        operation.
+      </t>
+    </section>
+  </section>
+

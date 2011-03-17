@@ -1,0 +1,3029 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+<section anchor="sec:multi-server_namespace" title="Multi-Server Namespace">
+  <t>
+    NFSv4.1 supports attributes that allow a namespace to extend beyond
+    the boundaries of a single server.  It is RECOMMENDED that clients
+    and servers support construction of such multi-server namespaces.
+    Use of such multi-server namespaces is OPTIONAL, however, and for
+    many purposes, single-server namespaces are perfectly acceptable.
+    Use of multi-server namespaces can provide many advantages, however,
+    by separating a file system's logical position in a namespace from
+    the (possibly changing) logistical and administrative considerations
+    that result in particular file systems being located on particular
+    servers.
+  </t>
+
+  <section anchor="ss:multi-server_namespace:LA" title="Location Attributes">
+    <t>
+      NFSv4.1 contains RECOMMENDED attributes that allow file systems on
+      one server to be associated with one or more instances of that file
+      system on other servers.  These attributes specify such file system
+      instances by specifying a server address target (either as a DNS name
+      representing one or more IP addresses or as a literal IP address)
+      together with the path of that file system within the associated
+      single-server namespace.
+    </t>
+
+    <t>
+      The fs_locations_info RECOMMENDED attribute allows specification of
+      one or more file system instance locations where the data
+      corresponding to a given file system may be found.  This attribute
+      provides to the client, in addition to information about file system
+      instance locations, significant information about the various file
+      system instance choices (e.g., priority for use, writability,
+      currency, etc.).  It also includes information to help the client
+      efficiently effect as seamless a transition as possible among
+      multiple file system instances, when and if that should be necessary.
+    </t>
+
+    <t>
+      The fs_locations RECOMMENDED attribute is inherited from NFSv4.0 and
+      only allows specification of the file system locations where the data
+      corresponding to a given file system may be found.  Servers SHOULD
+      make this attribute available whenever fs_locations_info is
+      supported, but client use of fs_locations_info is to be preferred.
+    </t>
+  </section>
+
+  <section anchor="ss:multi-server_namespace:FSPoA" title="File System Presence or Absence">
+    <t>
+      A given location in an NFSv4.1 namespace (typically but not
+      necessarily a multi-server namespace) can have a number of file
+      system instance locations associated with it (via the fs_locations or
+      fs_locations_info attribute).  There may also be an actual current
+      file system at that location, accessible via normal namespace
+      operations (e.g., LOOKUP).  In this case, the file system is said to
+      be "present" at that position in the namespace, and clients will
+      typically use it, reserving use of additional locations specified via
+      the location-related attributes to situations in which the principal
+      location is no longer available.
+    </t>
+
+    <t>
+      When there is no actual file system at the namespace location in
+      question, the file system is said to be "absent".  An absent file
+      system contains no files or directories other than the root.  Any
+      reference to it, except to access a small set of attributes useful in
+      determining alternate locations, will result in an error,
+      NFS4ERR_MOVED.  Note that if the server ever returns the error
+      NFS4ERR_MOVED, it MUST support the fs_locations attribute and SHOULD
+      support the fs_locations_info and fs_status attributes.
+    </t>
+
+    <t>
+      While the error name suggests that we have a case of a file system
+      that once was present, and has only become absent later, this is only
+      one possibility.  A position in the namespace may be permanently
+      absent with the set of file system(s) designated by the location
+      attributes being the only realization.  The name NFS4ERR_MOVED
+      reflects an earlier, more limited conception of its function, but
+      this error will be returned whenever the referenced file system is
+      absent, whether it has moved or not.
+    </t>
+
+    <t>
+      Except in the case of GETATTR-type operations (to be discussed
+      later), when the current filehandle at the start of an operation is
+      within an absent file system, that operation is not performed and the
+      error NFS4ERR_MOVED is returned, to indicate that the file system is
+      absent on the current server.
+    </t>
+
+    <t>
+      Because a GETFH cannot succeed if the current filehandle is within an
+      absent file system, filehandles within an absent file system cannot
+      be transferred to the client.  When a client does have filehandles
+      within an absent file system, it is the result of obtaining them when
+      the file system was present, and having the file system become absent
+      subsequently.
+    </t>
+
+    <t>
+      It should be noted that because the check for the current filehandle
+      being within an absent file system happens at the start of every
+      operation, operations that change the current filehandle so that it
+      is within an absent file system will not result in an error.  This
+      allows such combinations as PUTFH-GETATTR and LOOKUP-GETATTR to be
+      used to get attribute information, particularly location attribute
+      information, as discussed below.
+    </t>
+
+    <t>
+      The RECOMMENDED file system attribute fs_status can be used to
+      interrogate the present/absent status of a given file system.
+    </t>
+  </section>
+
+  <section anchor="ss:multi-server_namespace:GAfaAFS" title="Getting Attributes for an Absent File System">
+    <t>
+      When a file system is absent, most attributes are not available, but
+      it is necessary to allow the client access to the small set of
+      attributes that are available, and most particularly those that give
+      information about the correct current locations for this file system:
+      fs_locations and fs_locations_info.
+    </t>
+
+    <section toc='exclude' anchor="ss:multi-server_namespace:GwaAFS" title="GETATTR within an Absent File System">
+      <t>
+        As mentioned above, an exception is made for GETATTR in that
+        attributes may be obtained for a filehandle within an absent file
+        system.  This exception only applies if the attribute mask contains
+        at least one attribute bit that indicates the client is interested in
+        a result regarding an absent file system: fs_locations,
+        fs_locations_info, or fs_status.  If none of these attributes is
+        requested, GETATTR will result in an NFS4ERR_MOVED error.
+      </t>
+
+      <t>
+        When a GETATTR is done on an absent file system, the set of supported
+        attributes is very limited.  Many attributes, including those that
+        are normally REQUIRED, will not be available on an absent file
+        system.  In addition to the attributes mentioned above (fs_locations,
+        fs_locations_info, fs_status), the following attributes SHOULD be
+        available on absent file systems.  In the case of RECOMMENDED
+        attributes, they should be available at least to the same degree that
+        they are available on present file systems.
+      </t>
+
+      <t>
+        <list style='hanging'>
+          <t hangText='change_policy:'>
+            This attribute is useful for absent file systems and
+            can be helpful in summarizing to the client when any of the
+            location-related attributes change.
+          </t>
+
+          <t hangText='fsid:'>
+            This attribute should be provided so that the client can
+            determine file system boundaries, including, in particular, the
+            boundary between present and absent file systems.  This value must
+            be different from any other fsid on the current server and need
+            have no particular relationship to fsids on any particular
+            destination to which the client might be directed.
+          </t>
+
+          <t hangText='mounted_on_fileid:'>
+            For objects at the top of an absent file system,
+            this attribute needs to be available.  Since the fileid is within
+            the present parent file system, there should be no need to
+            reference the absent file system to provide this information.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        Other attributes SHOULD NOT be made available for absent file
+        systems, even when it is possible to provide them.  The server should
+        not assume that more information is always better and should avoid
+        gratuitously providing additional information.
+      </t>
+
+      <t>
+        When a GETATTR operation includes a bit mask for one of the
+        attributes fs_locations, fs_locations_info, or fs_status, but where
+        the bit mask includes attributes that are not supported, GETATTR will
+        not return an error, but will return the mask of the actual
+        attributes supported with the results.
+      </t>
+
+      <t>
+        Handling of VERIFY/NVERIFY is similar to GETATTR in that if the
+        attribute mask does not include fs_locations, fs_locations_info, or
+        fs_status, the error NFS4ERR_MOVED will result.  It differs in that
+        any appearance in the attribute mask of an attribute not supported
+        for an absent file system (and note that this will include some
+        normally REQUIRED attributes) will also cause an NFS4ERR_MOVED
+        result.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:multi-server_namespace:RaAFS" title="READDIR and Absent File Systems">
+      <t>
+        A READDIR performed when the current filehandle is within an absent
+        file system will result in an NFS4ERR_MOVED error, since, unlike the
+        case of GETATTR, no such exception is made for READDIR.
+      </t>
+
+      <t>
+        Attributes for an absent file system may be fetched via a READDIR for
+        a directory in a present file system, when that directory contains
+        the root directories of one or more absent file systems.  In this
+        case, the handling is as follows:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            If the attribute set requested includes one of the attributes
+            fs_locations, fs_locations_info, or fs_status, then fetching of
+            attributes proceeds normally and no NFS4ERR_MOVED indication is
+            returned, even when the rdattr_error attribute is requested.
+          </t>
+
+          <t>
+            If the attribute set requested does not include one of the
+            attributes fs_locations, fs_locations_info, or fs_status, then if
+            the rdattr_error attribute is requested, each directory entry for
+            the root of an absent file system will report NFS4ERR_MOVED as the
+            value of the rdattr_error attribute.
+          </t>
+
+          <t>
+            If the attribute set requested does not include any of the
+            attributes fs_locations, fs_locations_info, fs_status, or
+            rdattr_error, then the occurrence of the root of an absent file
+            system within the directory will result in the READDIR failing
+            with an NFS4ERR_MOVED error.
+          </t>
+
+          <t>
+            The unavailability of an attribute because of a file system's
+            absence, even one that is ordinarily REQUIRED, does not result in
+            any error indication.  The set of attributes returned for the root
+            directory of the absent file system in that case is simply
+            restricted to those actually available.
+          </t>
+        </list>
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:multi-server_namespace:UoLI" title="Uses of Location Information">
+    <t>
+      The location-bearing attributes (fs_locations and fs_locations_info),
+      together with the possibility of absent file systems, provide a
+      number of important facilities in providing reliable, manageable, and
+      scalable data access.
+    </t>
+
+    <t>
+      When a file system is present, these attributes can provide
+      alternative locations, to be used to access the same data, in the
+      event of server failures, communications problems, or other
+      difficulties that make continued access to the current file system
+      impossible or otherwise impractical.  Under some circumstances,
+      multiple alternative locations may be used simultaneously to provide
+      higher-performance access to the file system in question.  Provision
+      of such alternate locations is referred to as "replication" although
+      there are cases in which replicated sets of data are not in fact
+      present, and the replicas are instead different paths to the same
+      data.
+    </t>
+
+    <t>
+      When a file system is present and becomes absent, clients can be
+      given the opportunity to have continued access to their data, at an
+      alternate location.  In this case, a continued attempt to use the
+      data in the now-absent file system will result in an NFS4ERR_MOVED
+      error and, at that point, the successor locations (typically only one
+      although multiple choices are possible) can be fetched and used to
+      continue access.  Transfer of the file system contents to the new
+      location is referred to as "migration", but it should be kept in mind
+      that there are cases in which this term can be used, like
+      "replication", when there is no actual data migration per se.
+    </t>
+
+    <t>
+      Where a file system was not previously present, specification of file
+      system location provides a means by which file systems located on one
+      server can be associated with a namespace defined by another server,
+      thus allowing a general multi-server namespace facility.  A
+      designation of such a location, in place of an absent file system, is
+      called a "referral".
+    </t>
+
+    <t>
+      Because client support for location-related attributes is OPTIONAL, a
+      server may (but is not required to) take action to hide migration and
+      referral events from such clients, by acting as a proxy, for example.
+      The server can determine the presence of client support from the
+      arguments of the EXCHANGE_ID operation (see <xref target="ss:op_EXCHANGE_ID:D" />).
+    </t>
+
+    <section toc='exclude' anchor="ss:multi-server_namespace:FSR" title="File System Replication">
+      <t>
+        The fs_locations and fs_locations_info attributes provide alternative
+        locations, to be used to access data in place of or in addition to
+        the current file system instance.  On first access to a file system,
+        the client should obtain the value of the set of alternate locations
+        by interrogating the fs_locations or fs_locations_info attribute,
+        with the latter being preferred.
+      </t>
+
+      <t>
+        In the event that server failures, communications problems, or other
+        difficulties make continued access to the current file system
+        impossible or otherwise impractical, the client can use the alternate
+        locations as a way to get continued access to its data.  Depending on
+        specific attributes of these alternate locations, as indicated within
+        the fs_locations_info attribute, multiple locations may be used
+        simultaneously, to provide higher performance through the
+        exploitation of multiple paths between client and target file system.
+      </t>
+
+      <t>
+        The alternate locations may be physical replicas of the (typically
+        read-only) file system data, or they may reflect alternate paths to
+        the same server or provide for the use of various forms of server
+        clustering in which multiple servers provide alternate ways of
+        accessing the same physical file system.  How these different modes
+        of file system transition are represented within the fs_locations and
+        fs_locations_info attributes and how the client deals with file
+        system transition issues will be discussed in detail below.
+      </t>
+
+      <t>
+        Multiple server addresses, whether they are derived from a single
+        entry with a DNS name representing a set of IP addresses or from
+        multiple entries each with its own server address, may correspond to
+        the same actual server.  The fact that two addresses correspond to
+        the same server is shown by a common so_major_id field within the
+        eir_server_owner field returned by EXCHANGE_ID (see <xref target="ss:op_EXCHANGE_ID:D" />).
+      </t>
+
+      <t>
+        For a detailed discussion of how server address targets interact with
+        the determination of server identity specified by the server owner
+        field, see <xref target="ss:multi-server_namespace:LEaSI" />.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:multi-server_namespace:FSM" title="File System Migration">
+      <t>
+        When a file system is present and becomes absent, clients can be
+        given the opportunity to have continued access to their data, at an
+        alternate location, as specified by the fs_locations or
+        fs_locations_info attribute.  Typically, a client will be accessing
+        the file system in question, get an NFS4ERR_MOVED error, and then use
+        the fs_locations or fs_locations_info attribute to determine the new
+        location of the data.  When fs_locations_info is used, additional
+        information will be available that will define the nature of the
+        client's handling of the transition to a new server.
+      </t>
+
+      <t>
+        Such migration can be helpful in providing load balancing or general
+        resource reallocation.  The protocol does not specify how the file
+        system will be moved between servers.  It is anticipated that a
+        number of different server-to-server transfer mechanisms might be
+        used with the choice left to the server implementor.  The NFSv4.1
+        protocol specifies the method used to communicate the migration event
+        between client and server.
+      </t>
+
+      <t>
+        The new location may be an alternate communication path to the same
+        server or, in the case of various forms of server clustering, another
+        server providing access to the same physical file system.  The
+        client's responsibilities in dealing with this transition depend on
+        the specific nature of the new access path as well as how and whether
+        data was in fact migrated.  These issues will be discussed in detail
+        below.
+      </t>
+
+      <t>
+        When multiple server addresses correspond to the same actual server,
+        as shown by a common value for the so_major_id field of the
+        eir_server_owner field returned by EXCHANGE_ID, the location or
+        locations may designate alternate server addresses in the form of
+        specific server network addresses.  These can be used to access the
+        file system in question at those addresses and when it is no longer
+        accessible at the original address.
+      </t>
+
+      <t>
+        Although a single successor location is typical, multiple locations
+        may be provided, together with information that allows priority among
+        the choices to be indicated, via information in the fs_locations_info
+        attribute.  Where suitable, clustering mechanisms make it possible to
+        provide multiple identical file systems or paths to them; this allows
+        the client the opportunity to deal with any resource or
+        communications issues that might limit data availability.
+      </t>
+
+      <t>
+        When an alternate location is designated as the target for migration,
+        it must designate the same data (with metadata being the same to the
+        degree indicated by the fs_locations_info attribute).  Where file
+        systems are writable, a change made on the original file system must
+        be visible on all migration targets.  Where a file system is not
+        writable but represents a read-only copy (possibly periodically
+        updated) of a writable file system, similar requirements apply to the
+        propagation of updates.  Any change visible in the original file
+        system must already be effected on all migration targets, to avoid
+        any possibility that a client, in effecting a transition to the
+        migration target, will see any reversion in file system state.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:multi-server_namespace:R" title="Referrals">
+      <t>
+        Referrals provide a way of placing a file system in a location within
+        the namespace essentially without respect to its physical location on
+        a given server.  This allows a single server or a set of servers to
+        present a multi-server namespace that encompasses file systems
+        located on multiple servers.  Some likely uses of this include
+        establishment of site-wide or organization-wide namespaces, or even
+        knitting such together into a truly global namespace.
+      </t>
+     
+      <t>
+        Referrals occur when a client determines, upon first referencing a
+        position in the current namespace, that it is part of a new file
+        system and that the file system is absent.  When this occurs,
+        typically by receiving the error NFS4ERR_MOVED, the actual location
+        or locations of the file system can be determined by fetching the
+        fs_locations or fs_locations_info attribute.
+      </t>
+     
+      <t>
+        The locations-related attribute may designate a single file system
+        location or multiple file system locations, to be selected based on
+        the needs of the client.  The server, in the fs_locations_info
+        attribute, may specify priorities to be associated with various file
+        system location choices.  The server may assign different priorities
+        to different locations as reported to individual clients, in order to
+        adapt to client physical location or to effect load balancing.  When
+        both read-only and read-write file systems are present, some of the
+        read-only locations might not be absolutely up-to-date (as they would
+        have to be in the case of replication and migration).  Servers may
+        also specify file system locations that include client-substituted
+        variables so that different clients are referred to different file
+        systems (with different data contents) based on client attributes
+        such as CPU architecture.
+      </t>
+     
+      <t>
+        When the fs_locations_info attribute indicates that there are
+        multiple possible targets listed, the relationships among them may be
+        important to the client in selecting which one to use.  The same
+        rules specified in <xref target="ss:multi-server_namespace:FSR" /> defining the appropriate standards
+        for the data propagation apply to these multiple replicas as well.
+        For example, the client might prefer a writable target on a server
+        that has additional writable replicas to which it subsequently might
+        switch.  Note that, as distinguished from the case of replication,
+        there is no need to deal with the case of propagation of updates made
+        by the current client, since the current client has not accessed the
+        file system in question.
+      </t>
+     
+      <t>
+        Use of multi-server namespaces is enabled by NFSv4.1 but is not
+        required.  The use of multi-server namespaces and their scope will
+        depend on the applications used and system administration
+        preferences.
+      </t>
+     
+      <t>
+        Multi-server namespaces can be established by a single server
+        providing a large set of referrals to all of the included file
+        systems.  Alternatively, a single multi-server namespace may be
+        administratively segmented with separate referral file systems (on
+        separate servers) for each separately administered portion of the
+        namespace.  The top-level referral file system or any segment may use
+        replicated referral file systems for higher availability.
+      </t>
+     
+      <t>
+        Generally, multi-server namespaces are for the most part uniform, in
+        that the same data made available to one client at a given location
+        in the namespace is made available to all clients at that location.
+        However, there are facilities provided that allow different clients
+        to be directed to different sets of data, so as to adapt to such
+        client characteristics as CPU architecture.
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:multi-server_namespace:LEaSI" title="Location Entries and Server Identity">
+    <t>
+      As mentioned above, a single location entry may have a server address
+      target in the form of a DNS name that may represent multiple IP
+      addresses, while multiple location entries may have their own server
+      address targets that reference the same server.  Whether two IP
+      addresses designate the same server is indicated by the existence of
+      a common so_major_id field within the eir_server_owner field returned
+      by EXCHANGE_ID (see <xref target="ss:op_EXCHANGE_ID:D" />), subject to further verification
+      (for details see <xref target="ss:core_infrastructure:T" />).
+    </t>
+
+    <t>
+      When multiple addresses for the same server exist, the client may
+      assume that for each file system in the namespace of a given server
+      network address, there exist file systems at corresponding namespace
+      locations for each of the other server network addresses.  It may do
+      this even in the absence of explicit listing in fs_locations and
+      fs_locations_info.  Such corresponding file system locations can be
+      used as alternate locations, just as those explicitly specified via
+      the fs_locations and fs_locations_info attributes.  Where these
+      specific addresses are explicitly designated in the fs_locations_info
+      attribute, the conditions of use specified in this attribute (e.g.,
+      priorities, specification of simultaneous use) may limit the client's
+      use of these alternate locations.
+    </t>
+
+    <t>
+      If a single location entry designates multiple server IP addresses,
+      the client cannot assume that these addresses are multiple paths to
+      the same server.  In most cases, they will be, but the client MUST
+      verify that before acting on that assumption.  When two server
+      addresses are designated by a single location entry and they
+      correspond to different servers, this normally indicates some sort of
+      misconfiguration, and so the client should avoid using such location
+      entries when alternatives are available.  When they are not, clients
+      should pick one of IP addresses and use it, without using others that
+      are not directed to the same server.
+    </t>
+  </section>
+
+  <section anchor="ss:multi-server_namespace:ACC" title="Additional Client-Side Considerations">
+    <t>
+      When clients make use of servers that implement referrals,
+      replication, and migration, care should be taken that a user who
+      mounts a given file system that includes a referral or a relocated
+      file system continues to see a coherent picture of that user-side
+      file system despite the fact that it contains a number of server-side
+      file systems that may be on different servers.
+    </t>
+
+    <t>
+      One important issue is upward navigation from the root of a
+      server-side file system to its parent (specified as ".." in UNIX), in the
+      case in which it transitions to that file system as a result of
+      referral, migration, or a transition as a result of replication.
+      When the client is at such a point, and it needs to ascend to the
+      parent, it must go back to the parent as seen within the multi-server
+      namespace rather than sending a LOOKUPP operation to the server,
+      which would result in the parent within that server's single-server
+      namespace.  In order to do this, the client needs to remember the
+      filehandles that represent such file system roots and use these
+      instead of sending a LOOKUPP operation to the current server.  This
+      will allow the client to present to applications a consistent
+      namespace, where upward navigation and downward navigation are
+      consistent.
+    </t>
+
+    <t>
+      Another issue concerns refresh of referral locations.  When referrals
+      are used extensively, they may change as server configurations
+      change.  It is expected that clients will cache information related
+      to traversing referrals so that future client-side requests are
+      resolved locally without server communication.  This is usually
+      rooted in client-side name look up caching.  Clients should
+      periodically purge this data for referral points in order to detect
+      changes in location information.  When the change_policy attribute
+      changes for directories that hold referral entries or for the
+      referral entries themselves, clients should consider any associated
+      cached referral information to be out of date.
+    </t>
+  </section>
+
+  <section anchor="ss:multi-server_namespace:EFST" title="Effecting File System Transitions">
+    <t>
+      Transitions between file system instances, whether due to switching
+      between replicas upon server unavailability or to server-initiated
+      migration events, are best dealt with together.  This is so even
+      though, for the server, pragmatic considerations will normally force
+      different implementation strategies for planned and unplanned
+      transitions.  Even though the prototypical use cases of replication
+      and migration contain distinctive sets of features, when all
+      possibilities for these operations are considered, there is an
+      underlying unity of these operations, from the client's point of
+      view, that makes treating them together desirable.
+    </t>
+
+    <t>
+      A number of methods are possible for servers to replicate data and to
+      track client state in order to allow clients to transition between
+      file system instances with a minimum of disruption.  Such methods
+      vary between those that use inter-server clustering techniques to
+      limit the changes seen by the client, to those that are less
+      aggressive, use more standard methods of replicating data, and impose
+      a greater burden on the client to adapt to the transition.
+    </t>
+
+    <t>
+      The NFSv4.1 protocol does not impose choices on clients and servers
+      with regard to that spectrum of transition methods.  In fact, there
+      are many valid choices, depending on client and application
+      requirements and their interaction with server implementation
+      choices.  The NFSv4.1 protocol does define the specific choices that
+      can be made, how these choices are communicated to the client, and
+      how the client is to deal with any discontinuities.
+    </t>
+
+    <t>
+      In the sections below, references will be made to various possible
+      server implementation choices as a way of illustrating the transition
+      scenarios that clients may deal with.  The intent here is not to
+      define or limit server implementations but rather to illustrate the
+      range of issues that clients may face.
+    </t>
+
+    <t>
+      In the discussion below, references will be made to a file system
+      having a particular property or to two file systems (typically the
+      source and destination) belonging to a common class of any of several
+      types.  Two file systems that belong to such a class share some
+      important aspects of file system behavior that clients may depend
+      upon when present, to easily effect a seamless transition between
+      file system instances.  Conversely, where the file systems do not
+      belong to such a common class, the client has to deal with various
+      sorts of implementation discontinuities that may cause performance or
+      other issues in effecting a transition.
+    </t>
+
+    <t>
+      Where the fs_locations_info attribute is available, such file system
+      classification data will be made directly available to the client
+      (see <xref target="ss:multi-server_namespace:TAf1" /> for details).  When only fs_locations is
+      available, default assumptions with regard to such classifications
+      have to be inferred (see <xref target="ss:multi-server_namespace:TAf" /> for details).
+    </t>
+
+    <t>
+      In cases in which one server is expected to accept opaque values from
+      the client that originated from another server, the servers SHOULD
+      encode the "opaque" values in big-endian byte order.  If this is
+      done, servers acting as replicas or immigrating file systems will be
+      able to parse values like stateids, directory cookies, filehandles,
+      etc., even if their native byte order is different from that of other
+      servers cooperating in the replication and migration of the file
+      system.
+    </t>
+
+    <section toc='exclude' anchor="ss:multi-server_namespace:FSTaSA" title="File System Transitions and Simultaneous Access">
+      <t>
+        When a single file system may be accessed at multiple locations,
+        either because of an indication of file system identity as reported
+        by the fs_locations or fs_locations_info attributes or because two
+        file system instances have corresponding locations on server
+        addresses that connect to the same server (as indicated by a common
+        so_major_id field in the eir_server_owner field returned by
+        EXCHANGE_ID), the client will, depending on specific circumstances as
+        discussed below, either:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            Access multiple instances simultaneously, each of which represents
+            an alternate path to the same data and metadata.
+          </t>
+
+          <t>
+            Access one instance (or set of instances) and then transition to
+            an alternative instance (or set of instances) as a result of
+            network issues, server unresponsiveness, or server-directed
+            migration.  The transition may involve changes in filehandles,
+            fileids, the change attribute, and/or locking state, depending on
+            the attributes of the source and destination file system
+            instances, as specified in the fs_locations_info attribute.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        Which of these choices is possible, and how a transition is effected,
+        is governed by equivalence classes of file system instances as
+        reported by the fs_locations_info attribute, and for file system
+        instances in the same location within a multi-homed single-server
+        namespace, as indicated by the value of the so_major_id field of the
+        eir_server_owner field returned by EXCHANGE_ID.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:multi-server_namespace:SUaTT" title="Simultaneous Use and Transparent Transitions">
+      <t>
+        When two file system instances have the same location within their
+        respective single-server namespaces and those two server network
+        addresses designate the same server (as indicated by the same value
+        of the so_major_id field of the eir_server_owner field returned in
+        response to EXCHANGE_ID), those file system instances can be treated
+        as the same, and either used together simultaneously or serially with
+        no transition activity required on the part of the client.  In this
+        case, we refer to the transition as "transparent", and the client in
+        transferring access from one to the other is acting as it would in
+        the event that communication is interrupted, with a new connection
+        and possibly a new session being established to continue access to
+        the same file system.
+      </t>
+
+      <t>
+        Whether simultaneous use of the two file system instances is valid is
+        controlled by whether the fs_locations_info attribute shows the two
+        instances as having the same simultaneous-use class.  See
+        <xref target="ss:multi-server_namespace:TfS" /> for information about the definition of the various
+        use classes, including the simultaneous-use class.
+      </t>
+
+      <t>
+        Note that for two such file systems, any information within the
+        fs_locations_info attribute that indicates the need for special
+        transition activity, i.e., the appearance of the two file system
+        instances with different handle, fileid, write-verifier, change, and
+        readdir classes, indicates a serious problem.  The client, if it
+        allows transition to the file system instance at all, must not treat
+        this as a transparent transition.  The server SHOULD NOT indicate
+        that these instances belong to different handle, fileid,
+        write-verifier, change, and readdir classes, whether or not the two
+        instances are shown belonging to the same simultaneous-use class.
+      </t>
+
+      <t>
+        Where these conditions do not apply, a non-transparent file system
+        instance transition is required with the details depending on the
+        respective handle, fileid, write-verifier, change, and readdir
+        classes of the two file system instances, and whether the two
+        servers' addresses in question have the same eir_server_scope value
+        as reported by EXCHANGE_ID.
+      </t>
+
+      <section toc='exclude' anchor="ss:multi-server_namespace:SUoFSI" title="Simultaneous Use of File System Instances">
+        <t>
+          When the conditions in <xref target="ss:multi-server_namespace:SUaTT" /> hold, in either of the
+          following two cases, the client may use the two file system instances
+          simultaneously.
+        </t>
+
+        <t>
+          <list style='symbols'>
+            <t>
+              The fs_locations_info attribute does not contain separate
+              per-network-address entries for file system instances at the distinct
+              network addresses.  This includes the case in which the
+              fs_locations_info attribute is unavailable.  In this case, the
+              fact that the two server addresses connect to the same server (as
+              indicated by the two addresses sharing the same the so_major_id
+              value and subsequently confirmed as described in <xref target="ss:core_infrastructure:T" />)
+              justifies simultaneous use, and there is no fs_locations_info
+              attribute information contradicting that.
+            </t>
+
+            <t>
+              The fs_locations_info attribute indicates that two file system
+              instances belong to the same simultaneous-use class.
+            </t>
+          </list>
+        </t>
+
+        <t>
+          In this case, the client may use both file system instances
+          simultaneously, as representations of the same file system, whether
+          that happens because the two network addresses connect to the same
+          physical server or because different servers connect to clustered
+          file systems and export their data in common.  When simultaneous use
+          is in effect, any change made to one file system instance must be
+          immediately reflected in the other file system instance(s).  Locks
+          are treated as part of a common lease, associated with a common
+          client ID.  Depending on the details of the eir_server_owner returned
+          by EXCHANGE_ID, the two server instances may be accessed by different
+          sessions or a single session in common.
+        </t>
+      </section>
+
+      <section toc='exclude' anchor="ss:multi-server_namespace:TFST" title="Transparent File System Transitions">
+        <t>
+          When the conditions in <xref target="ss:multi-server_namespace:SUoFSI" /> hold and the
+          fs_locations_info attribute explicitly shows the file system
+          instances for these distinct network addresses as belonging to
+          different simultaneous-use classes, the file system instances should
+          not be used by the client simultaneously.  Rather, they should be
+          used serially with one being used unless and until communication
+          difficulties, lack of responsiveness, or an explicit migration event
+          causes another file system instance (or set of file system instances
+          sharing a common simultaneous-use class) to be used.
+        </t>
+
+        <t>
+          When a change of file system instance is to be done, the client will
+          use the same client ID already in effect.  If the client already has
+          connections to the new server address, these will be used.
+          Otherwise, new connections to existing sessions or new sessions
+          associated with the existing client ID are established as indicated
+          by the eir_server_owner returned by EXCHANGE_ID.
+        </t>
+
+        <t>
+          In all such transparent transition cases, the following apply:
+        </t>
+
+        <t>
+          <list style='symbols'>
+            <t>
+              If filehandles are persistent, they stay the same.  If filehandles
+              are volatile, they either stay the same or expire, but the reason
+              for expiration is not due to the file system transition.
+            </t>
+
+            <t>
+              Fileid values do not change across the transition.
+            </t>
+
+            <t>
+              The file system will have the same fsid in both the old and new
+              locations.
+            </t>
+
+            <t>
+              Change attribute values are consistent across the transition and
+              do not have to be refetched.  When change attributes indicate that
+              a cached object is still valid, it can remain cached.
+            </t>
+
+            <t>
+              Client and state identifiers retain their validity across the
+              transition, except where their staleness is recognized and
+              reported by the new server.  Except where such staleness requires
+              it, no lock reclamation is needed.  Any such staleness is an
+              indication that the server should be considered to have restarted
+              and is reported as discussed in <xref target="ss:state_management:SFaR" />.
+            </t>
+
+            <t>
+              Write verifiers are presumed to retain their validity and can be
+              used to compare with verifiers returned by COMMIT on the new
+              server.  If COMMIT on the new server returns an identical
+              verifier, then it is expected that the new server has all of the
+              data that was written unstably to the original server and has
+              committed that data to stable storage as requested.
+            </t>
+
+            <t>
+              Readdir cookies are presumed to retain their validity and can be
+              presented to subsequent READDIR requests together with the readdir
+              verifier with which they are associated.  When the verifier is
+              accepted as valid, the cookie will continue the READDIR operation
+              so that the entire directory can be obtained by the client.
+            </t>
+          </list>
+        </t>
+      </section>
+    </section>
+
+    <section toc='exclude' anchor="ss:multi-server_namespace:FaFST" title="Filehandles and File System Transitions">
+      <t>
+        There are a number of ways in which filehandles can be handled across
+        a file system transition.  These can be divided into two broad
+        classes depending upon whether the two file systems across which the
+        transition happens share sufficient state to effect some sort of
+        continuity of file system handling.
+      </t>
+
+      <t>
+        When there is no such cooperation in filehandle assignment, the two
+        file systems are reported as being in different handle classes.  In
+        this case, all filehandles are assumed to expire as part of the file
+        system transition.  Note that this behavior does not depend on the
+        fh_expire_type attribute and supersedes the specification of the
+        FH4_VOL_MIGRATION bit, which only affects behavior when
+        fs_locations_info is not available.
+      </t>
+
+      <t>
+        When there is cooperation in filehandle assignment, the two file
+        systems are reported as being in the same handle classes.  In this
+        case, persistent filehandles remain valid after the file system
+        transition, while volatile filehandles (excluding those that are only
+        volatile due to the FH4_VOL_MIGRATION bit) are subject to expiration
+        on the target server.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:multi-server_namespace:FaFST1" title="Fileids and File System Transitions">
+      <t>
+        In NFSv4.0, the issue of continuity of fileids in the event of a file
+        system transition was not addressed.  The general expectation had
+        been that in situations in which the two file system instances are
+        created by a single vendor using some sort of file system image copy,
+        fileids will be consistent across the transition, while in the
+        analogous multi-vendor transitions they will not.  This poses
+        difficulties, especially for the client without special knowledge of
+        the transition mechanisms adopted by the server.  Note that although
+        fileid is not a REQUIRED attribute, many servers support fileids and
+        many clients provide APIs that depend on fileids.
+      </t>
+
+      <t>
+        It is important to note that while clients themselves may have no
+        trouble with a fileid changing as a result of a file system
+        transition event, applications do typically have access to the fileid
+        (e.g., via stat).  The result is that an application may work
+        perfectly well if there is no file system instance transition or if
+        any such transition is among instances created by a single vendor,
+        yet be unable to deal with the situation in which a multi-vendor
+        transition occurs at the wrong time.
+      </t>
+
+      <t>
+        Providing the same fileids in a multi-vendor (multiple server
+        vendors) environment has generally been held to be quite difficult.
+        While there is work to be done, it needs to be pointed out that this
+        difficulty is partly self-imposed.  Servers have typically identified
+        fileid with inode number, i.e. with a quantity used to find the file
+        in question.  This identification poses special difficulties for
+        migration of a file system between vendors where assigning the same
+        index to a given file may not be possible.  Note here that a fileid
+        is not required to be useful to find the file in question, only that
+        it is unique within the given file system.  Servers prepared to
+        accept a fileid as a single piece of metadata and store it apart from
+        the value used to index the file information can relatively easily
+        maintain a fileid value across a migration event, allowing a truly
+        transparent migration event.
+      </t>
+
+      <t>
+        In any case, where servers can provide continuity of fileids, they
+        should, and the client should be able to find out that such
+        continuity is available and take appropriate action.  Information
+        about the continuity (or lack thereof) of fileids across a file
+        system transition is represented by specifying whether the file
+        systems in question are of the same fileid class.
+      </t>
+
+      <t>
+        Note that when consistent fileids do not exist across a transition
+        (either because there is no continuity of fileids or because fileid
+        is not a supported attribute on one of instances involved), and there
+        are no reliable filehandles across a transition event (either because
+        there is no filehandle continuity or because the filehandles are
+        volatile), the client is in a position where it cannot verify that
+        files it was accessing before the transition are the same objects.
+        It is forced to assume that no object has been renamed, and, unless
+        there are guarantees that provide this (e.g., the file system is
+        read-only), problems for applications may occur.  Therefore, use of
+        such configurations should be limited to situations where the
+        problems that this may cause can be tolerated.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:multi-server_namespace:FaFST2" title="Fsids and File System Transitions">
+      <t>
+        Since fsids are generally only unique within a per-server basis, it
+        is likely that they will change during a file system transition.  One
+        exception is the case of transparent transitions, but in that case we
+        have multiple network addresses that are defined as the same server
+        (as specified by a common value of the so_major_id field of
+        eir_server_owner).  Clients should not make the fsids received from
+        the server visible to applications since they may not be globally
+        unique, and because they may change during a file system transition
+        event.  Applications are best served if they are isolated from such
+        transitions to the extent possible.
+      </t>
+
+      <t>
+        Although normally a single source file system will transition to a
+        single target file system, there is a provision for splitting a
+        single source file system into multiple target file systems, by
+        specifying the FSLI4F_MULTI_FS flag.
+      </t>
+
+      <section toc='exclude' anchor="ss:multi-server_namespace:FSS" title="File System Splitting">
+        <t>
+          When a file system transition is made and the fs_locations_info
+          indicates that the file system in question may be split into multiple
+          file systems (via the FSLI4F_MULTI_FS flag), the client SHOULD do
+          GETATTRs to determine the fsid attribute on all known objects within
+          the file system undergoing transition to determine the new file
+          system boundaries.
+        </t>
+
+        <t>
+          Clients may maintain the fsids passed to existing applications by
+          mapping all of the fsids for the descendant file systems to the
+          common fsid used for the original file system.
+        </t>
+
+        <t>
+          Splitting a file system may be done on a transition between file
+          systems of the same fileid class, since the fact that fileids are
+          unique within the source file system ensure they will be unique in
+          each of the target file systems.
+        </t>
+      </section>
+    </section>
+
+    <section toc='exclude' anchor="ss:multi-server_namespace:TCAaFST" title="The Change Attribute and File System Transitions">
+      <t>
+        Since the change attribute is defined as a server-specific one,
+        change attributes fetched from one server are normally presumed to be
+        invalid on another server.  Such a presumption is troublesome since
+        it would invalidate all cached change attributes, requiring
+        refetching.  Even more disruptive, the absence of any assured
+        continuity for the change attribute means that even if the same value
+        is retrieved on refetch, no conclusions can be drawn as to whether
+        the object in question has changed.  The identical change attribute
+        could be merely an artifact of a modified file with a different
+        change attribute construction algorithm, with that new algorithm just
+        happening to result in an identical change value.
+      </t>
+
+      <t>
+        When the two file systems have consistent change attribute formats,
+        and this fact is communicated to the client by reporting in the same
+        change class, the client may assume a continuity of change attribute
+        construction and handle this situation just as it would be handled
+        without any file system transition.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:multi-server_namespace:LSaFST" title="Lock State and File System Transitions">
+      <t>
+        In a file system transition, the client needs to handle cases in
+        which the two servers have cooperated in state management and in
+        which they have not.  Cooperation by two servers in state management
+        requires coordination of client IDs.  Before the client attempts to
+        use a client ID associated with one server in a request to the server
+        of the other file system, it must eliminate the possibility that two
+        non-cooperating servers have assigned the same client ID by accident.
+        The client needs to compare the eir_server_scope values returned by
+        each server.  If the scope values do not match, then the servers have
+        not cooperated in state management.  If the scope values match, then
+        this indicates the servers have cooperated in assigning client IDs to
+        the point that they will reject client IDs that refer to state they
+        do not know about.  See <xref target="ss:core_infrastructure:SS" /> for more information about the
+        use of server scope.
+      </t>
+
+      <t>
+        In the case of migration, the servers involved in the migration of a
+        file system SHOULD transfer all server state from the original to the
+        new server.  When this is done, it must be done in a way that is
+        transparent to the client.  With replication, such a degree of common
+        state is typically not the case.  Clients, however, should use the
+        information provided by the eir_server_scope returned by EXCHANGE_ID
+        (as modified by the validation procedures described in
+        <xref target="ss:core_infrastructure:SS" />) to determine whether such sharing may be in effect,
+        rather than making assumptions based on the reason for the
+        transition.
+      </t>
+
+      <t>
+        This state transfer will reduce disruption to the client when a file
+        system transition occurs.  If the servers are successful in
+        transferring all state, the client can attempt to establish sessions
+        associated with the client ID used for the source file system
+        instance.  If the server accepts that as a valid client ID, then the
+        client may use the existing stateids associated with that client ID
+        for the old file system instance in connection with that same client
+        ID in connection with the transitioned file system instance.  If the
+        client in question already had a client ID on the target system, it
+        may interrogate the stateid values from the source system under that
+        new client ID, with the assurance that if they are accepted as valid,
+        then they represent validly transferred lock state for the source
+        file system, which has been transferred to the target server.
+      </t>
+
+      <t>
+        When the two servers belong to the same server scope, it does not
+        mean that when dealing with the transition, the client will not have
+        to reclaim state.  However, it does mean that the client may proceed
+        using its current client ID when establishing communication with the
+        new server, and the new server will either recognize the client ID as
+        valid or reject it, in which case locks must be reclaimed by the
+        client.
+      </t>
+
+      <t>
+        File systems cooperating in state management may actually share state
+        or simply divide the identifier space so as to recognize (and reject
+        as stale) each other's stateids and client IDs.  Servers that do
+        share state may not do so under all conditions or at all times.  If
+        the server cannot be sure when accepting a client ID that it reflects
+        the locks the client was given, the server must treat all associated
+        state as stale and report it as such to the client.
+      </t>
+
+      <t>
+        When the two file system instances are on servers that do not share a
+        server scope value, the client must establish a new client ID on the
+        destination, if it does not have one already, and reclaim locks if
+        allowed by the server.  In this case, old stateids and client IDs
+        should not be presented to the new server since there is no assurance
+        that they will not conflict with IDs valid on that server.  Note that
+        in this case, lock reclaim may be attempted even when the servers
+        involved in the transfer have different server scope values (see
+        <xref target="ss:state_management:SR" /> for the contrary case of reclaim after server
+        reboot).  Servers with different server scope values may cooperate to
+        allow reclaim for locks associated with the transfer of a file system
+        even if they do not cooperate sufficiently to share a server scope.
+      </t>
+
+      <t>
+        In either case, when actual locks are not known to be maintained, the
+        destination server may establish a grace period specific to the given
+        file system, with non-reclaim locks being rejected for that file
+        system, even though normal locks are being granted for other file
+        systems.  Clients should not infer the absence of a grace period for
+        file systems being transitioned to a server from responses to
+        requests for other file systems.
+      </t>
+
+      <t>
+        In the case of lock reclamation for a given file system after a file
+        system transition, edge conditions can arise similar to those for
+        reclaim after server restart (although in the case of the planned
+        state transfer associated with migration, these can be avoided by
+        securely recording lock state as part of state migration).  Unless
+        the destination server can guarantee that locks will not be
+        incorrectly granted, the destination server should not allow lock
+        reclaims and should avoid establishing a grace period.
+      </t>
+
+      <t>
+        Once all locks have been reclaimed, or there were no locks to
+        reclaim, the client indicates that there are no more reclaims to be
+        done for the file system in question by sending a RECLAIM_COMPLETE
+        operation with the rca_one_fs parameter set to true.  Once this has
+        been done, non-reclaim locking operations may be done, and any
+        subsequent request to do reclaims will be rejected with the error
+        NFS4ERR_NO_GRACE.
+      </t>
+
+      <t>
+        Information about client identity may be propagated between servers
+        in the form of client_owner4 and associated verifiers, under the
+        assumption that the client presents the same values to all the
+        servers with which it deals.
+      </t>
+
+      <t>
+        Servers are encouraged to provide facilities to allow locks to be
+        reclaimed on the new server after a file system transition.  Often,
+        however, in cases in which the two servers do not share a server
+        scope value, such facilities may not be available and the client
+        should be prepared to re-obtain locks, even though it is possible
+        that the client may have its LOCK or OPEN request denied due to a
+        conflicting lock.
+      </t>
+
+      <t>
+        The consequences of having no facilities available to reclaim locks
+        on the new server will depend on the type of environment.  In some
+        environments, such as the transition between read-only file systems,
+        such denial of locks should not pose large difficulties in practice.
+        When an attempt to re-establish a lock on a new server is denied, the
+        client should treat the situation as if its original lock had been
+        revoked.  Note that when the lock is granted, the client cannot
+        assume that no conflicting lock could have been granted in the
+        interim.  Where change attribute continuity is present, the client
+        may check the change attribute to check for unwanted file
+        modifications.  Where even this is not available, and the file system
+        is not read-only, a client may reasonably treat all pending locks as
+        having been revoked.
+      </t>
+
+      <section toc='exclude' anchor="ss:multi-server_namespace:LaFST" title="Leases and File System Transitions">
+        <t>
+          In the case of lease renewal, the client may not be submitting
+          requests for a file system that has been transferred to another
+          server.  This can occur because of the lease renewal mechanism.  The
+          client renews the lease associated with all file systems when
+          submitting a request on an associated session, regardless of the
+          specific file system being referenced.
+        </t>
+
+        <t>
+          In order for the client to schedule renewal of its lease where there
+          is locking state that may have been relocated to the new server, the
+          client must find out about lease relocation before that lease expire.
+          To accomplish this, the SEQUENCE operation will return the status bit
+          SEQ4_STATUS_LEASE_MOVED if responsibility for any of the renewed
+          locking state has been transferred to a new server.  This will
+          continue until the client receives an NFS4ERR_MOVED error for each of
+          the file systems for which there has been locking state relocation.
+        </t>
+
+        <t>
+          When a client receives an SEQ4_STATUS_LEASE_MOVED indication from a
+          server, for each file system of the server for which the client has
+          locking state, the client should perform an operation.  For
+          simplicity, the client may choose to reference all file systems, but
+          what is important is that it must reference all file systems for
+          which there was locking state where that state has moved.  Once the
+          client receives an NFS4ERR_MOVED error for each such file system, the
+          server will clear the SEQ4_STATUS_LEASE_MOVED indication.  The client
+          can terminate the process of checking file systems once this
+          indication is cleared (but only if the client has received a reply
+          for all outstanding SEQUENCE requests on all sessions it has with the
+          server), since there are no others for which locking state has moved.
+        </t>
+
+        <t>
+          A client may use GETATTR of the fs_status (or fs_locations_info)
+          attribute on all of the file systems to get absence indications in a
+          single (or a few) request(s), since absent file systems will not
+          cause an error in this context.  However, it still must do an
+          operation that receives NFS4ERR_MOVED on each file system, in order
+          to clear the SEQ4_STATUS_LEASE_MOVED indication.
+        </t>
+
+        <t>
+          Once the set of file systems with transferred locking state has been
+          determined, the client can follow the normal process to obtain the
+          new server information (through the fs_locations and
+          fs_locations_info attributes) and perform renewal of that lease on
+          the new server, unless information in the fs_locations_info attribute
+          shows that no state could have been transferred.  If the server has
+          not had state transferred to it transparently, the client will
+          receive NFS4ERR_STALE_CLIENTID from the new server, as described
+          above, and the client can then reclaim locks as is done in the event
+          of server failure.
+        </t>
+      </section>
+
+      <section toc='exclude' anchor="ss:multi-server_namespace:TatLA" title="Transitions and the Lease_time Attribute">
+        <t>
+          In order that the client may appropriately manage its lease in the
+          case of a file system transition, the destination server must
+          establish proper values for the lease_time attribute.
+        </t>
+
+        <t>
+          When state is transferred transparently, that state should include
+          the correct value of the lease_time attribute.  The lease_time
+          attribute on the destination server must never be less than that on
+          the source, since this would result in premature expiration of a
+          lease granted by the source server.  Upon transitions in which state
+          is transferred transparently, the client is under no obligation to
+          refetch the lease_time attribute and may continue to use the value
+          previously fetched (on the source server).
+        </t>
+
+        <t>
+          If state has not been transferred transparently, either because the
+          associated servers are shown as having different eir_server_scope
+          strings or because the client ID is rejected when presented to the
+          new server, the client should fetch the value of lease_time on the
+          new (i.e., destination) server, and use it for subsequent locking
+          requests.  However, the server must respect a grace period of at
+          least as long as the lease_time on the source server, in order to
+          ensure that clients have ample time to reclaim their lock before
+          potentially conflicting non-reclaimed locks are granted.
+        </t>
+      </section>
+    </section>
+
+    <section toc='exclude' anchor="ss:multi-server_namespace:WVaFST" title="Write Verifiers and File System Transitions">
+      <t>
+        In a file system transition, the two file systems may be clustered in
+        the handling of unstably written data.  When this is the case, and
+        the two file systems belong to the same write-verifier class, write
+        verifiers returned from one system may be compared to those returned
+        by the other and superfluous writes avoided.
+      </t>
+
+      <t>
+        When two file systems belong to different write-verifier classes, any
+        verifier generated by one must not be compared to one provided by the
+        other.  Instead, it should be treated as not equal even when the
+        values are identical.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:multi-server_namespace:RCaVaFST" title="Readdir Cookies and Verifiers and File System Transitions">
+      <t>
+        In a file system transition, the two file systems may be consistent
+        in their handling of READDIR cookies and verifiers.  When this is the
+        case, and the two file systems belong to the same readdir class,
+        READDIR cookies and verifiers from one system may be recognized by
+        the other and READDIR operations started on one server may be validly
+        continued on the other, simply by presenting the cookie and verifier
+        returned by a READDIR operation done on the first file system to the
+        second.
+      </t>
+
+      <t>
+        When two file systems belong to different readdir classes, any
+        READDIR cookie and verifier generated by one is not valid on the
+        second, and must not be presented to that server by the client.  The
+        client should act as if the verifier was rejected.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:multi-server_namespace:FSDaFST" title="File System Data and File System Transitions">
+      <t>
+        When multiple replicas exist and are used simultaneously or in
+        succession by a client, applications using them will normally expect
+        that they contain either the same data or data that is consistent
+        with the normal sorts of changes that are made by other clients
+        updating the data of the file system (with metadata being the same to
+        the degree indicated by the fs_locations_info attribute).  However,
+        when multiple file systems are presented as replicas of one another,
+        the precise relationship between the data of one and the data of
+        another is not, as a general matter, specified by the NFSv4.1
+        protocol.  It is quite possible to present as replicas file systems
+        where the data of those file systems is sufficiently different that
+        some applications have problems dealing with the transition between
+        replicas.  The namespace will typically be constructed so that
+        applications can choose an appropriate level of support, so that in
+        one position in the namespace a varied set of replicas will be
+        listed, while in another only those that are up-to-date may be
+        considered replicas.  The protocol does define four special cases of
+        the relationship among replicas to be specified by the server and
+        relied upon by clients:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            When multiple server addresses correspond to the same actual
+            server, as indicated by a common so_major_id field within the
+            eir_server_owner field returned by EXCHANGE_ID, the client may
+            depend on the fact that changes to data, metadata, or locks made
+            on one file system are immediately reflected on others.
+          </t>
+
+          <t>
+            When multiple replicas exist and are used simultaneously by a
+            client (see the FSLIB4_CLSIMUL definition within
+            fs_locations_info), they must designate the same data.  Where file
+            systems are writable, a change made on one instance must be
+            visible on all instances, immediately upon the earlier of the
+            return of the modifying requester or the visibility of that change
+            on any of the associated replicas.  This allows a client to use
+            these replicas simultaneously without any special adaptation to
+            the fact that there are multiple replicas.  In this case, locks
+            (whether share reservations or byte-range locks) and delegations
+            obtained on one replica are immediately reflected on all replicas,
+            even though these locks will be managed under a set of client IDs.
+          </t>
+
+          <t>
+            When one replica is designated as the successor instance to
+            another existing instance after return NFS4ERR_MOVED (i.e., the
+            case of migration), the client may depend on the fact that all
+            changes written to stable storage on the original instance are
+            written to stable storage of the successor (uncommitted writes are
+            dealt with in <xref target="ss:multi-server_namespace:WVaFST" />).
+          </t>
+
+          <t>
+            Where a file system is not writable but represents a read-only
+            copy (possibly periodically updated) of a writable file system,
+            clients have similar requirements with regard to the propagation
+            of updates.  They may need a guarantee that any change visible on
+            the original file system instance must be immediately visible on
+            any replica before the client transitions access to that replica,
+            in order to avoid any possibility that a client, in effecting a
+            transition to a replica, will see any reversion in file system
+            state.  The specific means of this guarantee varies based on the
+            value of the fss_type field that is reported as part of the
+            fs_status attribute (see <xref target="ss:multi-server_namespace:TAf2" />).  Since these file systems
+            are presumed to be unsuitable for simultaneous use, there is no
+            specification of how locking is handled; in general, locks
+            obtained on one file system will be separate from those on others.
+            Since these are going to be read-only file systems, this is not
+            expected to pose an issue for clients or applications.
+          </t>
+        </list>
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:multi-server_namespace:EFSR" title="Effecting File System Referrals">
+    <t>
+      Referrals are effected when an absent file system is encountered and
+      one or more alternate locations are made available by the
+      fs_locations or fs_locations_info attributes.  The client will
+      typically get an NFS4ERR_MOVED error, fetch the appropriate location
+      information, and proceed to access the file system on a different
+      server, even though it retains its logical position within the
+      original namespace.  Referrals differ from migration events in that
+      they happen only when the client has not previously referenced the
+      file system in question (so there is nothing to transition).
+      Referrals can only come into effect when an absent file system is
+      encountered at its root.
+    </t>
+
+    <t>
+      The examples given in the sections below are somewhat artificial in
+      that an actual client will not typically do a multi-component look
+      up, but will have cached information regarding the upper levels of
+      the name hierarchy.  However, these example are chosen to make the
+      required behavior clear and easy to put within the scope of a small
+      number of requests, without getting unduly into details of how
+      specific clients might choose to cache things.
+    </t>
+
+    <section toc='exclude' anchor="ss:multi-server_namespace:RE" title="Referral Example (LOOKUP)">
+      <t>
+        Let us suppose that the following COMPOUND is sent in an environment
+        in which /this/is/the/path is absent from the target server.  This
+        may be for a number of reasons.  It may be that the file system has
+        moved, or it may be that the target server is functioning mainly, or
+        solely, to refer clients to the servers on which various file systems
+        are located.
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            PUTROOTFH
+          </t>
+
+          <t>
+            LOOKUP "this"
+          </t>
+
+          <t>
+            LOOKUP "is"
+          </t>
+
+          <t>
+            LOOKUP "the"
+          </t>
+
+          <t>
+            LOOKUP "path"
+          </t>
+
+          <t>
+            GETFH
+          </t>
+
+          <t>
+            GETATTR (fsid, fileid, size, time_modify)
+          </t>
+        </list>
+      </t>
+
+      <t>
+        Under the given circumstances, the following will be the result.
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            PUTROOTFH --&gt; NFS_OK.  The current fh is now the root of the
+            pseudo-fs.
+          </t>
+
+          <t>
+            LOOKUP "this" --&gt; NFS_OK.  The current fh is for /this and is
+            within the pseudo-fs.
+          </t>
+
+          <t>
+            LOOKUP "is" --&gt; NFS_OK.  The current fh is for /this/is and is
+            within the pseudo-fs.
+          </t>
+
+          <t>
+            LOOKUP "the" --&gt; NFS_OK.  The current fh is for /this/is/the and
+            is within the pseudo-fs.
+          </t>
+
+          <t>
+            LOOKUP "path" --&gt; NFS_OK.  The current fh is for /this/is/the/path
+            and is within a new, absent file system, but ... the client will
+            never see the value of that fh.
+          </t>
+
+          <t>
+            GETFH --&gt; NFS4ERR_MOVED.  Fails because current fh is in an absent
+            file system at the start of the operation, and the specification
+            makes no exception for GETFH.
+          </t>
+
+          <t>
+            GETATTR (fsid, fileid, size, time_modify).  Not executed because
+            the failure of the GETFH stops processing of the COMPOUND.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        Given the failure of the GETFH, the client has the job of determining
+        the root of the absent file system and where to find that file
+        system, i.e., the server and path relative to that server's root fh.
+        Note that in this example, the client did not obtain filehandles and
+        attribute information (e.g., fsid) for the intermediate directories,
+        so that it would not be sure where the absent file system starts.  It
+        could be the case, for example, that /this/is/the is the root of the
+        moved file system and that the reason that the look up of "path"
+        succeeded is that the file system was not absent on that operation
+        but was moved between the last LOOKUP and the GETFH (since COMPOUND
+        is not atomic).  Even if we had the fsids for all of the intermediate
+        directories, we could have no way of knowing that /this/is/the/path
+        was the root of a new file system, since we don't yet have its fsid.
+      </t>
+
+      <t>
+        In order to get the necessary information, let us re-send the chain
+        of LOOKUPs with GETFHs and GETATTRs to at least get the fsids so we
+        can be sure where the appropriate file system boundaries are.  The
+        client could choose to get fs_locations_info at the same time but in
+        most cases the client will have a good guess as to where file system
+        boundaries are (because of where NFS4ERR_MOVED was, and was not,
+        received) making fetching of fs_locations_info unnecessary.
+      </t>
+
+      <t>
+        <list style='hanging'>
+          <t hangText='OP01:'>
+            PUTROOTFH --&gt; NFS_OK
+
+            <list style='symbols'>
+              <t>
+                Current fh is root of pseudo-fs.
+              </t>
+            </list>
+          </t>
+
+          <t hangText='OP02:'>
+            GETATTR(fsid) --&gt; NFS_OK
+
+            <list style='symbols'>
+              <t>
+                Just for completeness.  Normally, clients will know the fsid of
+                the pseudo-fs as soon as they establish communication with a
+                server.
+              </t>
+            </list>
+          </t>
+
+          <t hangText='OP03:'>
+            LOOKUP "this" --&gt; NFS_OK
+          </t>
+
+          <t hangText='OP04:'>
+            GETATTR(fsid) --&gt; NFS_OK
+
+            <list style='symbols'>
+              <t>
+                Get current fsid to see where file system boundaries are.  The
+                fsid will be that for the pseudo-fs in this example, so no
+                boundary.
+              </t>
+            </list>
+          </t>
+
+          <t hangText='OP05:'>
+            GETFH --&gt; NFS_OK
+
+            <list style='symbols'>
+              <t>
+                Current fh is for /this and is within pseudo-fs.
+              </t>
+            </list>
+          </t>
+
+          <t hangText='OP06:'>
+            LOOKUP "is" --&gt; NFS_OK
+
+            <list style='symbols'>
+              <t>
+                Current fh is for /this/is and is within pseudo-fs.
+              </t>
+            </list>
+          </t>
+
+          <t hangText='OP07:'>
+            GETATTR(fsid) --&gt; NFS_OK
+
+            <list style='symbols'>
+              <t>
+                Get current fsid to see where file system boundaries are.  The
+                fsid will be that for the pseudo-fs in this example, so no
+                boundary.
+              </t>
+            </list>
+          </t>
+
+          <t hangText='OP08:'>
+            GETFH --&gt; NFS_OK
+
+            <list style='symbols'>
+              <t>
+                Current fh is for /this/is and is within pseudo-fs.
+              </t>
+            </list>
+          </t>
+
+          <t hangText='OP09:'>
+            LOOKUP "the" --&gt; NFS_OK
+
+            <list style='symbols'>
+              <t>
+                Current fh is for /this/is/the and is within pseudo-fs.
+              </t>
+            </list>
+          </t>
+
+          <t hangText='OP10:'>
+            GETATTR(fsid) --&gt; NFS_OK
+
+            <list style='symbols'>
+              <t>
+                Get current fsid to see where file system boundaries are.  The
+                fsid will be that for the pseudo-fs in this example, so no
+                boundary.
+              </t>
+            </list>
+          </t>
+
+          <t hangText='OP11:'>
+            GETFH --&gt; NFS_OK
+
+            <list style='symbols'>
+              <t>
+                Current fh is for /this/is/the and is within pseudo-fs.
+              </t>
+            </list>
+          </t>
+
+          <t hangText='OP12:'>
+            LOOKUP "path" --&gt; NFS_OK
+
+            <list style='symbols'>
+              <t>
+                Current fh is for /this/is/the/path and is within a new, absent
+                file system, but ...
+              </t>
+
+              <t>
+                The client will never see the value of that fh.
+              </t>
+            </list>
+          </t>
+
+          <t hangText='OP13:'>
+            GETATTR(fsid, fs_locations_info) --&gt; NFS_OK
+
+            <list style='symbols'>
+              <t>
+                We are getting the fsid to know where the file system boundaries
+                are.  In this operation, the fsid will be different than that of
+                the parent directory (which in turn was retrieved in OP10).  Note
+                that the fsid we are given will not necessarily be preserved at
+                the new location.  That fsid might be different, and in fact the
+                fsid we have for this file system might be a valid fsid of a
+                different file system on that new server.
+              </t>
+
+              <t>
+                In this particular case, we are pretty sure anyway that what has
+                moved is /this/is/the/path rather than /this/is/the since we have
+                the fsid of the latter and it is that of the pseudo-fs, which
+                presumably cannot move.  However, in other examples, we might not
+                have this kind of information to rely on (e.g., /this/is/the might
+                be a non-pseudo file system separate from /this/is/the/path), so
+                we need to have other reliable source information on the boundary
+                of the file system that is moved.  If, for example, the file
+                system /this/is had moved, we would have a case of migration
+                rather than referral, and once the boundaries of the migrated file
+                system was clear we could fetch fs_locations_info.
+              </t>
+
+              <t>
+                We are fetching fs_locations_info because the fact that we got an
+                NFS4ERR_MOVED at this point means that it is most likely that this
+                is a referral and we need the destination.  Even if it is the case
+                that /this/is/the is a file system that has migrated, we will
+                still need the location information for that file system.
+              </t>
+            </list>
+          </t>
+
+          <t hangText='OP14:'>
+            GETFH --&gt; NFS4ERR_MOVED
+
+            <list style='symbols'>
+              <t>
+                Fails because current fh is in an absent file system at the start
+                of the operation, and the specification makes no exception for
+                GETFH.  Note that this means the server will never send the client
+                a filehandle from within an absent file system.
+              </t>
+            </list>
+          </t>
+        </list>
+      </t>
+
+      <t>
+        Given the above, the client knows where the root of the absent file
+        system is (/this/is/the/path) by noting where the change of fsid
+        occurred (between "the" and "path").  The fs_locations_info attribute
+        also gives the client the actual location of the absent file system,
+        so that the referral can proceed.  The server gives the client the
+        bare minimum of information about the absent file system so that
+        there will be very little scope for problems of conflict between
+        information sent by the referring server and information of the file
+        system's home.  No filehandles and very few attributes are present on
+        the referring server, and the client can treat those it receives as
+        transient information with the function of enabling the referral.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:multi-server_namespace:RE1" title="Referral Example (READDIR)">
+      <t>
+        Another context in which a client may encounter referrals is when it
+        does a READDIR on a directory in which some of the sub-directories
+        are the roots of absent file systems.
+      </t>
+
+      <t>
+        Suppose such a directory is read as follows:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            PUTROOTFH
+          </t>
+
+          <t>
+            LOOKUP "this"
+          </t>
+
+          <t>
+            LOOKUP "is"
+          </t>
+
+          <t>
+            LOOKUP "the"
+          </t>
+
+          <t>
+            READDIR (fsid, size, time_modify, mounted_on_fileid)
+          </t>
+        </list>
+      </t>
+
+      <t>
+        In this case, because rdattr_error is not requested,
+        fs_locations_info is not requested, and some of the attributes cannot
+        be provided, the result will be an NFS4ERR_MOVED error on the
+        READDIR, with the detailed results as follows:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            PUTROOTFH --&gt; NFS_OK.  The current fh is at the root of the
+            pseudo-fs.
+          </t>
+
+          <t>
+            LOOKUP "this" --&gt; NFS_OK.  The current fh is for /this and is
+            within the pseudo-fs.
+          </t>
+
+          <t>
+            LOOKUP "is" --&gt; NFS_OK.  The current fh is for /this/is and is
+            within the pseudo-fs.
+          </t>
+
+          <t>
+            LOOKUP "the" --&gt; NFS_OK.  The current fh is for /this/is/the and
+            is within the pseudo-fs.
+          </t>
+
+          <t>
+            READDIR (fsid, size, time_modify, mounted_on_fileid) --&gt;
+            NFS4ERR_MOVED.  Note that the same error would have been returned
+            if /this/is/the had migrated, but it is returned because the
+            directory contains the root of an absent file system.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        So now suppose that we re-send with rdattr_error:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            PUTROOTFH
+          </t>
+
+          <t>
+            LOOKUP "this"
+          </t>
+
+          <t>
+            LOOKUP "is"
+          </t>
+
+          <t>
+            LOOKUP "the"
+          </t>
+
+          <t>
+            READDIR (rdattr_error, fsid, size, time_modify, mounted_on_fileid)
+          </t>
+        </list>
+      </t>
+
+      <t>
+        The results will be:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            PUTROOTFH --&gt; NFS_OK.  The current fh is at the root of the
+            pseudo-fs.
+          </t>
+
+          <t>
+            LOOKUP "this" --&gt; NFS_OK.  The current fh is for /this and is
+            within the pseudo-fs.
+          </t>
+
+          <t>
+            LOOKUP "is" --&gt; NFS_OK.  The current fh is for /this/is and is
+            within the pseudo-fs.
+          </t>
+
+          <t>
+            LOOKUP "the" --&gt; NFS_OK.  The current fh is for /this/is/the and
+            is within the pseudo-fs.
+          </t>
+
+          <t>
+            READDIR (rdattr_error, fsid, size, time_modify, mounted_on_fileid)
+            --&gt; NFS_OK.  The attributes for directory entry with the component
+            named "path" will only contain rdattr_error with the value
+            NFS4ERR_MOVED, together with an fsid value and a value for
+            mounted_on_fileid.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        So suppose we do another READDIR to get fs_locations_info (although
+        we could have used a GETATTR directly, as in <xref target="ss:multi-server_namespace:RE" />).
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            PUTROOTFH
+          </t>
+
+          <t>
+            LOOKUP "this"
+          </t>
+
+          <t>
+            LOOKUP "is"
+          </t>
+
+          <t>
+            LOOKUP "the"
+          </t>
+
+          <t>
+            READDIR (rdattr_error, fs_locations_info, mounted_on_fileid, fsid,
+            size, time_modify)
+          </t>
+        </list>
+      </t>
+
+      <t>
+        The results would be:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            PUTROOTFH --&gt; NFS_OK.  The current fh is at the root of the
+            pseudo-fs.
+          </t>
+
+          <t>
+            LOOKUP "this" --&gt; NFS_OK.  The current fh is for /this and is
+            within the pseudo-fs.
+          </t>
+
+          <t>
+            LOOKUP "is" --&gt; NFS_OK.  The current fh is for /this/is and is
+            within the pseudo-fs.
+          </t>
+
+          <t>
+            LOOKUP "the" --&gt; NFS_OK.  The current fh is for /this/is/the and
+            is within the pseudo-fs.
+          </t>
+
+          <t>
+            READDIR (rdattr_error, fs_locations_info, mounted_on_fileid, fsid,
+            size, time_modify) --&gt; NFS_OK.  The attributes will be as shown
+            below.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        The attributes for the directory entry with the component named
+        "path" will only contain:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            rdattr_error (value: NFS_OK)
+          </t>
+
+          <t>
+            fs_locations_info
+          </t>
+
+          <t>
+            mounted_on_fileid (value: unique fileid within referring file
+            system)
+          </t>
+
+          <t>
+            fsid (value: unique value within referring server)
+          </t>
+        </list>
+      </t>
+
+      <t>
+        The attributes for entry "path" will not contain size or time_modify
+        because these attributes are not available within an absent file
+        system.
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:multi-server_namespace:TAf" title="The Attribute fs_locations">
+    <t>
+      The fs_locations attribute is structured in the following way:
+    </t>
+
+    <t>
+      <?rfc include='autogen/type_fs_location4.xml'?>
+    </t>
+    <t>
+      <?rfc include='autogen/type_fs_locations4.xml'?>
+    </t>
+
+    <t>
+      The fs_location4 data type is used to represent the location of a
+      file system by providing a server name and the path to the root of
+      the file system within that server's namespace.  When a set of
+      servers have corresponding file systems at the same path within their
+      namespaces, an array of server names may be provided.  An entry in
+      the server array is a UTF-8 string and represents one of a
+      traditional DNS host name, IPv4 address, IPv6 address, or a
+      zero-length string.  An IPv4 or IPv6 address is represented as a universal
+      address (see <xref target="ss:protocol_constants:n1" />
+      and <xref target="RFC5665" />), minus the netid, and either
+      with or without the trailing ".p1.p2" suffix that represents the port
+      number.  If the suffix is omitted, then the default port, 2049,
+      SHOULD be assumed.  A zero-length string SHOULD be used to indicate
+      the current address being used for the RPC call.  It is not a
+      requirement that all servers that share the same rootpath be listed
+      in one fs_location4 instance.  The array of server names is provided
+      for convenience.  Servers that share the same rootpath may also be
+      listed in separate fs_location4 entries in the fs_locations
+      attribute.
+    </t>
+
+    <t>
+      The fs_locations4 data type and fs_locations attribute contain an
+      array of such locations.  Since the namespace of each server may be
+      constructed differently, the "fs_root" field is provided.  The path
+      represented by fs_root represents the location of the file system in
+      the current server's namespace, i.e., that of the server from which
+      the fs_locations attribute was obtained.  The fs_root path is meant
+      to aid the client by clearly referencing the root of the file system
+      whose locations are being reported, no matter what object within the
+      current file system the current filehandle designates.  The fs_root
+      is simply the pathname the client used to reach the object on the
+      current server (i.e., the object to which the fs_locations attribute
+      applies).
+    </t>
+
+    <t>
+      When the fs_locations attribute is interrogated and there are no
+      alternate file system locations, the server SHOULD return a
+      zero-length array of fs_location4 structures, together with a valid
+      fs_root.
+    </t>
+
+    <t>
+      As an example, suppose there is a replicated file system located at
+      two servers (servA and servB).  At servA, the file system is located
+      at path /a/b/c.  At, servB the file system is located at path /x/y/z.
+      If the client were to obtain the fs_locations value for the directory
+      at /a/b/c/d, it might not necessarily know that the file system's
+      root is located in servA's namespace at /a/b/c.  When the client
+      switches to servB, it will need to determine that the directory it
+      first referenced at servA is now represented by the path /x/y/z/d on
+      servB.  To facilitate this, the fs_locations attribute provided by
+      servA would have an fs_root value of /a/b/c and two entries in
+      fs_locations.  One entry in fs_locations will be for itself (servA)
+      and the other will be for servB with a path of /x/y/z.  With this
+      information, the client is able to substitute /x/y/z for the /a/b/c
+      at the beginning of its access path and construct /x/y/z/d to use for
+      the new server.
+    </t>
+
+    <t>
+      Note that there is no requirement that the number of components in
+      each rootpath be the same; there is no relation between the number of
+      components in rootpath or fs_root, and none of the components in a
+      rootpath and fs_root have to be the same.  In the above example, we
+      could have had a third element in the locations array, with server
+      equal to "servC" and rootpath equal to "/I/II", and a fourth element
+      in locations with server equal to "servD" and rootpath equal to
+      "/aleph/beth/gimel/daleth/he".
+    </t>
+
+    <t>
+      The relationship between fs_root to a rootpath is that the client
+      replaces the pathname indicated in fs_root for the current server for
+      the substitute indicated in rootpath for the new server.
+    </t>
+
+    <t>
+      For an example of a referred or migrated file system, suppose there
+      is a file system located at serv1.  At serv1, the file system is
+      located at /az/buky/vedi/glagoli.  The client finds that object at
+      glagoli has migrated (or is a referral).  The client gets the
+      fs_locations attribute, which contains an fs_root of
+      /az/buky/vedi/glagoli, and one element in the locations array, with server equal to
+      serv2, and rootpath equal to /izhitsa/fita.  The client replaces
+      /az/buky/vedi/glagoli with /izhitsa/fita, and uses the latter pathname on
+      serv2.
+    </t>
+
+    <t>
+      Thus, the server MUST return an fs_root that is equal to the path the
+      client used to reach the object to which the fs_locations attribute
+      applies.  Otherwise, the client cannot determine the new path to use
+      on the new server.
+    </t>
+
+    <t>
+      Since the fs_locations attribute lacks information defining various
+      attributes of the various file system choices presented, it SHOULD
+      only be interrogated and used when fs_locations_info is not
+      available.  When fs_locations is used, information about the specific
+      locations should be assumed based on the following rules.
+    </t>
+
+    <t>
+      The following rules are general and apply irrespective of the
+      context.
+    </t>
+
+    <t>
+      <list style='symbols'>
+        <t>
+          All listed file system instances should be considered as of the
+          same handle class, if and only if, the current fh_expire_type
+          attribute does not include the FH4_VOL_MIGRATION bit.  Note that
+          in the case of referral, filehandle issues do not apply since
+          there can be no filehandles known within the current file system,
+          nor is there any access to the fh_expire_type attribute on the
+          referring (absent) file system.
+        </t>
+
+        <t>
+          All listed file system instances should be considered as of the
+          same fileid class if and only if the fh_expire_type attribute
+          indicates persistent filehandles and does not include the
+          FH4_VOL_MIGRATION bit.  Note that in the case of referral, fileid
+          issues do not apply since there can be no fileids known within the
+          referring (absent) file system, nor is there any access to the
+          fh_expire_type attribute.
+        </t>
+
+        <t>
+          All file system instances servers should be considered as of
+          different change classes.
+        </t>
+      </list>
+    </t>
+
+    <t>
+      For other class assignments, handling of file system transitions
+      depends on the reasons for the transition:
+    </t>
+
+    <t>
+      <list style='symbols'>
+        <t>
+          When the transition is due to migration, that is, the client was
+          directed to a new file system after receiving an NFS4ERR_MOVED
+          error, the target should be treated as being of the same
+          write-verifier class as the source.
+        </t>
+
+        <t>
+          When the transition is due to failover to another replica, that
+          is, the client selected another replica without receiving an
+          NFS4ERR_MOVED error, the target should be treated as being of a
+          different write-verifier class from the source.
+        </t>
+      </list>
+    </t>
+
+    <t>
+      The specific choices reflect typical implementation patterns for
+      failover and controlled migration, respectively.  Since other choices
+      are possible and useful, this information is better obtained by using
+      fs_locations_info.  When a server implementation needs to communicate
+      other choices, it MUST support the fs_locations_info attribute.
+    </t>
+
+    <t>
+      See <xref target="sec:security_considerations" /> for a discussion on the recommendations for the
+      security flavor to be used by any GETATTR operation that requests the
+      "fs_locations" attribute.
+    </t>
+  </section>
+
+  <section anchor="ss:multi-server_namespace:TAf1" title="The Attribute fs_locations_info">
+    <t>
+      The fs_locations_info attribute is intended as a more functional
+      replacement for fs_locations that will continue to exist and be
+      supported.  Clients can use it to get a more complete set of
+      information about alternative file system locations.  When the server
+      does not support fs_locations_info, fs_locations can be used to get a
+      subset of the information.  A server that supports fs_locations_info
+      MUST support fs_locations as well.
+    </t>
+
+    <t>
+      There is additional information present in fs_locations_info, that is
+      not available in fs_locations:
+    </t>
+
+    <t>
+      <list style='symbols'>
+        <t>
+          Attribute continuity information.  This information will allow a
+          client to select a location that meets the transparency
+          requirements of the applications accessing the data and to
+          leverage optimizations due to the server guarantees of attribute
+          continuity (e.g., if between multiple server locations the change
+          attribute of a file of the file system is continuous, the client
+          does not have to invalidate the file's cache if the change
+          attribute is the same among all locations).
+        </t>
+
+        <t>
+          File system identity information that indicates when multiple
+          replicas, from the client's point of view, correspond to the same
+          target file system, allowing them to be used interchangeably,
+          without disruption, as multiple paths to the same thing.
+        </t>
+
+        <t>
+          Information that will bear on the suitability of various replicas,
+          depending on the use that the client intends.  For example, many
+          applications need an absolutely up-to-date copy (e.g., those that
+          write), while others may only need access to the most up-to-date
+          copy reasonably available.
+        </t>
+
+        <t>
+          Server-derived preference information for replicas, which can be
+          used to implement load-balancing while giving the client the
+          entire file system list to be used in case the primary fails.
+        </t>
+      </list>
+    </t>
+
+    <t>
+      The fs_locations_info attribute is structured similarly to the
+      fs_locations attribute.  A top-level structure (fs_locations_info4)
+      contains the entire attribute including the root pathname of the file
+      system and an array of lower-level structures that define replicas
+      that share a common rootpath on their respective servers.  The
+      lower-level structure in turn (fs_locations_item4) contains a specific
+      pathname and information on one or more individual server replicas.
+      For that last lowest-level, fs_locations_info has an
+      fs_locations_server4 structure that contains per-server-replica
+      information in addition to the server name.  This per-server-replica
+      information includes a nominally opaque array, fls_info, in which
+      specific pieces of information are located at the specific indices
+      listed below.
+    </t>
+
+    <t>
+      The attribute will always contain at least a single
+      fs_locations_server entry.  Typically, this will be an entry with the
+      FS4LIGF_CUR_REQ flag set, although in the case of a referral there
+      will be no entry with that flag set.
+    </t>
+
+    <t>
+      It should be noted that fs_locations_info attributes returned by
+      servers for various replicas may differ for various reasons.  One
+      server may know about a set of replicas that are not known to other
+      servers.  Further, compatibility attributes may differ.  Filehandles
+      might be of the same class going from replica A to replica B but not
+      going in the reverse direction.  This might happen because the
+      filehandles are the same, but replica B's server implementation might
+      not have provision to note and report that equivalence.
+    </t>
+
+    <t>
+      The fs_locations_info attribute consists of a root pathname
+      (fli_fs_root, just like fs_root in the fs_locations attribute),
+      together with an array of fs_location_item4 structures.  The
+      fs_location_item4 structures in turn consist of a root pathname
+      (fli_rootpath) together with an array (fli_entries) of elements of
+      data type fs_locations_server4, all defined as follows.
+    </t>
+
+    <t>
+      <?rfc include='autogen/fs_locations_info.xml'?>
+    </t>
+
+    <t>
+      As noted above, the fs_locations_info attribute, when supported, may
+      be requested of absent file systems without causing NFS4ERR_MOVED to
+      be returned.  It is generally expected that it will be available for
+      both present and absent file systems even if only a single
+      fs_locations_server4 entry is present, designating the current
+      (present) file system, or two fs_locations_server4 entries
+      designating the previous location of an absent file system (the one
+      just referenced) and its successor location.  Servers are strongly
+      urged to support this attribute on all file systems if they support
+      it on any file system.
+    </t>
+
+    <t>
+      The data presented in the fs_locations_info attribute may be obtained
+      by the server in any number of ways, including specification by the
+      administrator or by current protocols for transferring data among
+      replicas and protocols not yet developed.  NFSv4.1 only defines how
+      this information is presented by the server to the client.
+    </t>
+
+    <section toc='exclude' anchor="ss:multi-server_namespace:TfS" title="The fs_locations_server4 Structure">
+      <t>
+        The fs_locations_server4 structure consists of the following items:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            An indication of how up-to-date the file system is (fls_currency)
+            in seconds.  This value is relative to the master copy.  A
+            negative value indicates that the server is unable to give any
+            reasonably useful value here.  A value of zero indicates that the
+            file system is the actual writable data or a reliably coherent and
+            fully up-to-date copy.  Positive values indicate how out-of-date
+            this copy can normally be before it is considered for update.
+            Such a value is not a guarantee that such updates will always be
+            performed on the required schedule but instead serves as a hint
+            about how far the copy of the data would be expected to be behind
+            the most up-to-date copy.
+          </t>
+
+          <t>
+            A counted array of one-byte values (fls_info) containing
+            information about the particular file system instance.  This data
+            includes general flags, transport capability flags, file system
+            equivalence class information, and selection priority information.
+            The encoding will be discussed below.
+          </t>
+
+          <t>
+            The server string (fls_server).  For the case of the replica
+            currently being accessed (via GETATTR), a zero-length string MAY
+            be used to indicate the current address being used for the RPC
+            call.  The fls_server field can also be an IPv4 or IPv6 address,
+            formatted the same way as an IPv4 or IPv6 address in the "server"
+            field of the fs_location4 data type (see <xref target="ss:multi-server_namespace:TAf" />).
+          </t>
+        </list>
+      </t>
+
+      <t>
+        Data within the fls_info array is in the form of 8-bit data items
+        with constants giving the offsets within the array of various values
+        describing this particular file system instance.  This style of
+        definition was chosen, in preference to explicit XDR structure
+        definitions for these values, for a number of reasons.
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            The kinds of data in the fls_info array, representing flags, file
+            system classes, and priorities among sets of file systems
+            representing the same data, are such that 8 bits provide a quite
+            acceptable range of values.  Even where there might be more than
+            256 such file system instances, having more than 256 distinct
+            classes or priorities is unlikely.
+          </t>
+
+          <t>
+            Explicit definition of the various specific data items within XDR
+            would limit expandability in that any extension within a
+            subsequent minor version would require yet another attribute,
+            leading to specification and implementation clumsiness.
+          </t>
+
+          <t>
+            Such explicit definitions would also make it impossible to propose
+            Standards Track extensions apart from a full minor version.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        This encoding scheme can be adapted to the specification of
+        multi-byte numeric values, even though none are currently defined.  If
+        extensions are made via Standards Track RFCs, multi-byte quantities
+        will be encoded as a range of bytes with a range of indices, with the
+        byte interpreted in big-endian byte order.  Further, any such index
+        assignments are constrained so that the relevant quantities will not
+        cross XDR word boundaries.
+      </t>
+
+      <t>
+        The set of fls_info data is subject to expansion in a future minor
+        version, or in a Standards Track RFC, within the context of a single
+        minor version.  The server SHOULD NOT send and the client MUST NOT
+        use indices within the fls_info array that are not defined in
+        Standards Track RFCs.
+      </t>
+
+      <t>
+        The fls_info array contains:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            Two 8-bit flag fields, one devoted to general file-system
+            characteristics and a second reserved for transport-related
+            capabilities.
+          </t>
+
+          <t>
+            Six 8-bit class values that define various file system equivalence
+            classes as explained below.
+          </t>
+
+          <t>
+            Four 8-bit priority values that govern file system selection as
+            explained below.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        The general file system characteristics flag (at byte index
+        FSLI4BX_GFLAGS) has the following bits defined within it:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            FSLI4GF_WRITABLE indicates that this file system target is
+            writable, allowing it to be selected by clients that may need to
+            write on this file system.  When the current file system instance
+            is writable and is defined as of the same simultaneous use class
+            (as specified by the value at index FSLI4BX_CLSIMUL) to which the
+            client was previously writing, then it must incorporate within its
+            data any committed write made on the source file system instance.
+            See <xref target="ss:multi-server_namespace:WVaFST" />, which discusses the write-verifier class.
+            While there is no harm in not setting this flag for a file system
+            that turns out to be writable, turning the flag on for a read-only
+            file system can cause problems for clients that select a migration
+            or replication target based on the flag and then find themselves
+            unable to write.
+          </t>
+
+          <t>
+            FSLI4GF_CUR_REQ indicates that this replica is the one on which
+            the request is being made.  Only a single server entry may have
+            this flag set and, in the case of a referral, no entry will have
+            it.
+          </t>
+
+          <t>
+            FSLI4GF_ABSENT indicates that this entry corresponds to an absent
+            file system replica.  It can only be set if FSLI4GF_CUR_REQ is
+            set.  When both such bits are set, it indicates that a file system
+            instance is not usable but that the information in the entry can
+            be used to determine the sorts of continuity available when
+            switching from this replica to other possible replicas.  Since
+            this bit can only be true if FSLI4GF_CUR_REQ is true, the value
+            could be determined using the fs_status attribute, but the
+            information is also made available here for the convenience of the
+            client.  An entry with this bit, since it represents a true file
+            system (albeit absent), does not appear in the event of a
+            referral, but only when a file system has been accessed at this
+            location and has subsequently been migrated.
+          </t>
+
+          <t>
+            FSLI4GF_GOING indicates that a replica, while still available,
+            should not be used further.  The client, if using it, should make
+            an orderly transfer to another file system instance as
+            expeditiously as possible.  It is expected that file systems going
+            out of service will be announced as FSLI4GF_GOING some time before
+            the actual loss of service.  It is also expected that the
+            fli_valid_for value will be sufficiently small to allow clients to
+            detect and act on scheduled events, while large enough that the
+            cost of the requests to fetch the fs_locations_info values will
+            not be excessive.  Values on the order of ten minutes seem
+            reasonable.
+            <vspace blankLines="1"/>
+            When this flag is seen as part of a transition into a new file
+            system, a client might choose to transfer immediately to another
+            replica, or it may reference the current file system and only
+            transition when a migration event occurs.  Similarly, when this
+            flag appears as a replica in the referral, clients would likely
+            avoid being referred to this instance whenever there is another
+            choice.
+          </t>
+
+          <t>
+            FSLI4GF_SPLIT indicates that when a transition occurs from the
+            current file system instance to this one, the replacement may
+            consist of multiple file systems.  In this case, the client has to
+            be prepared for the possibility that objects on the same file
+            system before migration will be on different ones after.  Note
+            that FSLI4GF_SPLIT is not incompatible with the file systems
+            belonging to the same fileid class since, if one has a set of
+            fileids that are unique within a file system, each subset assigned
+            to a smaller file system after migration would not have any
+            conflicts internal to that file system.
+            <vspace blankLines="1"/>
+            A client, in the case of a split file system, will interrogate
+            existing files with which it has continuing connection (it is free
+            to simply forget cached filehandles).  If the client remembers the
+            directory filehandle associated with each open file, it may
+            proceed upward using LOOKUPP to find the new file system
+            boundaries.  Note that in the event of a referral, there will not
+            be any such files and so these actions will not be performed.
+            Instead, a reference to a portion of the original file system now
+            split off into other file systems will encounter an fsid change
+            and possibly a further referral.
+            <vspace blankLines="1"/>
+            Once the client recognizes that one file system has been split
+            into two, it can prevent the disruption of running applications by
+            presenting the two file systems as a single one until a convenient
+            point to recognize the transition, such as a restart.  This would
+            require a mapping from the server's fsids to fsids as seen by the
+            client, but this is already necessary for other reasons.  As noted
+            above, existing fileids within the two descendant file systems
+            will not conflict.  Providing non-conflicting fileids for newly
+            created files on the split file systems is the responsibility of
+            the server (or servers working in concert).  The server can encode
+            filehandles such that filehandles generated before the split event
+            can be discerned from those generated after the split, allowing
+            the server to determine when the need for emulating two file
+            systems as one is over.
+            <vspace blankLines="1"/>
+            Although it is possible for this flag to be present in the event
+            of referral, it would generally be of little interest to the
+            client, since the client is not expected to have information
+            regarding the current contents of the absent file system.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        The transport-flag field (at byte index FSLI4BX_TFLAGS) contains the
+        following bits related to the transport capabilities of the specific
+        file system.
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            FSLI4TF_RDMA indicates that this file system provides NFSv4.1 file
+            system access using an RDMA-capable transport.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        Attribute continuity and file system identity information are
+        expressed by defining equivalence relations on the sets of file
+        systems presented to the client.  Each such relation is expressed as
+        a set of file system equivalence classes.  For each relation, a file
+        system has an 8-bit class number.  Two file systems belong to the
+        same class if both have identical non-zero class numbers.  Zero is
+        treated as non-matching.  Most often, the relevant question for the
+        client will be whether a given replica is identical to / continuous
+        with the current one in a given respect, but the information should
+        be available also as to whether two other replicas match in that
+        respect as well.
+      </t>
+
+      <t>
+        The following fields specify the file system's class numbers for the
+        equivalence relations used in determining the nature of file system
+        transitions.  See <xref target="ss:multi-server_namespace:EFST" /> and its various subsections for
+        details about how this information is to be used.  Servers may assign
+        these values as they wish, so long as file system instances that
+        share the same value have the specified relationship to one another;
+        conversely, file systems that have the specified relationship to one
+        another share a common class value.  As each instance entry is added,
+        the relationships of this instance to previously entered instances
+        can be consulted, and if one is found that bears the specified
+        relationship, that entry's class value can be copied to the new
+        entry.  When no such previous entry exists, a new value for that byte
+        index (not previously used) can be selected, most likely by
+        incrementing the value of the last class value assigned for that
+        index.
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            The field with byte index FSLI4BX_CLSIMUL defines the
+            simultaneous-use class for the file system.
+          </t>
+
+          <t>
+            The field with byte index FSLI4BX_CLHANDLE defines the handle
+            class for the file system.
+          </t>
+
+          <t>
+            The field with byte index FSLI4BX_CLFILEID defines the fileid
+            class for the file system.
+          </t>
+
+          <t>
+            The field with byte index FSLI4BX_CLWRITEVER defines the
+            write-verifier class for the file system.
+          </t>
+
+          <t>
+            The field with byte index FSLI4BX_CLCHANGE defines the change
+            class for the file system.
+          </t>
+
+          <t>
+            The field with byte index FSLI4BX_CLREADDIR defines the readdir
+            class for the file system.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        Server-specified preference information is also provided via 8-bit
+        values within the fls_info array.  The values provide a rank and an
+        order (see below) to be used with separate values specifiable for the
+        cases of read-only and writable file systems.  These values are
+        compared for different file systems to establish the server-specified
+        preference, with lower values indicating "more preferred".
+      </t>
+
+      <t>
+        Rank is used to express a strict server-imposed ordering on clients,
+        with lower values indicating "more preferred".  Clients should
+        attempt to use all replicas with a given rank before they use one
+        with a higher rank.  Only if all of those file systems are
+        unavailable should the client proceed to those of a higher rank.
+        Because specifying a rank will override client preferences, servers
+        should be conservative about using this mechanism, particularly when
+        the environment is one in which client communication characteristics
+        are neither tightly controlled nor visible to the server.
+      </t>
+
+      <t>
+        Within a rank, the order value is used to specify the server's
+        preference to guide the client's selection when the client's own
+        preferences are not controlling, with lower values of order
+        indicating "more preferred".  If replicas are approximately equal in
+        all respects, clients should defer to the order specified by the
+        server.  When clients look at server latency as part of their
+        selection, they are free to use this criterion but it is suggested
+        that when latency differences are not significant, the
+        server-specified order should guide selection.
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            The field at byte index FSLI4BX_READRANK gives the rank value to
+            be used for read-only access.
+          </t>
+
+          <t>
+            The field at byte index FSLI4BX_READORDER gives the order value to
+            be used for read-only access.
+          </t>
+
+          <t>
+            The field at byte index FSLI4BX_WRITERANK gives the rank value to
+            be used for writable access.
+          </t>
+
+          <t>
+            The field at byte index FSLI4BX_WRITEORDER gives the order value
+            to be used for writable access.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        Depending on the potential need for write access by a given client,
+        one of the pairs of rank and order values is used.  The read rank and
+        order should only be used if the client knows that only reading will
+        ever be done or if it is prepared to switch to a different replica in
+        the event that any write access capability is required in the future.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:multi-server_namespace:TfS1" title="The fs_locations_info4 Structure">
+      <t>
+        The fs_locations_info4 structure, encoding the fs_locations_info
+        attribute, contains the following:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            The fli_flags field, which contains general flags that affect the
+            interpretation of this fs_locations_info4 structure and all
+            fs_locations_item4 structures within it.  The only flag currently
+            defined is FSLI4IF_VAR_SUB.  All bits in the fli_flags field that
+            are not defined should always be returned as zero.
+          </t>
+
+          <t>
+            The fli_fs_root field, which contains the pathname of the root of
+            the current file system on the current server, just as it does in
+            the fs_locations4 structure.
+          </t>
+
+          <t>
+            An array called fli_items of fs_locations4_item structures, which
+            contain information about replicas of the current file system.
+            Where the current file system is actually present, or has been
+            present, i.e., this is not a referral situation, one of the
+            fs_locations_item4 structures will contain an fs_locations_server4
+            for the current server.  This structure will have FSLI4GF_ABSENT
+            set if the current file system is absent, i.e., normal access to
+            it will return NFS4ERR_MOVED.
+          </t>
+
+          <t>
+            The fli_valid_for field specifies a time in seconds for which it
+            is reasonable for a client to use the fs_locations_info attribute
+            without refetch.  The fli_valid_for value does not provide a
+            guarantee of validity since servers can unexpectedly go out of
+            service or become inaccessible for any number of reasons.  Clients
+            are well-advised to refetch this information for an actively
+            accessed file system at every fli_valid_for seconds.  This is
+            particularly important when file system replicas may go out of
+            service in a controlled way using the FSLI4GF_GOING flag to
+            communicate an ongoing change.  The server should set
+            fli_valid_for to a value that allows well-behaved clients to
+            notice the FSLI4GF_GOING flag and make an orderly switch before
+            the loss of service becomes effective.  If this value is zero,
+            then no refetch interval is appropriate and the client need not
+            refetch this data on any particular schedule.  In the event of a
+            transition to a new file system instance, a new value of the
+            fs_locations_info attribute will be fetched at the destination.
+            It is to be expected that this may have a different fli_valid_for
+            value, which the client should then use in the same fashion as the
+            previous value.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        The FSLI4IF_VAR_SUB flag within fli_flags controls whether variable
+        substitution is to be enabled.  See <xref target="ss:multi-server_namespace:TfS2" /> for an
+        explanation of variable substitution.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:multi-server_namespace:TfS2" title="The fs_locations_item4 Structure">
+      <t>
+        The fs_locations_item4 structure contains a pathname (in the field
+        fli_rootpath) that encodes the path of the target file system
+        replicas on the set of servers designated by the included
+        fs_locations_server4 entries.  The precise manner in which this
+        target location is specified depends on the value of the
+        FSLI4IF_VAR_SUB flag within the associated fs_locations_info4
+        structure.
+      </t>
+
+      <t>
+        If this flag is not set, then fli_rootpath simply designates the
+        location of the target file system within each server's single-server
+        namespace just as it does for the rootpath within the fs_location4
+        structure.  When this bit is set, however, component entries of a
+        certain form are subject to client-specific variable substitution so
+        as to allow a degree of namespace non-uniformity in order to
+        accommodate the selection of client-specific file system targets to
+        adapt to different client architectures or other characteristics.
+      </t>
+
+      <t>
+        When such substitution is in effect, a variable beginning with the
+        string "${" and ending with the string "}" and containing a colon is
+        to be replaced by the client-specific value associated with that
+        variable.  The string "unknown" should be used by the client when it
+        has no value for such a variable.  The pathname resulting from such
+        substitutions is used to designate the target file system, so that
+        different clients may have different file systems, corresponding to
+        that location in the multi-server namespace.
+      </t>
+
+      <t>
+        As mentioned above, such substituted pathname variables contain a
+        colon.  The part before the colon is to be a DNS domain name, and the
+        part after is to be a case-insensitive alphanumeric string.
+      </t>
+
+      <t>
+        Where the domain is "ietf.org", only variable names defined in this
+        document or subsequent Standards Track RFCs are subject to such
+        substitution.  Organizations are free to use their domain names to
+        create their own sets of client-specific variables, to be subject to
+        such substitution.  In cases where such variables are intended to be
+        used more broadly than a single organization, publication of an
+        Informational RFC defining such variables is RECOMMENDED.
+      </t>
+
+      <t>
+        The variable ${ietf.org:CPU_ARCH} is used to denote that the CPU
+        architecture object files are compiled.  This specification does not
+        limit the acceptable values (except that they must be valid UTF-8
+        strings), but such values as "x86", "x86_64", and "sparc" would be
+        expected to be used in line with industry practice.
+      </t>
+
+      <t>
+        The variable ${ietf.org:OS_TYPE} is used to denote the operating
+        system, and thus the kernel and library APIs, for which code might be
+        compiled.  This specification does not limit the acceptable values
+        (except that they must be valid UTF-8 strings), but such values as
+        "linux" and "freebsd" would be expected to be used in line with
+        industry practice.
+      </t>
+
+      <t>
+        The variable ${ietf.org:OS_VERSION} is used to denote the operating
+        system version, and thus the specific details of versioned
+        interfaces, for which code might be compiled.  This specification
+        does not limit the acceptable values (except that they must be valid
+        UTF-8 strings).  However, combinations of numbers and letters with
+        interspersed dots would be expected to be used in line with industry
+        practice, with the details of the version format depending on the
+        specific value of the variable ${ietf.org:OS_TYPE} with which it is
+        used.
+      </t>
+
+      <t>
+        Use of these variables could result in the direction of different
+        clients to different file systems on the same server, as appropriate
+        to particular clients.  In cases in which the target file systems are
+        located on different servers, a single server could serve as a
+        referral point so that each valid combination of variable values
+        would designate a referral hosted on a single server, with the
+        targets of those referrals on a number of different servers.
+      </t>
+
+      <t>
+        Because namespace administration is affected by the values selected
+        to substitute for various variables, clients should provide
+        convenient means of determining what variable substitutions a client
+        will implement, as well as, where appropriate, providing means to
+        control the substitutions to be used.  The exact means by which this
+        will be done is outside the scope of this specification.
+      </t>
+
+      <t>
+        Although variable substitution is most suitable for use in the
+        context of referrals, it may be used in the context of replication
+        and migration.  If it is used in these contexts, the server must
+        ensure that no matter what values the client presents for the
+        substituted variables, the result is always a valid successor file
+        system instance to that from which a transition is occurring, i.e.,
+        that the data is identical or represents a later image of a writable
+        file system.
+      </t>
+
+      <t>
+        Note that when fli_rootpath is a null pathname (that is, one with
+        zero components), the file system designated is at the root of the
+        specified server, whether or not the FSLI4IF_VAR_SUB flag within the
+        associated fs_locations_info4 structure is set.
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:multi-server_namespace:TAf2" title="The Attribute fs_status">
+    <t>
+      In an environment in which multiple copies of the same basic set of
+      data are available, information regarding the particular source of
+      such data and the relationships among different copies can be very
+      helpful in providing consistent data to applications.
+    </t>
+
+    <?rfc include='autogen/type_fs4_status.xml'?>
+
+    <t>
+      The boolean fss_absent indicates whether the file system is currently
+      absent.  This value will be set if the file system was previously
+      present and becomes absent, or if the file system has never been
+      present and the type is STATUS4_REFERRAL.  When this boolean is set
+      and the type is not STATUS4_REFERRAL, the remaining information in
+      the fs4_status reflects that last valid when the file system was
+      present.
+    </t>
+
+    <t>
+      The fss_type field indicates the kind of file system image
+      represented.  This is of particular importance when using the version
+      values to determine appropriate succession of file system images.
+      When fss_absent is set, and the file system was previously present,
+      the value of fss_type reflected is that when the file was last
+      present.  Five values are distinguished:
+    </t>
+
+    <t>
+      <list style='hanging'>
+        <t hangText='STATUS4_FIXED,'>
+          which indicates a read-only image in the sense that
+          it will never change.  The possibility is allowed that, as a
+          result of migration or switch to a different image, changed data
+          can be accessed, but within the confines of this instance, no
+          change is allowed.  The client can use this fact to cache
+          aggressively.
+        </t>
+
+        <t hangText='STATUS4_VERSIONED,'>
+          which indicates that the image, like the
+          STATUS4_UPDATED case, is updated externally, but it provides a
+          guarantee that the server will carefully update an associated
+          version value so that the client can protect itself from a
+          situation in which it reads data from one version of the file
+          system and then later reads data from an earlier version of the
+          same file system.  See below for a discussion of how this can be
+          done.
+        </t>
+
+        <t hangText='STATUS4_UPDATED,'>
+          which indicates an image that cannot be updated
+          by the user writing to it but that may be changed externally,
+          typically because it is a periodically updated copy of another
+          writable file system somewhere else.  In this case, version
+          information is not provided, and the client does not have the
+          responsibility of making sure that this version only advances upon
+          a file system instance transition.  In this case, it is the
+          responsibility of the server to make sure that the data presented
+          after a file system instance transition is a proper successor
+          image and includes all changes seen by the client and any change
+          made before all such changes.
+        </t>
+
+        <t hangText='STATUS4_WRITABLE,'>
+          which indicates that the file system is an
+          actual writable one.  The client need not, of course, actually
+          write to the file system, but once it does, it should not accept a
+          transition to anything other than a writable instance of that same
+          file system.
+        </t>
+
+        <t hangText='STATUS4_REFERRAL,'>
+          which indicates that the file system in question
+          is absent and has never been present on this server.
+        </t>
+      </list>
+    </t>
+
+    <t>
+      Note that in the STATUS4_UPDATED and STATUS4_VERSIONED cases, the
+      server is responsible for the appropriate handling of locks that are
+      inconsistent with external changes to delegations.  If a server gives
+      out delegations, they SHOULD be recalled before an inconsistent
+      change is made to the data, and MUST be revoked if this is not
+      possible.  Similarly, if an OPEN is inconsistent with data that is
+      changed (the OPEN has OPEN4_SHARE_DENY_WRITE/OPEN4_SHARE_DENY_BOTH
+      and the data is changed), that OPEN SHOULD be considered
+      administratively revoked.
+    </t>
+
+    <t>
+      The opaque strings fss_source and fss_current provide a way of
+      presenting information about the source of the file system image
+      being present.  It is not intended that the client do anything with
+      this information other than make it available to administrative
+      tools.  It is intended that this information be helpful when
+      researching possible problems with a file system image that might
+      arise when it is unclear if the correct image is being accessed and,
+      if not, how that image came to be made.  This kind of diagnostic
+      information will be helpful, if, as seems likely, copies of file
+      systems are made in many different ways (e.g., simple user-level
+      copies, file-system-level point-in-time copies, clones of the
+      underlying storage), under a variety of administrative arrangements.
+      In such environments, determining how a given set of data was
+      constructed can be very helpful in resolving problems.
+    </t>
+
+    <t>
+      The opaque string fss_source is used to indicate the source of a
+      given file system with the expectation that tools capable of creating
+      a file system image propagate this information, when possible.  It is
+      understood that this may not always be possible since a user-level
+      copy may be thought of as creating a new data set and the tools used
+      may have no mechanism to propagate this data.  When a file system is
+      initially created, it is desirable to associate with it data
+      regarding how the file system was created, where it was created, who
+      created it, etc.  Making this information available in this attribute
+      in a human-readable string will be helpful for applications and
+      system administrators and will also serve to make it available when
+      the original file system is used to make subsequent copies.
+    </t>
+
+    <t>
+      The opaque string fss_current should provide whatever information is
+      available about the source of the current copy.  Such information
+      includes the tool creating it, any relevant parameters to that tool,
+      the time at which the copy was done, the user making the change, the
+      server on which the change was made, etc.  All information should be
+      in a human-readable string.
+    </t>
+
+    <t>
+      The field fss_age provides an indication of how out-of-date the file
+      system currently is with respect to its ultimate data source (in case
+      of cascading data updates).  This complements the fls_currency field
+      of fs_locations_server4 (see <xref target="ss:multi-server_namespace:TAf1" />) in the following way: the
+      information in fls_currency gives a bound for how out of date the
+      data in a file system might typically get, while the value in fss_age
+      gives a bound on how out-of-date that data actually is.  Negative
+      values imply that no information is available.  A zero means that
+      this data is known to be current.  A positive value means that this
+      data is known to be no older than that number of seconds with respect
+      to the ultimate data source.  Using this value, the client may be
+      able to decide that a data copy is too old, so that it may search for
+      a newer version to use.
+    </t>
+
+    <t>
+      The fss_version field provides a version identification, in the form
+      of a time value, such that successive versions always have later time
+      values.  When the fs_type is anything other than STATUS4_VERSIONED,
+      the server may provide such a value, but there is no guarantee as to
+      its validity and clients will not use it except to provide additional
+      information to add to fss_source and fss_current.
+    </t>
+
+    <t>
+      When fss_type is STATUS4_VERSIONED, servers SHOULD provide a value of
+      fss_version that progresses monotonically whenever any new version of
+      the data is established.  This allows the client, if reliable image
+      progression is important to it, to fetch this attribute as part of
+      each COMPOUND where data or metadata from the file system is used.
+    </t>
+
+    <t>
+      When it is important to the client to make sure that only valid
+      successor images are accepted, it must make sure that it does not
+      read data or metadata from the file system without updating its sense
+      of the current state of the image.  This is to avoid the possibility
+      that the fs_status that the client holds will be one for an earlier
+      image, which would cause the client to accept a new file system
+      instance that is later than that but still earlier than the updated
+      data read by the client.
+    </t>
+
+    <t>
+      In order to accept valid images reliably, the client must do a
+      GETATTR of the fs_status attribute that follows any interrogation of
+      data or metadata within the file system in question.  Often this is
+      most conveniently done by appending such a GETATTR after all other
+      operations that reference a given file system.  When errors occur
+      between reading file system data and performing such a GETATTR, care
+      must be exercised to make sure that the data in question is not used
+      before obtaining the proper fs_status value.  In this connection,
+      when an OPEN is done within such a versioned file system and the
+      associated GETATTR of fs_status is not successfully completed, the
+      open file in question must not be accessed until that fs_status is
+      fetched.
+    </t>
+
+    <t>
+      The procedure above will ensure that before using any data from the
+      file system the client has in hand a newly-fetched current version of
+      the file system image.  Multiple values for multiple requests in
+      flight can be resolved by assembling them into the required partial
+      order (and the elements should form a total order within the partial
+      order) and using the last.  The client may then, when switching among
+      file system instances, decline to use an instance that does not have
+      an fss_type of STATUS4_VERSIONED or whose fss_version field is
+      earlier than the last one obtained from the predecessor file system
+      instance.
+    </t>
+  </section>
+</section>

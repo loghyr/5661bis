@@ -1,0 +1,41 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_PUTFH" title="Operation 22: PUTFH - Set Current Filehandle">
+    <section toc='exclude' anchor="ss:op_PUTFH:A" title="ARGUMENT">
+      <?rfc include='autogen/putfh_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_PUTFH:R" title="RESULT">
+      <?rfc include='autogen/putfh_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_PUTFH:D" title="DESCRIPTION">
+      <t>
+        This operation replaces the current filehandle with the filehandle
+        provided as an argument.  It clears the current stateid.
+      </t>
+
+      <t>
+        If the security mechanism used by the requester does not meet the
+        requirements of the filehandle provided to this operation, the server
+        MUST return NFS4ERR_WRONGSEC.
+      </t>
+
+      <t>
+        See <xref target="ss:proc_COMPOUND:CF" /> for more details on the current filehandle.
+      </t>
+
+      <t>
+        See <xref target="ss:proc_COMPOUND:CS" /> for more details on the current stateid.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_PUTFH:I" title="IMPLEMENTATION">
+      <t>
+        This operation is used in an NFS request to set the context for file
+        accessing operations that follow in the same COMPOUND request.
+      </t>
+    </section>
+  </section>
+

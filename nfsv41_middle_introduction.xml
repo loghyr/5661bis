@@ -1,0 +1,653 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+<section anchor="sec:introduction" title="Introduction">
+  <section anchor="ss:introduction:TNVMVP" title="The NFS Version 4 Minor Version 1 Protocol">
+    <t>
+      The NFS version 4 minor version 1 (NFSv4.1) protocol is the second
+      minor version of the NFS version 4 (NFSv4) protocol.  The first minor
+      version, NFSv4.0, is described in <xref target="RFC3530" />.  It generally follows the
+      guidelines for minor versioning that are listed in <xref target="sec:client-side_caching" /> of RFC
+      3530.  However, it diverges from guidelines 11 ("a client and server
+      that support minor version X must support minor versions 0 through
+      X-1") and 12 ("no new features may be introduced as mandatory in a
+      minor version").  These divergences are due to the introduction of
+      the sessions model for managing non-idempotent operations and the
+      RECLAIM_COMPLETE operation.  These two new features are
+      infrastructural in nature and simplify implementation of existing and
+      other new features.  Making them anything but REQUIRED would add
+      undue complexity to protocol definition and implementation.  NFSv4.1
+      accordingly updates the minor versioning guidelines (<xref target="ss:core_infrastructure:MV" />).
+    </t>
+
+    <t>
+      As a minor version, NFSv4.1 is consistent with the overall goals for
+      NFSv4, but extends the protocol so as to better meet those goals,
+      based on experiences with NFSv4.0.  In addition, NFSv4.1 has adopted
+      some additional goals, which motivate some of the major extensions in
+      NFSv4.1.
+    </t>
+  </section>
+
+  <section anchor="ss:introduction:SoTD" title="Scope of This Document">
+    <t>
+      This document describes the NFSv4.1 protocol.  With respect to
+      NFSv4.0, this document does not:
+    </t>
+
+    <t>
+      <list style="symbols">
+        <t>
+          describe the NFSv4.0 protocol, except where needed to contrast
+          with NFSv4.1.
+        </t>
+
+        <t>
+          modify the specification of the NFSv4.0 protocol.
+        </t>
+
+        <t>
+          clarify the NFSv4.0 protocol.
+        </t>
+      </list>
+    </t>
+  </section>
+
+  <section anchor="ss:introduction:NG" title="NFSv4 Goals">
+    <t>
+      The NFSv4 protocol is a further revision of the NFS protocol defined
+      already by NFSv3 <xref target="RFC1813" />.  It retains the essential characteristics of
+      previous versions: easy recovery; independence of transport
+      protocols, operating systems, and file systems; simplicity; and good
+      performance.  NFSv4 has the following goals:
+    </t>
+
+    <t>
+      <list style="symbols">
+        <t>
+          Improved access and good performance on the Internet
+          <vspace blankLines="1"/>
+          The protocol is designed to transit firewalls easily, perform well
+          where latency is high and bandwidth is low, and scale to very
+          large numbers of clients per server.
+        </t>
+
+        <t>
+          Strong security with negotiation built into the protocol
+          <vspace blankLines="1"/>
+          The protocol builds on the work of the ONCRPC working group in
+          supporting the RPCSEC_GSS protocol.  Additionally, the NFSv4.1
+          protocol provides a mechanism to allow clients and servers the
+          ability to negotiate security and require clients and servers to
+          support a minimal set of security schemes.
+        </t>
+
+        <t>
+          Good cross-platform interoperability
+          <vspace blankLines="1"/>
+          The protocol features a file system model that provides a useful,
+          common set of features that does not unduly favor one file system
+          or operating system over another.
+        </t>
+
+        <t>
+          Designed for protocol extensions
+          <vspace blankLines="1"/>
+          The protocol is designed to accept standard extensions within a
+          framework that enables and encourages backward compatibility.
+        </t>
+      </list>
+    </t>
+  </section>
+
+  <section anchor="ss:introduction:NG1" title="NFSv4.1 Goals">
+    <t>
+      NFSv4.1 has the following goals, within the framework established by
+      the overall NFSv4 goals.
+    </t>
+
+    <t>
+      <list style="symbols">
+        <t>
+          To correct significant structural weaknesses and oversights
+          discovered in the base protocol.
+        </t>
+
+        <t>
+          To add clarity and specificity to areas left unaddressed or not
+          addressed in sufficient detail in the base protocol.  However, as
+          stated in <xref target="ss:introduction:SoTD" />, it is not a goal to clarify the NFSv4.0
+          protocol in the NFSv4.1 specification.
+        </t>
+
+        <t>
+          To add specific features based on experience with the existing
+          protocol and recent industry developments.
+        </t>
+
+        <t>
+          To provide protocol support to take advantage of clustered server
+          deployments including the ability to provide scalable parallel
+          access to files distributed among multiple servers.
+        </t>
+      </list>
+    </t>
+  </section>
+
+  <section anchor="ss:introduction:GD" title="General Definitions">
+    <t>
+      The following definitions provide an appropriate context for the
+      reader.
+    </t>
+
+    <t>
+      <list style="hanging">
+        <t hangText="Byte:">
+          In this document, a byte is an octet, i.e., a datum exactly 8
+          bits in length.
+        </t>
+
+        <t anchor='para:client_def' hangText="Client:">
+          The client is the entity that accesses the NFS server's
+          resources.  The client may be an application that contains the
+          logic to access the NFS server directly.  The client may also be
+          the traditional operating system client that provides remote file
+          system services for a set of applications.
+          <vspace blankLines="1"/>
+          A client is uniquely identified by a client owner.
+          <vspace blankLines="1"/>
+          With reference to byte-range locking, the client is also the
+          entity that maintains a set of locks on behalf of one or more
+          applications.  This client is responsible for crash or failure
+          recovery for those locks it manages.
+          <vspace blankLines="1"/>
+          Note that multiple clients may share the same transport and
+          connection and multiple clients may exist on the same network
+          node.
+        </t>
+
+        <t hangText="Client ID:">
+          The client ID is a 64-bit quantity used as a unique,
+          short-hand reference to a client-supplied verifier and client
+          owner.  The server is responsible for supplying the client ID.
+        </t>
+
+        <t hangText="Client Owner:">
+          The client owner is a unique string, opaque to the
+          server, that identifies a client.  Multiple network connections
+          and source network addresses originating from those connections
+          may share a client owner.  The server is expected to treat
+          requests from connections with the same client owner as coming
+          from the same client.
+        </t>
+
+        <t hangText="File System:">
+          The file system is the collection of objects on a
+          server (as identified by the major identifier of a server owner,
+          which is defined later in this section) that share the same fsid
+          attribute (see <xref target="ss:file_attributes:A8f" />).
+        </t>
+
+        <t hangText="Lease:">
+          A lease is an interval of time defined by the server for
+          which the client is irrevocably granted locks.  At the end of a
+          lease period, locks may be revoked if the lease has not been
+          extended.  A lock must be revoked if a conflicting lock has been
+          granted after the lease interval.
+          <vspace blankLines="1"/> 
+          A server grants a client a single lease for all state.
+        </t>
+
+        <t hangText="Lock:">
+          The term "lock" is used to refer to byte-range (in UNIX
+          environments, also known as record) locks, share reservations,
+          delegations, or layouts unless specifically stated otherwise.
+        </t>
+
+        <t hangText="Secret State Verifier (SSV):">
+          The SSV is a unique secret key shared
+          between a client and server.  The SSV serves as the secret key for
+          an internal (that is, internal to NFSv4.1) Generic Security
+          Services (GSS) mechanism (the SSV GSS mechanism; see
+          <xref target="ss:core_infrastructure:TSSVGM" />).  The SSV GSS
+          mechanism uses the SSV to compute message integrity code (MIC)
+          and Wrap tokens.  See <xref target="ss:core_infrastructure:PfUSC" />
+          for more details on how NFSv4.1 uses the SSV and the SSV GSS mechanism.
+        </t>
+
+        <t hangText="Server:">
+          The Server is the entity responsible for coordinating client
+          access to a set of file systems and is identified by a server
+          owner.  A server can span multiple network addresses.
+        </t>
+
+        <t hangText="Server Owner:">
+          The server owner identifies the server to the client.
+          The server owner consists of a major identifier and a minor
+          identifier.  When the client has two connections each to a peer
+          with the same major identifier, the client assumes that both peers
+          are the same server (the server namespace is the same via each
+          connection) and that lock state is sharable across both
+          connections.  When each peer has both the same major and minor
+          identifiers, the client assumes that each connection might be
+          associable with the same session.
+        </t>
+
+        <t hangText="Stable Storage:">
+          Stable storage is storage from which data stored by
+          an NFSv4.1 server can be recovered without data loss from multiple
+          power failures (including cascading power failures, that is,
+          several power failures in quick succession), operating system
+          failures, and/or hardware failure of components other than the
+          storage medium itself (such as disk, nonvolatile RAM, flash
+          memory, etc.).
+          <vspace blankLines="1"/>
+          Some examples of stable storage that are allowable for an NFS
+          server include:
+          <vspace blankLines="1"/>
+          <list style="numbers">
+            <t>
+              Media commit of data; that is, the modified data has been
+              successfully written to the disk media, for example, the disk
+              platter.
+            </t>
+
+            <t>
+              An immediate reply disk drive with battery-backed, on-drive
+              intermediate storage or uninterruptible power system (UPS).
+            </t>
+
+            <t>
+              Server commit of data with battery-backed intermediate storage
+              and recovery software.
+            </t>
+
+            <t>
+              Cache commit with uninterruptible power system (UPS) and
+              recovery software.
+            </t>
+          </list>
+        </t>
+
+        <t hangText="Stateid:">
+          A stateid is a 128-bit quantity returned by a server that
+          uniquely defines the open and locking states provided by the
+          server for a specific open-owner or lock-owner/open-owner pair for
+          a specific file and type of lock.
+        </t>
+
+        <t hangText="Verifier:">
+          A verifier is a 64-bit quantity generated by the client
+          that the server can use to determine if the client has restarted
+          and lost all previous lock state.
+        </t>
+      </list>
+    </t>
+  </section>
+
+  <section anchor="ss:introduction:OoNF" title="Overview of NFSv4.1 Features">
+    <t>
+      The major features of the NFSv4.1 protocol will be reviewed in brief.
+      This will be done to provide an appropriate context for both the
+      reader who is familiar with the previous versions of the NFS protocol
+      and the reader who is new to the NFS protocols.  For the reader new
+      to the NFS protocols, there is still a set of fundamental knowledge
+      that is expected.  The reader should be familiar with the External
+      Data Representation (XDR) and Remote Procedure Call (RPC) protocols
+      as described in <xref target="RFC4506" />
+      and <xref target="RFC5531" />.  A basic knowledge of file systems and
+      distributed file systems is expected as well.
+    </t>
+
+    <t>
+      In general, this specification of NFSv4.1 will not distinguish those
+      features added in minor version 1 from those present in the base
+      protocol but will treat NFSv4.1 as a unified whole.  See <xref target="ss:introduction:DfN" />
+      for a summary of the differences between NFSv4.0 and NFSv4.1.
+    </t>
+
+    <section toc='exclude' anchor="ss:introduction:RaS" title="RPC and Security">
+      <t>
+        As with previous versions of NFS, the External Data Representation
+        (XDR) and Remote Procedure Call (RPC) mechanisms used for the NFSv4.1
+        protocol are those defined in <xref target="RFC4506" />
+        and <xref target="RFC5531" />.  To meet end-to-end
+        security requirements, the RPCSEC_GSS framework <xref target="RFC2203" /> is used to extend
+        the basic RPC security.  With the use of RPCSEC_GSS, various
+        mechanisms can be provided to offer authentication, integrity, and
+        privacy to the NFSv4 protocol.  Kerberos V5 is used as described in
+        <xref target="RFC4121" /> to provide one security framework.  With the use of RPCSEC_GSS,
+        other mechanisms may also be specified and used for NFSv4.1 security.
+      </t>
+
+      <t>
+        To enable in-band security negotiation, the NFSv4.1 protocol has
+        operations that provide the client a method of querying the server
+        about its policies regarding which security mechanisms must be used
+        for access to the server's file system resources.  With this, the
+        client can securely match the security mechanism that meets the
+        policies specified at both the client and server.
+      </t>
+
+      <t>
+        NFSv4.1 introduces parallel access (see <xref target="ss:introduction:PA" />), which is
+        called pNFS.  The security framework described in this section is
+        significantly modified by the introduction of pNFS (see
+        <xref target="ss:parallel_nfs:SCfp" />), because data access is sometimes not over RPC.  The
+        level of significance varies with the storage protocol (see
+        <xref target="ss:parallel_nfs:SP" />) and can be as low as zero impact (see <xref target="ss:nfsv4.1_as:SCftFLT" />).
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:introduction:PS" title="Protocol Structure">
+      <section anchor="ss:introduction:CP" title="Core Protocol">
+        <t>
+          Unlike NFSv3, which used a series of ancillary protocols (e.g., 
+          Network Lock Manager (NLM), Network Status Monitor (NSM), MOUNT),
+          within all minor versions of NFSv4 a single RPC protocol is used to
+          make requests to the server.  Facilities that had been separate
+          protocols, such as locking, are now integrated within a single
+          unified protocol.
+        </t>
+      </section>
+
+      <section anchor="ss:introduction:PA" title="Parallel Access">
+        <t>
+          Minor version 1 supports high-performance data access to a clustered
+          server implementation by enabling a separation of metadata access and
+          data access, with the latter done to multiple servers in parallel.
+        </t>
+
+        <t>
+          Such parallel data access is controlled by recallable objects known
+          as "layouts", which are integrated into the protocol locking model.
+          Clients direct requests for data access to a set of data servers
+          specified by the layout via a data storage protocol which may be
+          NFSv4.1 or may be another protocol.
+        </t>
+
+        <t>
+          Because the protocols used for parallel data access are not
+          necessarily RPC-based, the RPC-based security model (<xref target="ss:introduction:RaS" />)
+          is obviously impacted (see <xref target="ss:parallel_nfs:SCfp" />).  The degree of impact
+          varies with the storage protocol (see <xref target="ss:parallel_nfs:SP" />) used for data
+          access, and can be as low as zero (see <xref target="ss:nfsv4.1_as:SCftFLT" />).
+        </t>
+    </section>
+
+    <section anchor="ss:introduction:FSM" title="File System Model">
+        <t>
+          The general file system model used for the NFSv4.1 protocol is the
+          same as previous versions.  The server file system is hierarchical
+          with the regular files contained within being treated as opaque byte
+          streams.  In a slight departure, file and directory names are encoded
+          with UTF-8 to deal with the basics of internationalization.
+        </t>
+
+        <t>
+          The NFSv4.1 protocol does not require a separate protocol to provide
+          for the initial mapping between path name and filehandle.  All file
+          systems exported by a server are presented as a tree so that all file
+          systems are reachable from a special per-server global root
+          filehandle.  This allows LOOKUP operations to be used to perform
+          functions previously provided by the MOUNT protocol.  The server
+          provides any necessary pseudo file systems to bridge any gaps that
+          arise due to unexported gaps between exported file systems.
+        </t>
+      </section>
+
+      <section anchor="ss:introduction:F" title="Filehandles">
+        <t>
+          As in previous versions of the NFS protocol, opaque filehandles are
+          used to identify individual files and directories.  Lookup-type and
+          create operations translate file and directory names to filehandles,
+          which are then used to identify objects in subsequent operations.
+        </t>
+
+        <t>
+          The NFSv4.1 protocol provides support for persistent filehandles,
+          guaranteed to be valid for the lifetime of the file system object
+          designated.  In addition, it provides support to servers to provide
+          filehandles with more limited validity guarantees, called volatile
+          filehandles.
+        </t>
+      </section>
+
+      <section anchor="ss:introduction:FA" title="File Attributes">
+        <t>
+          The NFSv4.1 protocol has a rich and extensible file object attribute
+          structure, which is divided into REQUIRED, RECOMMENDED, and named
+          attributes (see <xref target="sec:file_attributes" />).
+        </t>
+
+        <t>
+          Several (but not all) of the REQUIRED attributes are derived from the
+          attributes of NFSv3 (see the definition of the fattr3 data type in
+          <xref target="RFC1813" />).  An example of a REQUIRED attribute is the file object's type
+          (<xref target="ss:file_attributes:A1t" />) so that regular files can be distinguished from
+          directories (also known as folders in some operating environments)
+          and other types of objects.  REQUIRED attributes are discussed in
+          <xref target="ss:file_attributes:RA" />.
+        </t>
+
+        <t>
+          An example of three RECOMMENDED attributes are acl, sacl, and dacl.
+          These attributes define an Access Control List (ACL) on a file object
+          (<xref target="sec:access_control" />).  An ACL provides directory and file access control
+          beyond the model used in NFSv3.  The ACL definition allows for
+          specification of specific sets of permissions for individual users
+          and groups.  In addition, ACL inheritance allows propagation of
+          access permissions and restrictions down a directory tree as file
+          system objects are created.  RECOMMENDED attributes are discussed in
+          <xref target="ss:file_attributes:RA1" />.
+        </t>
+
+        <t>
+          A named attribute is an opaque byte stream that is associated with a
+          directory or file and referred to by a string name.  Named attributes
+          are meant to be used by client applications as a method to associate
+          application-specific data with a regular file or directory.  NFSv4.1
+          modifies named attributes relative to NFSv4.0 by tightening the
+          allowed operations in order to prevent the development of
+          non-interoperable implementations.  Named attributes are discussed in
+          <xref target="ss:file_attributes:NA" />.
+        </t>
+      </section>
+
+      <section anchor="ss:introduction:MN" title="Multi-Server Namespace">
+        <t>
+          NFSv4.1 contains a number of features to allow implementation of
+          namespaces that cross server boundaries and that allow and facilitate
+          a non-disruptive transfer of support for individual file systems
+          between servers.  They are all based upon attributes that allow one
+          file system to specify alternate or new locations for that file
+          system.
+        </t>
+
+        <t>
+          These attributes may be used together with the concept of absent file
+          systems, which provide specifications for additional locations but no
+          actual file system content.  This allows a number of important
+          facilities:
+        </t>
+
+        <t>
+          <list style="symbols">
+            <t>
+              Location attributes may be used with absent file systems to
+              implement referrals whereby one server may direct the client to a
+              file system provided by another server.  This allows extensive
+              multi-server namespaces to be constructed.
+            </t>
+
+            <t>
+              Location attributes may be provided for present file systems to
+              provide the locations of alternate file system instances or
+              replicas to be used in the event that the current file system
+              instance becomes unavailable.
+            </t>
+
+            <t>
+              Location attributes may be provided when a previously present file
+              system becomes absent.  This allows non-disruptive migration of
+              file systems to alternate servers.
+            </t>
+          </list>
+        </t>
+      </section>
+    </section>
+
+    <section toc='exclude' anchor="ss:introduction:LF" title="Locking Facilities">
+      <t>
+        As mentioned previously, NFSv4.1 is a single protocol that includes
+        locking facilities.  These locking facilities include support for
+        many types of locks including a number of sorts of recallable locks.
+      </t>
+
+      <t>
+        Recallable locks such as delegations allow the client to be assured
+        that certain events will not occur so long as that lock is held.
+        When circumstances change, the lock is recalled via a callback
+        request.  The assurances provided by delegations allow more extensive
+        caching to be done safely when circumstances allow it.
+      </t>
+
+      <t>
+        The types of locks are:
+      </t>
+
+      <t>
+        <list style="symbols">
+          <t>
+            Share reservations as established by OPEN operations.
+          </t>
+
+          <t>
+            Byte-range locks.
+          </t>
+
+          <t>
+            File delegations, which are recallable locks that assure the
+            holder that inconsistent opens and file changes cannot occur so
+            long as the delegation is held.
+          </t>
+
+          <t>
+            Directory delegations, which are recallable locks that assure the
+            holder that inconsistent directory modifications cannot occur so
+            long as the delegation is held.
+          </t>
+
+          <t>
+            Layouts, which are recallable objects that assure the holder that
+            direct access to the file data may be performed directly by the
+            client and that no change to the data's location that is
+            inconsistent with that access may be made so long as the layout is
+            held.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        All locks for a given client are tied together under a single
+        client-wide lease.  All requests made on sessions associated with the client
+        renew that lease.  When the client's lease is not promptly renewed,
+        the client's locks are subject to revocation.  In the event of server
+        restart, clients have the opportunity to safely reclaim their locks
+        within a special grace period.
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:introduction:DfN" title="Differences from NFSv4.0">
+    <t>
+      The following summarizes the major differences between minor version
+      1 and the base protocol:
+    </t>
+
+    <t>
+      <list style="symbols">
+        <t>
+          Implementation of the sessions model (<xref target="ss:core_infrastructure:S" />).
+        </t>
+
+        <t>
+          Parallel access to data (<xref target="sec:parallel_nfs" />).
+        </t>
+
+        <t>
+          Addition of the RECLAIM_COMPLETE operation to better structure the
+          lock reclamation process (<xref target="op_RECLAIM_COMPLETE" />).
+        </t>
+
+        <t>
+          Enhanced delegation support as follows.
+
+          <list style="symbols">
+            <t>
+              Delegations on directories and other file types in addition to
+              regular files (<xref target="op_GET_DIR_DELEGATION" />, <xref target="op_WANT_DELEGATION" />).
+            </t>
+
+            <t>
+              Operations to optimize acquisition of recalled or denied
+              delegations (<xref target="op_WANT_DELEGATION" />, <xref target="op_CB_PUSH_DELEG" />, <xref target="op_CB_RECALLABLE_OBJ_AVAIL" />).
+            </t>
+
+            <t>
+              Notifications of changes to files and directories
+              (<xref target="op_GET_DIR_DELEGATION" />, <xref target="op_CB_NOTIFY" />).
+            </t>
+
+            <t>
+              A method to allow a server to indicate that it is recalling one
+              or more delegations for resource management reasons, and thus a
+              method to allow the client to pick which delegations to return
+              (<xref target="op_CB_RECALL_ANY" />).
+            </t>
+          </list>
+        </t>
+
+        <t>
+          Attributes can be set atomically during exclusive file create via
+          the OPEN operation (see the new EXCLUSIVE4_1 creation method in
+          <xref target="op_OPEN" />).
+        </t>
+
+        <t>
+          Open files can be preserved if removed and the hard link count
+          ("hard link" is defined in an Open Group <xref target="openg_hardlink" /> standard) goes to
+          zero, thus obviating the need for clients to rename deleted files
+          to partially hidden names -- colloquially called "silly rename"
+          (see the new OPEN4_RESULT_PRESERVE_UNLINKED reply flag in
+          <xref target="op_OPEN" />).
+        </t>
+
+        <t>
+          Improved compatibility with Microsoft Windows for Access Control
+          Lists (<xref target="ss:access_control:A5s" />, <xref target="ss:access_control:A5d" />, <xref target="ss:access_control:AI" />).
+        </t>
+
+        <t>
+          Data retention (<xref target="ss:file_attributes:RA2" />).
+        </t>
+
+        <t>
+          Identification of the implementation of the NFS client and server
+          (<xref target="op_EXCHANGE_ID" />).
+        </t>
+
+        <t>
+          Support for notification of the availability of byte-range locks
+          (see the new OPEN4_RESULT_MAY_NOTIFY_LOCK reply flag in
+          <xref target="op_OPEN" /> and see <xref target="op_CB_NOTIFY_LOCK" />).
+        </t>
+
+        <t>
+          In NFSv4.1, LIPKEY and SPKM-3 are not required security mechanisms
+          <xref target="RFC2847" />.
+        </t>
+      </list>
+    </t>
+  </section>
+</section>

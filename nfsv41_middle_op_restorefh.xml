@@ -1,0 +1,58 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_RESTOREFH" title="Operation 31: RESTOREFH - Restore Saved Filehandle">
+    <section toc='exclude' anchor="ss:op_RESTOREFH:A" title="ARGUMENT">
+      <figure>
+        <artwork>
+/* SAVED_FH: */
+void;
+        </artwork>
+      </figure>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_RESTOREFH:R" title="RESULT">
+      <?rfc include='autogen/restorefh_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_RESTOREFH:D" title="DESCRIPTION">
+      <t>
+        The RESTOREFH operation sets the current filehandle and stateid to
+        the values in the saved filehandle and stateid.  If there is no saved
+        filehandle, then the server will return the error
+        NFS4ERR_NOFILEHANDLE.
+      </t>
+
+      <t>
+        See <xref target="ss:proc_COMPOUND:CF" /> for more details on the current filehandle.
+      </t>
+
+      <t>
+        See <xref target="ss:proc_COMPOUND:CS" /> for more details on the current stateid.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_RESTOREFH:I" title="IMPLEMENTATION">
+      <t>
+        Operations like OPEN and LOOKUP use the current filehandle to
+        represent a directory and replace it with a new filehandle.  Assuming
+        that the previous filehandle was saved with a SAVEFH operator, the
+        previous filehandle can be restored as the current filehandle.  This
+        is commonly used to obtain post-operation attributes for the
+        directory, e.g.,
+      </t>
+
+      <figure>
+        <artwork>
+    PUTFH (directory filehandle)
+    SAVEFH
+    GETATTR attrbits     (pre-op dir attrs)
+    CREATE optbits "foo" attrs
+    GETATTR attrbits     (file attributes)
+    RESTOREFH
+    GETATTR attrbits     (post-op dir attrs)
+        </artwork>
+      </figure>
+    </section>
+  </section>
+

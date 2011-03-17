@@ -1,0 +1,161 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_WANT_DELEGATION" title="Operation 56: WANT_DELEGATION - Request Delegation">
+    <section toc='exclude' anchor="ss:op_WANT_DELEGATION:A" title="ARGUMENT">
+      <?rfc include='autogen/want_delegation_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_WANT_DELEGATION:R" title="RESULT">
+      <?rfc include='autogen/want_delegation_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_WANT_DELEGATION:D" title="DESCRIPTION">
+      <t>
+        Where this description mandates the return of a specific error code
+        for a specific condition, and where multiple conditions apply, the
+        server MAY return any of the mandated error codes.
+      </t>
+
+      <t>
+        This operation allows a client to:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            Get a delegation on all types of files except directories.
+          </t>
+
+          <t>
+            Register a "want" for a delegation for the specified file object,
+            and be notified via a callback when the delegation is available.
+            The server MAY support notifications of availability via
+            callbacks.  If the server does not support registration of wants,
+            it MUST NOT return an error to indicate that, and instead MUST
+            return with ond_why set to WND4_CONTENTION or WND4_RESOURCE and
+            ond_server_will_push_deleg or ond_server_will_signal_avail set to
+            FALSE.  When the server indicates that it will notify the client
+            by means of a callback, it will either provide the delegation
+            using a CB_PUSH_DELEG operation or cancel its promise by sending a
+            CB_WANTS_CANCELLED operation.
+          </t>
+
+          <t>
+            Cancel a want for a delegation.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        The client SHOULD NOT set OPEN4_SHARE_ACCESS_READ and SHOULD NOT set
+        OPEN4_SHARE_ACCESS_WRITE in wda_want.  If it does, the server MUST
+        ignore them.
+      </t>
+
+      <t>
+        The meanings of the following flags in wda_want are the same as they
+        are in OPEN, except as noted below.
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            OPEN4_SHARE_ACCESS_WANT_READ_DELEG
+          </t>
+
+          <t>
+            OPEN4_SHARE_ACCESS_WANT_WRITE_DELEG
+          </t>
+
+          <t>
+            OPEN4_SHARE_ACCESS_WANT_ANY_DELEG
+          </t>
+
+          <t>
+            OPEN4_SHARE_ACCESS_WANT_NO_DELEG.  Unlike the OPEN operation, this
+            flag SHOULD NOT be set by the client in the arguments to
+            WANT_DELEGATION, and MUST be ignored by the server.
+          </t>
+
+          <t>
+            OPEN4_SHARE_ACCESS_WANT_CANCEL
+          </t>
+
+          <t>
+            OPEN4_SHARE_ACCESS_WANT_SIGNAL_DELEG_WHEN_RESRC_AVAIL
+          </t>
+
+          <t>
+            OPEN4_SHARE_ACCESS_WANT_PUSH_DELEG_WHEN_UNCONTENDED
+          </t>
+        </list>
+      </t>
+
+      <t>
+        The handling of the above flags in WANT_DELEGATION is the same as in
+        OPEN.  Information about the delegation and/or the promises the
+        server is making regarding future callbacks are the same as those
+        described in the open_delegation4 structure.
+      </t>
+
+      <t>
+        The successful results of WANT_DELEGATION are of data type
+        open_delegation4, which is the same data type as the "delegation"
+        field in the results of the OPEN operation (see <xref target="ss:op_OPEN:D" />).
+        The server constructs wdr_resok4 the same way it constructs OPEN's
+        "delegation" with one difference: WANT_DELEGATION MUST NOT return a
+        delegation type of OPEN_DELEGATE_NONE.
+      </t>
+
+      <t>
+        If ((wda_want &amp; OPEN4_SHARE_ACCESS_WANT_DELEG_MASK) &amp;
+        ~OPEN4_SHARE_ACCESS_WANT_NO_DELEG) is zero, then the client is
+        indicating no explicit desire or non-desire for a delegation and the
+        server MUST return NFS4ERR_INVAL.
+      </t>
+
+      <t>
+        The client uses the OPEN4_SHARE_ACCESS_WANT_CANCEL flag in the
+        WANT_DELEGATION operation to cancel a previously requested want for a
+        delegation.  Note that if the server is in the process of sending the
+        delegation (via CB_PUSH_DELEG) at the time the client sends a
+        cancellation of the want, the delegation might still be pushed to the
+        client.
+      </t>
+
+      <t>
+        If WANT_DELEGATION fails to return a delegation, and the server
+        returns NFS4_OK, the server MUST set the delegation type to
+        OPEN4_DELEGATE_NONE_EXT, and set od_whynone, as described in
+        <xref target="op_OPEN" />.  Write delegations are not available for file types
+        that are not writable.  This includes file objects of types NF4BLK,
+        NF4CHR, NF4LNK, NF4SOCK, and NF4FIFO.  If the client requests
+        OPEN4_SHARE_ACCESS_WANT_WRITE_DELEG without
+        OPEN4_SHARE_ACCESS_WANT_READ_DELEG on an object with one of the
+        aforementioned file types, the server must set
+        wdr_resok4.od_whynone.ond_why to WND4_WRITE_DELEG_NOT_SUPP_FTYPE.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_WANT_DELEGATION:I" title="IMPLEMENTATION">
+      <t>
+        A request for a conflicting delegation is not normally intended to
+        trigger the recall of the existing delegation.  Servers may choose to
+        treat some clients as having higher priority such that their wants
+        will trigger recall of an existing delegation, although that is
+        expected to be an unusual situation.
+      </t>
+
+      <t>
+        Servers will generally recall delegations assigned by WANT_DELEGATION
+        on the same basis as those assigned by OPEN.  CB_RECALL will
+        generally be done only when other clients perform operations
+        inconsistent with the delegation.  The normal response to aging of
+        delegations is to use CB_RECALL_ANY, in order to give the client the
+        opportunity to keep the delegations most useful from its point of
+        view.
+      </t>
+    </section>
+  </section>
+

@@ -1,0 +1,70 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_CLOSE" title="Operation 4: CLOSE - Close File">
+    <section toc='exclude' anchor="ss:op_CLOSE:A" title="ARGUMENT">
+      <?rfc include='autogen/close_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CLOSE:R" title="RESULT">
+      <?rfc include='autogen/close_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CLOSE:D" title="DESCRIPTION">
+      <t>
+        The CLOSE operation releases share reservations for the regular or
+        named attribute file as specified by the current filehandle.  The
+        share reservations and other state information released at the server
+        as a result of this CLOSE are only those associated with the supplied
+        stateid.  State associated with other OPENs is not affected.
+      </t>
+
+      <t>
+        If byte-range locks are held, the client SHOULD release all locks
+        before sending a CLOSE.  The server MAY free all outstanding locks on
+        CLOSE, but some servers may not support the CLOSE of a file that
+        still has byte-range locks held.  The server MUST return failure if
+        any locks would exist after the CLOSE.
+      </t>
+
+      <t>
+        The argument seqid MAY have any value, and the server MUST ignore
+        seqid.
+      </t>
+
+      <t>
+        On success, the current filehandle retains its value.
+      </t>
+
+      <t>
+        The server MAY require that the combination of principal, security
+        flavor, and, if applicable, GSS mechanism that sent the OPEN request
+        also be the one to CLOSE the file.  This might not be possible if
+        credentials for the principal are no longer available.  The server
+        MAY allow the machine credential or SSV credential (see
+        <xref target="op_EXCHANGE_ID" />) to send CLOSE.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CLOSE:I" title="IMPLEMENTATION">
+      <t>
+        Even though CLOSE returns a stateid, this stateid is not useful
+        to the client and should be treated as deprecated.  CLOSE "shuts
+        down" the state associated with all OPENs for the file by a
+        single open-owner.  As noted above, CLOSE will either release
+        all file-locking state or return an error.  Therefore, the stateid
+        returned by CLOSE is not useful for operations that follow.  To
+        help find any uses of this stateid by clients, the server SHOULD
+        return the invalid special stateid (the "other" value is zero
+        and the "seqid" field is NFS4_UINT32_MAX, see <xref target="ss:state_management:SS1" />).
+      </t>
+
+      <t>
+        A CLOSE operation may make delegations grantable where they were not
+        previously.  Servers may choose to respond immediately if there are
+        pending delegation want requests or may respond to the situation at a
+        later time.
+      </t>
+    </section>
+  </section>
+

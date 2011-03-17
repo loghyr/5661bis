@@ -1,0 +1,1573 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+<section anchor="sec:nfsv4.1_as" title="NFSv4.1 as a Storage Protocol in pNFS: the File Layout Type">
+  <t>
+   This section describes the semantics and format of NFSv4.1 file-based
+   layouts for pNFS.  NFSv4.1 file-based layouts use the
+   LAYOUT4_NFSV4_1_FILES layout type.  The LAYOUT4_NFSV4_1_FILES type
+   defines striping data across multiple NFSv4.1 data servers.
+  </t>
+
+  <section anchor="ss:nfsv4.1_as:CIaSC" title="Client ID and Session Considerations">
+    <t>
+      Sessions are a REQUIRED feature of NFSv4.1, and this extends to both
+      the metadata server and file-based (NFSv4.1-based) data servers.
+    </t>
+
+    <t>
+      The role a server plays in pNFS is determined by the result it
+      returns from EXCHANGE_ID.  The roles are:
+    </t>
+
+    <t>
+      <list style='symbols'>
+        <t>
+          Metadata server (EXCHGID4_FLAG_USE_PNFS_MDS is set in the result
+          eir_flags).
+        </t>
+
+        <t>
+          Data server (EXCHGID4_FLAG_USE_PNFS_DS).
+        </t>
+
+        <t>
+          Non-metadata server (EXCHGID4_FLAG_USE_NON_PNFS).  This is an
+          NFSv4.1 server that does not support operations (e.g., LAYOUTGET)
+          or attributes that pertain to pNFS.
+        </t>
+      </list>
+    </t>
+
+    <t>
+      The client MAY request zero or more of EXCHGID4_FLAG_USE_NON_PNFS,
+      EXCHGID4_FLAG_USE_PNFS_DS, or EXCHGID4_FLAG_USE_PNFS_MDS, even though
+      some combinations (e.g., EXCHGID4_FLAG_USE_NON_PNFS |
+      EXCHGID4_FLAG_USE_PNFS_MDS) are contradictory.  However, the server
+      MUST only return the following acceptable combinations:
+    </t>
+
+    <texttable>
+      <ttcol>Acceptable Results from EXCHANGE_ID</ttcol>
+      <c>EXCHGID4_FLAG_USE_PNFS_MDS</c>
+      <c>EXCHGID4_FLAG_USE_PNFS_MDS | EXCHGID4_FLAG_USE_PNFS_DS</c>
+      <c>EXCHGID4_FLAG_USE_PNFS_DS</c>
+      <c>EXCHGID4_FLAG_USE_NON_PNFS</c>
+      <c>EXCHGID4_FLAG_USE_PNFS_DS | EXCHGID4_FLAG_USE_NON_PNFS</c>
+    </texttable>
+
+    <t>
+      As the above table implies, a server can have one or two roles.  A
+      server can be both a metadata server and a data server, or it can be
+      both a data server and non-metadata server.  In addition to returning
+      two roles in the EXCHANGE_ID's results, and thus serving both roles
+      via a common client ID, a server can serve two roles by returning a
+      unique client ID and server owner for each role in each of two
+      EXCHANGE_ID results, with each result indicating each role.
+    </t>
+
+    <t>
+      In the case of a server with concurrent pNFS roles that are served by
+      a common client ID, if the EXCHANGE_ID request from the client has
+      zero or a combination of the bits set in eia_flags, the server result
+      should set bits that represent the higher of the acceptable
+      combination of the server roles, with a preference to match the roles
+      requested by the client.  Thus, if a client request has
+      (EXCHGID4_FLAG_USE_NON_PNFS | EXCHGID4_FLAG_USE_PNFS_MDS |
+      EXCHGID4_FLAG_USE_PNFS_DS) flags set, and the server is both a
+      metadata server and a data server, serving both the roles by a common
+      client ID, the server SHOULD return with (EXCHGID4_FLAG_USE_PNFS_MDS
+      | EXCHGID4_FLAG_USE_PNFS_DS) set.
+    </t>
+
+    <t>
+      In the case of a server that has multiple concurrent pNFS roles, each
+      role served by a unique client ID, if the client specifies zero or a
+      combination of roles in the request, the server results SHOULD return
+      only one of the roles from the combination specified by the client
+      request.  If the role specified by the server result does not match
+      the intended use by the client, the client should send the
+      EXCHANGE_ID specifying just the interested pNFS role.
+    </t>
+
+    <t>
+      If a pNFS metadata client gets a layout that refers it to an NFSv4.1
+      data server, it needs a client ID on that data server.  If it does
+      not yet have a client ID from the server that had the
+      EXCHGID4_FLAG_USE_PNFS_DS flag set in the EXCHANGE_ID results, then
+      the client needs to send an EXCHANGE_ID to the data server, using the
+      same co_ownerid as it sent to the metadata server, with the
+      EXCHGID4_FLAG_USE_PNFS_DS flag set in the arguments.  If the server's
+      EXCHANGE_ID results have EXCHGID4_FLAG_USE_PNFS_DS set, then the
+      client may use the client ID to create sessions that will exchange
+      pNFS data operations.  The client ID returned by the data server has
+      no relationship with the client ID returned by a metadata server
+      unless the client IDs are equal, and the server owners and server
+      scopes of the data server and metadata server are equal.
+    </t>
+
+    <t>
+      In NFSv4.1, the session ID in the SEQUENCE operation implies the
+      client ID, which in turn might be used by the server to map the
+      stateid to the right client/server pair.  However, when a data server
+      is presented with a READ or WRITE operation with a stateid, because
+      the stateid is associated with a client ID on a metadata server, and
+      because the session ID in the preceding SEQUENCE operation is tied to
+      the client ID of the data server, the data server has no obvious way
+      to determine the metadata server from the COMPOUND procedure, and
+      thus has no way to validate the stateid.  One RECOMMENDED approach is
+      for pNFS servers to encode metadata server routing and/or identity
+      information in the data server filehandles as returned in the layout.
+    </t>
+
+    <t>
+      If metadata server routing and/or identity information is encoded in
+      data server filehandles, when the metadata server identity or
+      location changes, the data server filehandles it gave out will become
+      invalid (stale), and so the metadata server MUST first recall the
+      layouts.  Invalidating a data server filehandle does not render the
+      NFS client's data cache invalid.  The client's cache should map a
+      data server filehandle to a metadata server filehandle, and a
+      metadata server filehandle to cached data.
+    </t>
+
+    <t>
+      If a server is both a metadata server and a data server, the server
+      might need to distinguish operations on files that are directed to
+      the metadata server from those that are directed to the data server.
+      It is RECOMMENDED that the values of the filehandles returned by the
+      LAYOUTGET operation be different than the value of the filehandle
+      returned by the OPEN of the same file.
+    </t>
+
+    <t>
+      Another scenario is for the metadata server and the storage device to
+      be distinct from one client's point of view, and the roles reversed
+      from another client's point of view.  For example, in the cluster
+      file system model, a metadata server to one client might be a data
+      server to another client.  If NFSv4.1 is being used as the storage
+      protocol, then pNFS servers need to encode the values of filehandles
+      according to their specific roles.
+    </t>
+
+    <section toc='exclude' anchor="ss:nfsv4.1_as:SCfDS" title="Sessions Considerations for Data Servers">
+      <t>
+        <xref target="ss:core_infrastructure:OotC" /> states that a client has to keep its lease renewed
+        in order to prevent a session from being deleted by the server.  If
+        the reply to EXCHANGE_ID has just the EXCHGID4_FLAG_USE_PNFS_DS role
+        set, then (as noted in <xref target="ss:nfsv4.1_as:OStNDS" />) the client will not be able to
+        determine the data server's lease_time attribute because GETATTR will
+        not be permitted.  Instead, the rule is that any time a client
+        receives a layout referring it to a data server that returns just the
+        EXCHGID4_FLAG_USE_PNFS_DS role, the client MAY assume that the
+        lease_time attribute from the metadata server that returned the
+        layout applies to the data server.  Thus, the data server MUST be
+        aware of the values of all lease_time attributes of all metadata
+        servers for which it is providing I/O, and it MUST use the maximum of
+        all such lease_time values as the lease interval for all client IDs
+        and sessions established on it.
+      </t>
+
+      <t>
+        For example, if one metadata server has a lease_time attribute of 20
+        seconds, and a second metadata server has a lease_time attribute of
+        10 seconds, then if both servers return layouts that refer to an
+        EXCHGID4_FLAG_USE_PNFS_DS-only data server, the data server MUST
+        renew a client's lease if the interval between two SEQUENCE
+        operations on different COMPOUND requests is less than 20 seconds.
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:nfsv4.1_as:FLD" title="File Layout Definitions">
+    <t>
+      The following definitions apply to the LAYOUT4_NFSV4_1_FILES layout
+      type and may be applicable to other layout types.
+    </t>
+
+    <t>
+      <list style='hanging'>
+        <t hangText='Unit.'>
+          A unit is a fixed-size quantity of data written to a data
+          server.
+        </t>
+
+        <t hangText='Pattern.'>
+          A pattern is a method of distributing one or more equal
+          sized units across a set of data servers.  A pattern is iterated
+          one or more times.
+        </t>
+
+        <t hangText='Stripe.'>
+          A stripe is a set of data distributed across a set of data
+          servers in a pattern before that pattern repeats.
+        </t>
+
+        <t hangText='Stripe Count.'>
+          A stripe count is the number of units in a pattern.
+        </t>
+
+        <t hangText='Stripe Width.'>
+          A stripe width is the size of a stripe in bytes.  The
+          stripe width = the stripe count * the size of the stripe unit.
+        </t>
+      </list>
+    </t>
+
+    <t>
+      Hereafter, this document will refer to a unit that is a written in a
+      pattern as a "stripe unit".
+    </t>
+
+    <t>
+      A pattern may have more stripe units than data servers.  If so, some
+      data servers will have more than one stripe unit per stripe.  A data
+      server that has multiple stripe units per stripe MAY store each unit
+      in a different data file (and depending on the implementation, will
+      possibly assign a unique data filehandle to each data file).
+    </t>
+  </section>
+
+  <section anchor="ss:nfsv4.1_as:FLDT" title="File Layout Data Types">
+    <t>
+      The high level NFSv4.1 layout types are nfsv4_1_file_layouthint4,
+      nfsv4_1_file_layout_ds_addr4, and nfsv4_1_file_layout4.
+    </t>
+
+    <t>
+      The SETATTR operation supports a layout hint attribute
+      (<xref target="ss:file_attributes:A6l2" />).  When the client sets a layout hint (data type
+      layouthint4) with a layout type of LAYOUT4_NFSV4_1_FILES (the
+      loh_type field), the loh_body field contains a value of data type
+      nfsv4_1_file_layouthint4.
+    </t>
+
+    <?rfc include='autogen/type_nfl_util4.xml'?>
+    <?rfc include='autogen/type_nfsv4_1_file_layouthint4.xml'?>
+
+    <t>
+      The generic layout hint structure is described in <xref target="ss:protocol_constants:l5" />.
+      The client uses the layout hint in the layout_hint (<xref target="ss:file_attributes:A6l2" />)
+      attribute to indicate the preferred type of layout to be used for a
+      newly created file.  The LAYOUT4_NFSV4_1_FILES layout-type-specific
+      content for the layout hint is composed of three fields.  The first
+      field, nflh_care, is a set of flags indicating which values of the
+      hint the client cares about.  If the NFLH4_CARE_DENSE flag is set,
+      then the client indicates in the second field, nflh_util, a
+      preference for how the data file is packed (<xref target="ss:nfsv4.1_as:SaDSUP" />), which is
+      controlled by the value of the expression nflh_util &amp; NFL4_UFLG_DENSE
+      ("&amp;" represents the bitwise AND operator).  If the
+      NFLH4_CARE_COMMIT_THRU_MDS flag is set, then the client indicates a
+      preference for whether the client should send COMMIT operations to
+      the metadata server or data server (<xref target="ss:nfsv4.1_as:CtMS" />), which is
+      controlled by the value of nflh_util &amp; NFL4_UFLG_COMMIT_THRU_MDS.  If
+      the NFLH4_CARE_STRIPE_UNIT_SIZE flag is set, the client indicates its
+      preferred stripe unit size, which is indicated in nflh_util &amp;
+      NFL4_UFLG_STRIPE_UNIT_SIZE_MASK (thus, the stripe unit size MUST be a
+      multiple of 64 bytes).  The minimum stripe unit size is 64 bytes.  If
+      the NFLH4_CARE_STRIPE_COUNT flag is set, the client indicates in the
+      third field, nflh_stripe_count, the stripe count.  The stripe count
+      multiplied by the stripe unit size is the stripe width.
+    </t>
+
+    <t>
+      When LAYOUTGET returns a LAYOUT4_NFSV4_1_FILES layout (indicated in
+      the loc_type field of the lo_content field), the loc_body field of
+      the lo_content field contains a value of data type
+      nfsv4_1_file_layout4.  Among other content, nfsv4_1_file_layout4 has
+      a storage device ID (field nfl_deviceid) of data type deviceid4.  The
+      GETDEVICEINFO operation maps a device ID to a storage device address
+      (type device_addr4).  When GETDEVICEINFO returns a device address
+      with a layout type of LAYOUT4_NFSV4_1_FILES (the da_layout_type
+      field), the da_addr_body field contains a value of data type
+      nfsv4_1_file_layout_ds_addr4.
+    </t>
+
+    <?rfc include='autogen/type_nfsv4_1_file_layout_ds_addr4.xml'?>
+
+    <t>
+      The nfsv4_1_file_layout_ds_addr4 data type represents the device
+      address.  It is composed of two fields:
+    </t>
+
+    <t>
+      <list style='numbers'>
+        <t>
+          nflda_multipath_ds_list: An array of lists of data servers, where
+          each list can be one or more elements, and each element
+          represents a data server address that may serve equally as the
+          target of I/O operations (see <xref target="ss:nfsv4.1_as:DSM" />).  The length of this
+          array might be different than the stripe count.
+        </t>
+
+        <t>
+          nflda_stripe_indices: An array of indices used to index into
+          nflda_multipath_ds_list.  The value of each element of
+          nflda_stripe_indices MUST be less than the number of elements in
+          nflda_multipath_ds_list.  Each element of nflda_multipath_ds_list
+          SHOULD be referred to by one or more elements of
+          nflda_stripe_indices.  The number of elements in
+          nflda_stripe_indices is always equal to the stripe count.
+        </t>
+      </list>
+    </t>
+
+    <?rfc include='autogen/type_nfsv4_1_file_layout4.xml'?>
+
+    <t>
+      The nfsv4_1_file_layout4 data type represents the layout.  It is
+      composed of the following fields:
+    </t>
+
+    <t>
+      <list style='numbers'>
+        <t>
+          nfl_deviceid: The device ID that maps to a value of type
+          nfsv4_1_file_layout_ds_addr4.
+        </t>
+
+        <t>
+          nfl_util: Like the nflh_util field of data type
+          nfsv4_1_file_layouthint4, a compact representation of how the
+          data on a file on each data server is packed, whether the client
+          should send COMMIT operations to the metadata server or data
+          server, and the stripe unit size.  If a server returns two or
+          more overlapping layouts, each stripe unit size in each
+          overlapping layout MUST be the same.
+        </t>
+
+        <t>
+          nfl_first_stripe_index: The index into the first element of the
+          nflda_stripe_indices array to use.
+        </t>
+
+        <t>
+          nfl_pattern_offset: This field is the logical offset into the
+          file where the striping pattern starts.  It is required for
+          converting the client's logical I/O offset (e.g., the current
+          offset in a POSIX file descriptor before the read() or write()
+          system call is sent) into the stripe unit number (see
+          <xref target="ss:nfsv4.1_as:DtSUN" />).
+          <vspace blankLines='1' />
+          If dense packing is used, then nfl_pattern_offset is also needed
+          to convert the client's logical I/O offset to an offset on the
+          file on the data server corresponding to the stripe unit number
+          (see <xref target="ss:nfsv4.1_as:SaDSUP" />).
+          <vspace blankLines='1' />
+          Note that nfl_pattern_offset is not always the same as lo_offset.
+          For example, via the LAYOUTGET operation, a client might request
+          a layout starting at offset 1000 of a file that has its striping
+          pattern start at offset zero.
+        </t>
+
+        <t>
+          nfl_fh_list: An array of data server filehandles for each list of
+          data servers in each element of the nflda_multipath_ds_list
+          array.  The number of elements in nfl_fh_list depends on whether
+          sparse or dense packing is being used.
+
+          <list style='symbols'>
+            <t>
+              If sparse packing is being used, the number of elements in
+              nfl_fh_list MUST be one of three values:
+
+              <list style='symbols'>
+                <t>
+                  Zero.  This means that filehandles used for each data
+                  server are the same as the filehandle returned by the OPEN
+                  operation from the metadata server.
+                </t>
+
+                <t>
+                  One.  This means that every data server uses the same
+                  filehandle: what is specified in nfl_fh_list[0].
+                </t>
+
+                <t>
+                  The same number of elements in nflda_multipath_ds_list.
+                  Thus, in this case, when sending an I/O operation to any
+                  data server in nflda_multipath_ds_list[X], the filehandle
+                  in nfl_fh_list[X] MUST be used.
+                </t>
+              </list>
+
+              <vspace blankLines='1' />
+              See the discussion on sparse packing in <xref target="ss:nfsv4.1_as:SaDSUP" />.
+            </t>
+
+            <t>
+              If dense packing is being used, the number of elements in
+              nfl_fh_list MUST be the same as the number of elements in
+              nflda_stripe_indices.  Thus, when sending an I/O operation to
+              any data server in
+              nflda_multipath_ds_list[nflda_stripe_indices[Y]], the
+              filehandle in nfl_fh_list[Y] MUST be used.  In addition, any
+              time there exists i and j, (i != j), such that the
+              intersection of
+              nflda_multipath_ds_list[nflda_stripe_indices[i]] and
+              nflda_multipath_ds_list[nflda_stripe_indices[j]] is not empty,
+              then nfl_fh_list[i] MUST NOT equal nfl_fh_list[j].  In other
+              words, when dense packing is being used, if a data server
+              appears in two or more units of a striping pattern, each
+              reference to the data server MUST use a different filehandle.
+              <vspace blankLines='1' />
+              Indeed, if there are multiple striping patterns, as indicated
+              by the presence of multiple objects of data type layout4
+              (either returned in one or multiple LAYOUTGET operations), and
+              a data server is the target of a unit of one pattern and
+              another unit of another pattern, then each reference to each
+              data server MUST use a different filehandle.
+              <vspace blankLines='1' />
+              See the discussion on dense packing in <xref target="ss:nfsv4.1_as:SaDSUP" />.
+            </t>
+          </list>
+        </t>
+      </list>
+    </t>
+
+    <t>
+      The details on the interpretation of the layout are in <xref target="ss:nfsv4.1_as:ItFL" />.
+    </t>
+  </section>
+
+  <section anchor="ss:nfsv4.1_as:ItFL" title="Interpreting the File Layout">
+    <section toc='exclude' anchor="ss:nfsv4.1_as:DtSUN" title="Determining the Stripe Unit Number">
+      <t>
+        To find the stripe unit number that corresponds to the client's
+        logical file offset, the pattern offset will also be used.  The i'th
+        stripe unit (SUi) is:
+      </t>
+
+      <figure>
+        <artwork>
+    relative_offset = file_offset - nfl_pattern_offset;
+    SUi = floor(relative_offset / stripe_unit_size);
+        </artwork>
+      </figure>
+    </section>
+
+    <section toc='exclude' anchor="ss:nfsv4.1_as:ItFLUSP" title="Interpreting the File Layout Using Sparse Packing">
+      <t>
+        When sparse packing is used, the algorithm for determining the
+        filehandle and set of data-server network addresses to write stripe
+        unit i (SUi) to is:
+      </t>
+
+      <figure>
+        <artwork>
+    stripe_count = number of elements in nflda_stripe_indices;
+    
+    j = (SUi + nfl_first_stripe_index) % stripe_count;
+    
+    idx = nflda_stripe_indices[j];
+    
+    fh_count = number of elements in nfl_fh_list;
+    ds_count = number of elements in nflda_multipath_ds_list;
+    
+    switch (fh_count) {
+      case ds_count:
+        fh = nfl_fh_list[idx];
+        break;
+    
+      case 1:
+        fh = nfl_fh_list[0];
+        break;
+    
+      case 0:
+        fh = filehandle returned by OPEN;
+        break;
+    
+      default:
+        throw a fatal exception;
+        break;
+    }
+    
+    address_list = nflda_multipath_ds_list[idx];
+        </artwork>
+      </figure>
+
+      <t>
+        The client would then select a data server from address_list, and
+        send a READ or WRITE operation using the filehandle specified in fh.
+      </t>
+
+      <t>
+        Consider the following example:
+      </t>
+
+      <t>
+        Suppose we have a device address consisting of seven data servers,
+        arranged in three equivalence (<xref target="ss:nfsv4.1_as:DSM" />) classes:
+      </t>
+
+      <figure>
+        <artwork>
+    { A, B, C, D }, { E }, { F, G }
+        </artwork>
+      </figure>
+
+      <t>
+        where A through G are network addresses.
+      </t>
+
+      <t>
+        Then
+      </t>
+
+      <figure>
+        <artwork>
+    nflda_multipath_ds_list&lt;&gt; = { A, B, C, D }, { E }, { F, G }
+        </artwork>
+      </figure>
+
+      <t>
+        i.e.,
+      </t>
+
+      <figure>
+        <artwork>
+    nflda_multipath_ds_list[0] = { A, B, C, D }
+
+    nflda_multipath_ds_list[1] = { E }
+
+    nflda_multipath_ds_list[2] = { F, G }
+        </artwork>
+      </figure>
+
+      <t>
+        Suppose the striping index array is:
+      </t>
+
+      <figure>
+        <artwork>
+    nflda_stripe_indices&lt;&gt; = { 2, 0, 1, 0 }
+        </artwork>
+      </figure>
+
+      <t>
+        Now suppose the client gets a layout that has a device ID that maps
+        to the above device address.  The initial index contains
+      </t>
+
+      <figure>
+        <artwork>
+    nfl_first_stripe_index = 2,
+        </artwork>
+      </figure>
+
+      <t>
+        and the filehandle list is
+      </t>
+
+      <figure>
+        <artwork>
+    nfl_fh_list = { 0x36, 0x87, 0x67 }.
+        </artwork>
+      </figure>
+
+      <t>
+        If the client wants to write to SU0, the set of valid { network
+        address, filehandle } combinations for SUi are determined by:
+      </t>
+
+      <figure>
+        <artwork>
+    nfl_first_stripe_index = 2
+        </artwork>
+      </figure>
+
+      <t>
+        So
+      </t>
+
+      <figure>
+        <artwork>
+    idx = nflda_stripe_indices[(0 + 2) % 4]
+
+       = nflda_stripe_indices[2]
+
+       = 1
+        </artwork>
+      </figure>
+
+      <t>
+        So
+      </t>
+
+      <figure>
+        <artwork>
+    nflda_multipath_ds_list[1] = { E }
+        </artwork>
+      </figure>
+
+      <t>
+        and
+      </t>
+
+      <figure>
+        <artwork>
+    nfl_fh_list[1] = { 0x87 }
+        </artwork>
+      </figure>
+
+      <t>
+        The client can thus write SU0 to { 0x87, { E } }.
+      </t>
+
+      <t>
+        The destinations of the first 13 storage units are:
+      </t>
+
+      <texttable>
+        <ttcol>SUi</ttcol>
+        <ttcol>filehandle</ttcol>
+        <ttcol>data servers</ttcol>
+        <c>0 </c> <c>87</c> <c>E</c>
+        <c>1 </c> <c>36</c> <c>A,B,C,D</c>
+        <c>2 </c> <c>67</c> <c>F,G</c>
+        <c>3 </c> <c>36</c> <c>A,B,C,D</c>
+        <c>4 </c> <c>87</c> <c>E</c>
+        <c>5 </c> <c>36</c> <c>A,B,C,D</c>
+        <c>6 </c> <c>67</c> <c>F,G</c>
+        <c>7 </c> <c>36</c> <c>A,B,C,D</c>
+        <c>8 </c> <c>87</c> <c>E</c>
+        <c>9 </c> <c>36</c> <c>A,B,C,D</c>
+        <c>10</c> <c>67</c> <c>F,G</c>
+        <c>11</c> <c>36</c> <c>A,B,C,D</c>
+        <c>12</c> <c>87</c> <c>E</c>
+      </texttable>
+    
+    </section>
+
+    <section toc='exclude' anchor="ss:nfsv4.1_as:ItFLUDP" title="Interpreting the File Layout Using Dense Packing">
+      <t>
+        When dense packing is used, the algorithm for determining the
+        filehandle and set of data server network addresses to write stripe
+        unit i (SUi) to is:
+      </t>
+
+      <figure>
+        <artwork>
+    stripe_count = number of elements in nflda_stripe_indices;
+    
+    j = (SUi + nfl_first_stripe_index) % stripe_count;
+    
+    idx = nflda_stripe_indices[j];
+    
+    fh_count = number of elements in nfl_fh_list;
+    ds_count = number of elements in nflda_multipath_ds_list;
+    
+    switch (fh_count) {
+      case stripe_count:
+        fh = nfl_fh_list[j];
+        break;
+    
+      default:
+        throw a fatal exception;
+        break;
+    }
+    
+    address_list = nflda_multipath_ds_list[idx];
+        </artwork>
+      </figure>
+
+      <t>
+        The client would then select a data server from address_list, and
+        send a READ or WRITE operation using the filehandle specified in fh.
+      </t>
+
+      <t>
+        Consider the following example (which is the same as the sparse
+        packing example, except for the filehandle list):
+      </t>
+
+      <t>
+        Suppose we have a device address consisting of seven data servers,
+        arranged in three equivalence (<xref target="ss:nfsv4.1_as:DSM" />) classes:
+      </t>
+
+      <figure>
+        <artwork>
+    { A, B, C, D }, { E }, { F, G }
+        </artwork>
+      </figure>
+
+      <t>
+        where A through G are network addresses.
+      </t>
+
+      <t>
+        Then
+      </t>
+
+      <figure>
+        <artwork>
+    nflda_multipath_ds_list&lt;&gt; = { A, B, C, D }, { E }, { F, G }
+        </artwork>
+      </figure>
+
+      <t>
+        i.e.,
+      </t>
+
+      <figure>
+        <artwork>
+    nflda_multipath_ds_list[0] = { A, B, C, D }
+
+    nflda_multipath_ds_list[1] = { E }
+
+    nflda_multipath_ds_list[2] = { F, G }
+        </artwork>
+      </figure>
+
+      <t>
+        Suppose the striping index array is:
+      </t>
+
+      <figure>
+        <artwork>
+    nflda_stripe_indices&lt;&gt; = { 2, 0, 1, 0 }
+        </artwork>
+      </figure>
+
+      <t>
+        Now suppose the client gets a layout that has a device ID that maps
+        to the above device address.  The initial index contains
+      </t>
+
+      <figure>
+        <artwork>
+    nfl_first_stripe_index = 2,
+        </artwork>
+      </figure>
+
+      <t>
+        and
+      </t>
+
+      <figure>
+        <artwork>
+    nfl_fh_list = { 0x67, 0x37, 0x87, 0x36 }.
+        </artwork>
+      </figure>
+
+      <t>
+        The interesting examples for dense packing are SU1 and SU3 because
+        each stripe unit refers to the same data server list, yet each stripe
+        unit MUST use a different filehandle.  If the client wants to write
+        to SU1, the set of valid { network address, filehandle } combinations
+        for SUi are determined by:
+      </t>
+
+      <figure>
+        <artwork>
+    nfl_first_stripe_index = 2
+        </artwork>
+      </figure>
+
+      <t>
+        So
+      </t>
+
+      <figure>
+        <artwork>
+    j = (1 + 2) % 4 = 3
+
+       idx = nflda_stripe_indices[j]
+
+       = nflda_stripe_indices[3]
+
+       = 0
+        </artwork>
+      </figure>
+
+      <t>
+        So
+      </t>
+
+      <figure>
+        <artwork>
+    nflda_multipath_ds_list[0] = { A, B, C, D }
+        </artwork>
+      </figure>
+
+      <t>
+        and
+      </t>
+
+      <figure>
+        <artwork>
+    nfl_fh_list[3] = { 0x36 }
+        </artwork>
+      </figure>
+      
+
+      <t>
+        The client can thus write SU1 to { 0x36, { A, B, C, D } }.
+      </t>
+
+      <t>
+        For SU3, j = (3 + 2) % 4 = 1, and nflda_stripe_indices[1] = 0.  Then
+        nflda_multipath_ds_list[0] = { A, B, C, D }, and nfl_fh_list[1] =
+        0x37.  The client can thus write SU3 to { 0x37, { A, B, C, D } }.
+      </t>
+
+      <t>
+        The destinations of the first 13 storage units are:
+      </t>
+
+      <texttable>
+        <ttcol>SUi</ttcol>
+        <ttcol>filehandle</ttcol>
+        <ttcol>data servers</ttcol>
+        <c>0 </c> <c>87</c> <c>E</c>
+        <c>1 </c> <c>36</c> <c>A,B,C,D</c>
+        <c>2 </c> <c>67</c> <c>F,G</c>
+        <c>3 </c> <c>37</c> <c>A,B,C,D</c>
+        <c>4 </c> <c>87</c> <c>E</c>
+        <c>5 </c> <c>36</c> <c>A,B,C,D</c>
+        <c>6 </c> <c>67</c> <c>F,G</c>
+        <c>7 </c> <c>37</c> <c>A,B,C,D</c>
+        <c>8 </c> <c>87</c> <c>E</c>
+        <c>9 </c> <c>36</c> <c>A,B,C,D</c>
+        <c>10</c> <c>67</c> <c>F,G</c>
+        <c>11</c> <c>37</c> <c>A,B,C,D</c>
+        <c>12</c> <c>87</c> <c>E</c>
+      </texttable>
+    </section>
+
+    <section toc='exclude' anchor="ss:nfsv4.1_as:SaDSUP" title="Sparse and Dense Stripe Unit Packing">
+      <t>
+        The flag NFL4_UFLG_DENSE of the nfl_util4 data type (field nflh_util
+        of the data type nfsv4_1_file_layouthint4 and field nfl_util of data
+        type nfsv4_1_file_layout_ds_addr4) specifies how the data is packed
+        within the data file on a data server.  It allows for two different
+        data packings: sparse and dense.  The packing type determines the
+        calculation that will be made to map the client-visible file offset
+        to the offset within the data file located on the data server.
+      </t>
+
+      <t>
+        If nfl_util &amp; NFL4_UFLG_DENSE is zero, this means that sparse packing
+        is being used.  Hence, the logical offsets of the file as viewed by a
+        client sending READs and WRITEs directly to the metadata server are
+        the same offsets each data server uses when storing a stripe unit.
+        The effect then, for striping patterns consisting of at least two
+        stripe units, is for each data server file to be sparse or "holey".
+        So for example, suppose there is a pattern with three stripe units,
+        the stripe unit size is 4096 bytes, and there are three data servers
+        in the pattern.  Then, the file in data server 1 will have stripe
+        units 0, 3, 6, 9, ... filled; data server 2's file will have stripe
+        units 1, 4, 7, 10, ... filled; and data server 3's file will have
+        stripe units 2, 5, 8, 11, ... filled.  The unfilled stripe units of
+        each file will be holes; hence, the files in each data server are
+        sparse.
+      </t>
+
+      <t>
+        If sparse packing is being used and a client attempts I/O to one of
+        the holes, then an error MUST be returned by the data server.  Using
+        the above example, if data server 3 received a READ or WRITE
+        operation for block 4, the data server would return
+        NFS4ERR_PNFS_IO_HOLE.  Thus, data servers need to understand the
+        striping pattern in order to support sparse packing.
+      </t>
+
+      <t>
+        If nfl_util &amp; NFL4_UFLG_DENSE is one, this means that dense packing
+        is being used, and the data server files have no holes.  Dense
+        packing might be selected because the data server does not
+        (efficiently) support holey files or because the data server cannot
+        recognize read-ahead unless there are no holes.  If dense packing is
+        indicated in the layout, the data files will be packed.  Using the
+        same striping pattern and stripe unit size that were used for the
+        sparse packing example, the corresponding dense packing example would
+        have all stripe units of all data files filled as follows:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            Logical stripe units 0, 3, 6, ... of the file would live on stripe
+            units 0, 1, 2, ... of the file of data server 1.
+          </t>
+
+          <t>
+            Logical stripe units 1, 4, 7, ... of the file would live on stripe
+            units 0, 1, 2, ... of the file of data server 2.
+          </t>
+
+          <t>
+            Logical stripe units 2, 5, 8, ... of the file would live on stripe
+            units 0, 1, 2, ... of the file of data server 3.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        Because dense packing does not leave holes on the data servers, the
+        pNFS client is allowed to write to any offset of any data file of any
+        data server in the stripe.  Thus, the data servers need not know the
+        file's striping pattern.
+      </t>
+
+      <t>
+        The calculation to determine the byte offset within the data file for
+        dense data server layouts is:
+      </t>
+
+      <figure>
+        <artwork>
+    stripe_width = stripe_unit_size * N;
+       where N = number of elements in nflda_stripe_indices.
+
+    relative_offset = file_offset - nfl_pattern_offset;
+
+    data_file_offset = floor(relative_offset / stripe_width)
+       * stripe_unit_size
+       + relative_offset % stripe_unit_size
+        </artwork>
+      </figure>
+
+      <t>
+        If dense packing is being used, and a data server appears more than
+        once in a striping pattern, then to distinguish one stripe unit from
+        another, the data server MUST use a different filehandle.  Let's
+        suppose there are two data servers.  Logical stripe units 0, 3, 6 are
+        served by data server 1; logical stripe units 1, 4, 7 are served by
+        data server 2; and logical stripe units 2, 5, 8 are also served by
+        data server 2.  Unless data server 2 has two filehandles (each
+        referring to a different data file), then, for example, a write to
+        logical stripe unit 1 overwrites the write to logical stripe unit 2
+        because both logical stripe units are located in the same stripe unit
+        (0) of data server 2.
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:nfsv4.1_as:DSM" title="Data Server Multipathing">
+    <t>
+      The NFSv4.1 file layout supports multipathing to multiple data server
+      addresses.  Data-server-level multipathing is used for bandwidth
+      scaling via trunking (<xref target="ss:core_infrastructure:T" />) and for higher availability of
+      use in the case of a data-server failure.  Multipathing allows the
+      client to switch to another data server address which may be that of
+      another data server that is exporting the same data stripe unit,
+      without having to contact the metadata server for a new layout.
+    </t>
+
+    <t>
+      To support data server multipathing, each element of the
+      nflda_multipath_ds_list contains an array of one more data server
+      network addresses.  This array (data type multipath_list4) represents
+      a list of data servers (each identified by a network address), with
+      the possibility that some data servers will appear in the list
+      multiple times.
+    </t>
+
+    <t>
+      The client is free to use any of the network addresses as a
+      destination to send data server requests.  If some network
+      addresses are less optimal paths to the data than others, then
+      the MDS SHOULD NOT include those network addresses in an element
+      of nflda_multipath_ds_list.  If less optimal network addresses
+      exist to provide failover, the RECOMMENDED method to offer the
+      addresses is to provide them in a replacement
+      device-ID-to-device-address mapping, or a replacement device ID.
+      When a client finds that no data server in an element of
+      nflda_multipath_ds_list responds, it SHOULD send a GETDEVICEINFO
+      to attempt to replace the existing device-ID-to-device-address
+      mappings.  If the MDS detects that all data servers represented
+      by an element of nflda_multipath_ds_list are unavailable, the
+      MDS SHOULD send a CB_NOTIFY_DEVICEID (if the client has indicated
+      it wants device ID notifications for changed device IDs) to
+      change the device-ID-to-device-address mappings to the available
+      data servers.  If the device ID itself will be replaced, the MDS
+      SHOULD recall all layouts with the device ID, and thus force the
+      client to get new layouts and device ID mappings via LAYOUTGET
+      and GETDEVICEINFO.
+    </t>
+
+    <t>
+      Generally, if two network addresses appear in an element of
+      nflda_multipath_ds_list, they will designate the same data server,
+      and the two data server addresses will support the implementation of
+      client ID or session trunking (the latter is RECOMMENDED) as defined
+      in <xref target="ss:core_infrastructure:T" />.  The two data server addresses will share the same
+      server owner or major ID of the server owner.  It is not always
+      necessary for the two data server addresses to designate the same
+      server with trunking being used.  For example, the data could be
+      read-only, and the data consist of exact replicas.
+    </t>
+  </section>
+
+  <section anchor="ss:nfsv4.1_as:OStNDS" title="Operations Sent to NFSv4.1 Data Servers">
+    <t>
+      Clients accessing data on an NFSv4.1 data server MUST send only the
+      NULL procedure and COMPOUND procedures whose operations are taken
+      only from two restricted subsets of the operations defined as valid
+      NFSv4.1 operations.  Clients MUST use the filehandle specified by the
+      layout when accessing data on NFSv4.1 data servers.
+    </t>
+
+    <t>
+      The first of these operation subsets consists of management
+      operations.  This subset consists of the BACKCHANNEL_CTL,
+      BIND_CONN_TO_SESSION, CREATE_SESSION, DESTROY_CLIENTID,
+      DESTROY_SESSION, EXCHANGE_ID, SECINFO_NO_NAME, SET_SSV, and SEQUENCE
+      operations.  The client may use these operations in order to set up
+      and maintain the appropriate client IDs, sessions, and security
+      contexts involved in communication with the data server.  Henceforth,
+      these will be referred to as data-server housekeeping operations.
+    </t>
+
+    <t>
+      The second subset consists of COMMIT, READ, WRITE, and PUTFH.  These
+      operations MUST be used with a current filehandle specified by the
+      layout.  In the case of PUTFH, the new current filehandle MUST be one
+      taken from the layout.  Henceforth, these will be referred to as
+      data-server I/O operations.  As described in <xref target="ss:parallel_nfs:GPbL" />, a client
+      MUST NOT send an I/O to a data server for which it does not hold a
+      valid layout; the data server MUST reject such an I/O.
+    </t>
+
+    <t>
+      Unless the server has a concurrent non-data-server personality --
+      i.e., EXCHANGE_ID results returned (EXCHGID4_FLAG_USE_PNFS_DS |
+      EXCHGID4_FLAG_USE_PNFS_MDS) or (EXCHGID4_FLAG_USE_PNFS_DS |
+      EXCHGID4_FLAG_USE_NON_PNFS) see <xref target="ss:nfsv4.1_as:CIaSC" /> -- any attempted use of
+      operations against a data server other than those specified in the
+      two subsets above MUST return NFS4ERR_NOTSUPP to the client.
+    </t>
+
+    <t>
+      When the server has concurrent data-server and non-data-server
+      personalities, each COMPOUND sent by the client MUST be constructed
+      so that it is appropriate to one of the two personalities, and it
+      MUST NOT contain operations directed to a mix of those personalities.
+      The server MUST enforce this.  To understand the constraints,
+      operations within a COMPOUND are divided into the following three
+      classes:
+    </t>
+
+    <t>
+      <list style='numbers'>
+        <t>
+          An operation that is ambiguous regarding its personality
+          assignment.  This includes all of the data-server housekeeping
+          operations.  Additionally, if the server has assigned filehandles
+          so that the ones defined by the layout are the same as those used
+          by the metadata server, all operations using such filehandles are
+          within this class, with the following exception.  The exception
+          is that if the operation uses a stateid that is incompatible with
+          a data-server personality (e.g., a special stateid or the stateid
+          has a non-zero "seqid" field, see <xref target="ss:nfsv4.1_as:GSR" />), the operation
+          is in class 3, as described below.  A COMPOUND containing
+          multiple class 1 operations (and operations of no other class)
+          MAY be sent to a server with multiple concurrent data server and
+          non-data-server personalities.
+        </t>
+
+        <t>
+          An operation that is unambiguously referable to the data-server
+          personality.  This includes data-server I/O operations where the
+          filehandle is one that can only be validly directed to the
+          data-server personality.
+        </t>
+
+        <t>
+          An operation that is unambiguously referable to the non-data-server
+          personality.  This includes all COMPOUND operations that
+          are neither data-server housekeeping nor data-server I/O
+          operations, plus data-server I/O operations where the current fh
+          (or the one to be made the current fh in the case of PUTFH) is
+          only valid on the metadata server or where a stateid is used that
+          is incompatible with the data server, i.e., is a special stateid
+          or has a non-zero seqid value.
+        </t>
+      </list>
+    </t>
+
+    <t>
+      When a COMPOUND first executes an operation from class 3 above, it
+      acts as a normal COMPOUND on any other server, and the data-server
+      personality ceases to be relevant.  There are no special restrictions
+      on the operations in the COMPOUND to limit them to those for a data
+      server.  When a PUTFH is done, filehandles derived from the layout
+      are not valid.  If their format is not normally acceptable, then
+      NFS4ERR_BADHANDLE MUST result.  Similarly, current filehandles for
+      other operations do not accept filehandles derived from layouts and
+      are not normally usable on the metadata server.  Using these will
+      result in NFS4ERR_STALE.
+    </t>
+
+    <t>
+      When a COMPOUND first executes an operation from class 2, which would
+      be PUTFH where the filehandle is one from a layout, the COMPOUND
+      henceforth is interpreted with respect to the data-server
+      personality.  Operations outside the two classes discussed above MUST
+      result in NFS4ERR_NOTSUPP.  Filehandles are validated using the rules
+      of the data server, resulting in NFS4ERR_BADHANDLE and/or
+      NFS4ERR_STALE even when they would not normally do so when addressed
+      to the non-data-server personality.  Stateids must obey the rules of
+      the data server in that any use of special stateids or stateids with
+      non-zero seqid values must result in NFS4ERR_BAD_STATEID.
+    </t>
+
+    <t>
+      Until the server first executes an operation from class 2 or class 3,
+      the client MUST NOT depend on the operation being executed by either
+      the data-server or the non-data-server personality.  The server MUST
+      pick one personality consistently for a given COMPOUND, with the only
+      possible transition being a single one when the first operation from
+      class 2 or class 3 is executed.
+    </t>
+
+    <t>
+      Because of the complexity induced by assigning filehandles so they
+      can be used on both a data server and a metadata server, it is
+      RECOMMENDED that where the same server can have both personalities,
+      the server assign separate unique filehandles to both personalities.
+      This makes it unambiguous for which server a given request is
+      intended.
+    </t>
+
+    <t>
+      GETATTR and SETATTR MUST be directed to the metadata server.  In the
+      case of a SETATTR of the size attribute, the control protocol is
+      responsible for propagating size updates/truncations to the data
+      servers.  In the case of extending WRITEs to the data servers, the
+      new size must be visible on the metadata server once a LAYOUTCOMMIT
+      has completed (see <xref target="ss:parallel_nfs:Las" />).  <xref target="ss:nfsv4.1_as:DSCFS" /> describes the
+      mechanism by which the client is to handle data-server files that do
+      not reflect the metadata server's size.
+    </t>
+  </section>
+
+  <section anchor="ss:nfsv4.1_as:CtMS" title="COMMIT through Metadata Server">
+    <t>
+      The file layout provides two alternate means of providing for the
+      commit of data written through data servers.  The flag
+      NFL4_UFLG_COMMIT_THRU_MDS in the field nfl_util of the file layout
+      (data type nfsv4_1_file_layout4) is an indication from the metadata
+      server to the client of the REQUIRED way of performing COMMIT, either
+      by sending the COMMIT to the data server or the metadata server.
+      These two methods of dealing with the issue correspond to broad
+      styles of implementation for a pNFS server supporting the file layout
+      type.
+    </t>
+
+    <t>
+      <list style='symbols'>
+        <t>
+          When the flag is FALSE, COMMIT operations MUST to be sent to the
+          data server to which the corresponding WRITE operations were sent.
+          This approach is sometimes useful when file striping is
+          implemented within the pNFS server (instead of the file system),
+          with the individual data servers each implementing their own file
+          systems.
+        </t>
+
+        <t>
+          When the flag is TRUE, COMMIT operations MUST be sent to the
+          metadata server, rather than to the individual data servers.  This
+          approach is sometimes useful when file striping is implemented
+          within the clustered file system that is the backend to the pNFS
+          server.  In such an implementation, each COMMIT to each data
+          server might result in repeated writes of metadata blocks to the
+          detriment of write performance.  Sending a single COMMIT to the
+          metadata server can be more efficient when there exists a
+          clustered file system capable of implementing such a coordinated
+          COMMIT.
+          <vspace blankLines='1' />
+          If nfl_util &amp; NFL4_UFLG_COMMIT_THRU_MDS is TRUE, then in order to
+          maintain the current NFSv4.1 commit and recovery model, the data
+          servers MUST return a common writeverf verifier in all WRITE
+          responses for a given file layout, and the metadata server's
+          COMMIT implementation must return the same writeverf.  The value
+          of the writeverf verifier MUST be changed at the metadata server
+          or any data server that is referenced in the layout, whenever
+          there is a server event that can possibly lead to loss of
+          uncommitted data.  The scope of the verifier can be for a file or
+          for the entire pNFS server.  It might be more difficult for the
+          server to maintain the verifier at the file level, but the benefit
+          is that only events that impact a given file will require recovery
+          action.
+        </t>
+      </list>
+    </t>
+
+    <t>
+      Note that if the layout specified dense packing, then the offset used
+      to a COMMIT to the MDS may differ than that of an offset used to a
+      COMMIT to the data server.
+    </t>
+
+    <t>
+      The single COMMIT to the metadata server will return a verifier, and
+      the client should compare it to all the verifiers from the WRITEs and
+      fail the COMMIT if there are any mismatched verifiers.  If COMMIT to
+      the metadata server fails, the client should re-send WRITEs for all
+      the modified data in the file.  The client should treat modified data
+      with a mismatched verifier as a WRITE failure and try to recover by
+      resending the WRITEs to the original data server or using another
+      path to that data if the layout has not been recalled.
+      Alternatively, the client can obtain a new layout or it could rewrite
+      the data directly to the metadata server.  If nfl_util &amp;
+      NFL4_UFLG_COMMIT_THRU_MDS is FALSE, sending a COMMIT to the metadata
+      server might have no effect.  If nfl_util &amp; NFL4_UFLG_COMMIT_THRU_MDS
+      is FALSE, a COMMIT sent to the metadata server should be used only to
+      commit data that was written to the metadata server.  See
+      <xref target="ss:parallel_nfs:SDR" /> for recovery options.
+    </t>
+  </section>
+
+  <section anchor="ss:nfsv4.1_as:TLI" title="The Layout Iomode">
+    <t>
+      The layout iomode need not be used by the metadata server when
+      servicing NFSv4.1 file-based layouts, although in some circumstances
+      it may be useful.  For example, if the server implementation supports
+      reading from read-only replicas or mirrors, it would be useful for
+      the server to return a layout enabling the client to do so.  As such,
+      the client SHOULD set the iomode based on its intent to read or write
+      the data.  The client may default to an iomode of LAYOUTIOMODE4_RW.
+    </t>
+
+    <t>
+      The iomode need not be checked by the data servers when clients
+      perform I/O.  However, the data servers SHOULD still validate that
+      the client holds a valid layout and return an error if the client
+      does not.
+    </t>
+  </section>
+
+  <section anchor="ss:nfsv4.1_as:MaDSSC" title="Metadata and Data Server State Coordination">
+    <section toc='exclude' anchor="ss:nfsv4.1_as:GSR" title="Global Stateid Requirements">
+      <t>
+        When the client sends I/O to a data server, the stateid used MUST NOT
+        be a layout stateid as returned by LAYOUTGET or sent by
+        CB_LAYOUTRECALL.  Permitted stateids are based on one of the
+        following: an OPEN stateid (the stateid field of data type OPEN4resok
+        as returned by OPEN), a delegation stateid (the stateid field of data
+        types open_read_delegation4 and open_write_delegation4 as returned by
+        OPEN or WANT_DELEGATION, or as sent by CB_PUSH_DELEG), or a stateid
+        returned by the LOCK or LOCKU operations.  The stateid sent to the
+        data server MUST be sent with the seqid set to zero, indicating the
+        most current version of that stateid, rather than indicating a
+        specific non-zero seqid value.  In no case is the use of special
+        stateid values allowed.
+      </t>
+
+      <t>
+        The stateid used for I/O MUST have the same effect and be subject to
+        the same validation on a data server as it would if the I/O was being
+        performed on the metadata server itself in the absence of pNFS.  This
+        has the implication that stateids are globally valid on both the
+        metadata and data servers.  This requires the metadata server to
+        propagate changes in LOCK and OPEN state to the data servers, so that
+        the data servers can validate I/O accesses.  This is discussed
+        further in <xref target="ss:nfsv4.1_as:DSSP" />.  Depending on when stateids are
+        propagated, the existence of a valid stateid on the data server may
+        act as proof of a valid layout.
+      </t>
+
+      <t>
+        Clients performing I/O operations need to select an appropriate
+        stateid based on the locks (including opens and delegations) held by
+        the client and the various types of state-owners sending the I/O
+        requests.  The rules for doing so when referencing data servers are
+        somewhat different from those discussed in <xref target="ss:state_management:SUfIO" />, which apply
+        when accessing metadata servers.
+      </t>
+
+      <t>
+        The following rules, applied in order of decreasing priority, govern
+        the selection of the appropriate stateid:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            If the client holds a delegation for the file in question, the
+            delegation stateid should be used.
+          </t>
+
+          <t>
+            Otherwise, there must be an OPEN stateid for the current
+            open-owner, and that OPEN stateid for the open file in question is
+            used, unless mandatory locking prevents that.  See below.
+          </t>
+
+          <t>
+            If the data server had previously responded with NFS4ERR_LOCKED to
+            use of the OPEN stateid, then the client should use the byte-range
+            lock stateid whenever one exists for that open file with the
+            current lock-owner.
+          </t>
+
+          <t>
+            Special stateids should never be used.  If they are used, the data
+            server MUST reject the I/O with an NFS4ERR_BAD_STATEID error.
+          </t>
+        </list>
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:nfsv4.1_as:DSSP" title="Data Server State Propagation">
+      <t>
+        Since the metadata server, which handles byte-range lock and
+        open-mode state changes as well as ACLs, might not be co-located
+        with the data servers where I/O accesses are validated, the
+        server implementation MUST take care of propagating changes of
+        this state to the data servers.  Once the propagation to the
+        data servers is complete, the full effect of those changes MUST
+        be in effect at the data servers.  However, some state changes
+        need not be propagated immediately, although all changes SHOULD
+        be propagated promptly.  These state propagations have an impact
+        on the design of the control protocol, even though the control
+        protocol is outside of the scope of this specification.  Immediate
+        propagation refers to the synchronous propagation of state from
+        the metadata server to the data server(s); the propagation must
+        be complete before returning to the client.
+      </t>
+
+      <section toc='exclude' anchor="ss:nfsv4.1_as:LSP" title="Lock State Propagation">
+        <t>
+          If the pNFS server supports mandatory byte-range locking, any
+          mandatory byte-range locks on a file MUST be made effective at the
+          data servers before the request that establishes them returns to the
+          caller.  The effect MUST be the same as if the mandatory byte-range
+          lock state were synchronously propagated to the data servers, even
+          though the details of the control protocol may avoid actual transfer
+          of the state under certain circumstances.
+        </t>
+
+        <t>
+          On the other hand, since advisory byte-range lock state is not used
+          for checking I/O accesses at the data servers, there is no semantic
+          reason for propagating advisory byte-range lock state to the data
+          servers.  Since updates to advisory locks neither confer nor remove
+          privileges, these changes need not be propagated immediately, and may
+          not need to be propagated promptly.  The updates to advisory locks
+          need only be propagated when the data server needs to resolve a
+          question about a stateid.  In fact, if byte-range locking is not
+          mandatory (i.e., is advisory) the clients are advised to avoid using
+          the byte-range lock-based stateids for I/O.  The stateids returned by
+          OPEN are sufficient and eliminate overhead for this kind of state
+          propagation.
+        </t>
+
+        <t>
+          If a client gets back an NFS4ERR_LOCKED error from a data server,
+          this is an indication that mandatory byte-range locking is in force.
+          The client recovers from this by getting a byte-range lock that
+          covers the affected range and re-sends the I/O with the stateid of
+          the byte-range lock.
+        </t>
+      </section>
+
+      <section toc='exclude' anchor="ss:nfsv4.1_as:OaDMV" title="Open and Deny Mode Validation">
+        <t>
+          Open and deny mode validation MUST be performed against the open and
+          deny mode(s) held by the data servers.  When access is reduced or a
+          deny mode made more restrictive (because of CLOSE or OPEN_DOWNGRADE),
+          the data server MUST prevent any I/Os that would be denied if
+          performed on the metadata server.  When access is expanded, the data
+          server MUST make sure that no requests are subsequently rejected
+          because of open or deny issues that no longer apply, given the
+          previous relaxation.
+        </t>
+      </section>
+
+      <section toc='exclude' anchor="ss:nfsv4.1_as:FA" title="File Attributes">
+        <t>
+          Since the SETATTR operation has the ability to modify state that is
+          visible on both the metadata and data servers (e.g., the size), care
+          must be taken to ensure that the resultant state across the set of
+          data servers is consistent, especially when truncating or growing the
+          file.
+        </t>
+
+        <t>
+          As described earlier, the LAYOUTCOMMIT operation is used to ensure
+          that the metadata is synchronized with changes made to the data
+          servers.  For the NFSv4.1-based data storage protocol, it is
+          necessary to re-synchronize state such as the size attribute, and the
+          setting of mtime/change/atime.  See <xref target="ss:parallel_nfs:CL" /> for a full
+          description of the semantics regarding LAYOUTCOMMIT and attribute
+          synchronization.  It should be noted that by using an NFSv4.1-based
+          layout type, it is possible to synchronize this state before
+          LAYOUTCOMMIT occurs.  For example, the control protocol can be used
+          to query the attributes present on the data servers.
+        </t>
+
+        <t>
+          Any changes to file attributes that control authorization or access
+          as reflected by ACCESS calls or READs and WRITEs on the metadata
+          server, MUST be propagated to the data servers for enforcement on
+          READ and WRITE I/O calls.  If the changes made on the metadata server
+          result in more restrictive access permissions for any user, those
+          changes MUST be propagated to the data servers synchronously.
+        </t>
+
+        <t>
+          The OPEN operation (<xref target="ss:op_OPEN:I" />) does not impose any requirement
+          that I/O operations on an open file have the same credentials as the
+          OPEN itself (unless EXCHGID4_FLAG_BIND_PRINC_STATEID is set when
+          EXCHANGE_ID creates the client ID), and so it requires the server's
+          READ and WRITE operations to perform appropriate access checking.
+          Changes to ACLs also require new access checking by READ and WRITE on
+          the server.  The propagation of access-right changes due to changes
+          in ACLs may be asynchronous only if the server implementation is able
+          to determine that the updated ACL is not more restrictive for any
+          user specified in the old ACL.  Due to the relative infrequency of
+          ACL updates, it is suggested that all changes be propagated
+          synchronously.
+        </t>
+      </section>
+    </section>
+  </section>
+
+  <section anchor="ss:nfsv4.1_as:DSCFS" title="Data Server Component File Size">
+    <t>
+      A potential problem exists when a component data file on a particular
+      data server has grown past EOF; the problem exists for both dense and
+      sparse layouts.  Imagine the following scenario: a client creates a
+      new file (size == 0) and writes to byte 131072; the client then seeks
+      to the beginning of the file and reads byte 100.  The client should
+      receive zeroes back as a result of the READ.  However, if the
+      striping pattern directs the client to send the READ to a data server
+      other than the one that received the client's original WRITE, the
+      data server servicing the READ may believe that the file's size is
+      still 0 bytes.  In that event, the data server's READ response will
+      contain zero bytes and an indication of EOF.  The data server can
+      only return zeroes if it knows that the file's size has been
+      extended.  This would require the immediate propagation of the file's
+      size to all data servers, which is potentially very costly.
+      Therefore, the client that has initiated the extension of the file's
+      size MUST be prepared to deal with these EOF conditions.  When the
+      offset in the arguments to READ is less than the client's view of the
+      file size, if the READ response indicates EOF and/or contains fewer
+      bytes than requested, the client will interpret such a response as a
+      hole in the file, and the NFS client will substitute zeroes for the
+      data.
+    </t>
+
+    <t>
+      The NFSv4.1 protocol only provides close-to-open file data cache
+      semantics; meaning that when the file is closed, all modified data is
+      written to the server.  When a subsequent OPEN of the file is done,
+      the change attribute is inspected for a difference from a cached
+      value for the change attribute.  For the case above, this means that
+      a LAYOUTCOMMIT will be done at close (along with the data WRITEs) and
+      will update the file's size and change attribute.  Access from
+      another client after that point will result in the appropriate size
+      being returned.
+    </t>
+  </section>
+
+  <section anchor="ss:nfsv4.1_as:LRaF" title="Layout Revocation and Fencing">
+    <t>
+      As described in <xref target="ss:parallel_nfs:R" />, the layout-type-specific storage
+      protocol is responsible for handling the effects of I/Os that started
+      before lease expiration and extend through lease expiration.  The
+      LAYOUT4_NFSV4_1_FILES layout type can prevent all I/Os to data
+      servers from being executed after lease expiration (this prevention
+      is called "fencing"), without relying on a precise client lease timer
+      and without requiring data servers to maintain lease timers.  The
+      LAYOUT4_NFSV4_1_FILES pNFS server has the flexibility to revoke
+      individual layouts, and thus fence I/O on a per-file basis.
+    </t>
+
+    <t>
+      In addition to lease expiration, the reasons a layout can be revoked
+      include: client fails to respond to a CB_LAYOUTRECALL, the metadata
+      server restarts, or administrative intervention.  Regardless of the
+      reason, once a client's layout has been revoked, the pNFS server MUST
+      prevent the client from sending I/O for the affected file from and to
+      all data servers; in other words, it MUST fence the client from the
+      affected file on the data servers.
+    </t>
+
+    <t>
+      Fencing works as follows.  As described in <xref target="ss:nfsv4.1_as:CIaSC" />, in COMPOUND
+      procedure requests to the data server, the data filehandle provided
+      by the PUTFH operation and the stateid in the READ or WRITE operation
+      are used to ensure that the client has a valid layout for the I/O
+      being performed; if it does not, the I/O is rejected with
+      NFS4ERR_PNFS_NO_LAYOUT.  The server can simply check the stateid and,
+      additionally, make the data filehandle stale if the layout specified
+      a data filehandle that is different from the metadata server's
+      filehandle for the file (see the nfl_fh_list description in
+      <xref target="ss:nfsv4.1_as:FLDT" />).
+    </t>
+
+    <t>
+      Before the metadata server takes any action to revoke layout state
+      given out by a previous instance, it must make sure that all layout
+      state from that previous instance are invalidated at the data
+      servers.  This has the following implications.
+    </t>
+
+    <t>
+      <list style='symbols'>
+        <t>
+          The metadata server must not restripe a file until it has
+          contacted all of the data servers to invalidate the layouts from
+          the previous instance.
+        </t>
+
+        <t>
+          The metadata server must not give out mandatory locks that
+          conflict with layouts from the previous instance without either
+          doing a specific layout invalidation (as it would have to do
+          anyway) or doing a global data server invalidation.
+        </t>
+      </list>
+    </t>
+  </section>
+
+  <section anchor="ss:nfsv4.1_as:SCftFLT" title="Security Considerations for the File Layout Type">
+    <t>
+      The NFSv4.1 file layout type MUST adhere to the security
+      considerations outlined in <xref target="ss:parallel_nfs:SCfp" />.  NFSv4.1 data servers MUST
+      make all of the required access checks on each READ or WRITE I/O as
+      determined by the NFSv4.1 protocol.  If the metadata server would
+      deny a READ or WRITE operation on a file due to its ACL, mode
+      attribute, open access mode, open deny mode, mandatory byte-range
+      lock state, or any other attributes and state, the data server MUST
+      also deny the READ or WRITE operation.  This impacts the control
+      protocol and the propagation of state from the metadata server to the
+      data servers; see <xref target="ss:nfsv4.1_as:DSSP" /> for more details.
+    </t>
+
+    <t>
+      The methods for authentication, integrity, and privacy for data
+      servers based on the LAYOUT4_NFSV4_1_FILES layout type are the same
+      as those used by metadata servers.  Metadata and data servers use ONC
+      RPC security flavors to authenticate, and SECINFO and SECINFO_NO_NAME
+      to negotiate the security mechanism and services to be used.  Thus,
+      when using the LAYOUT4_NFSV4_1_FILES layout type, the impact on the
+      RPC-based security model due to pNFS (as alluded to in Sections <xref target="ss:introduction:RaS" format='counter' />
+      and <xref target="ss:introduction:PA" format='counter' />) is zero.
+    </t>
+
+    <t>
+      For a given file object, a metadata server MAY require different
+      security parameters (secinfo4 value) than the data server.  For a
+      given file object with multiple data servers, the secinfo4 value
+      SHOULD be the same across all data servers.  If the secinfo4 values
+      across a metadata server and its data servers differ for a specific
+      file, the mapping of the principal to the server's internal user
+      identifier MUST be the same in order for the access-control checks
+      based on ACL, mode, open and deny mode, and mandatory locking to be
+      consistent across on the pNFS server.
+    </t>
+
+    <t>
+      If an NFSv4.1 implementation supports pNFS and supports NFSv4.1 file
+      layouts, then the implementation MUST support the SECINFO_NO_NAME
+      operation on both the metadata and data servers.
+    </t>
+  </section>
+</section>

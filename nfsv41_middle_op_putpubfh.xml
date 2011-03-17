@@ -1,0 +1,93 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_PUTPUBFH" title="Operation 23: PUTPUBFH - Set Public Filehandle">
+    <section toc='exclude' anchor="ss:op_PUTPUBFH:A" title="ARGUMENT">
+      <figure>
+        <artwork>
+void;
+        </artwork>
+      </figure>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_PUTPUBFH:R" title="RESULT">
+      <?rfc include='autogen/putpubfh_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_PUTPUBFH:D" title="DESCRIPTION">
+      <t>
+        This operation replaces the current filehandle with the filehandle
+        that represents the public filehandle of the server's namespace.
+        This filehandle may be different from the "root" filehandle that may
+        be associated with some other directory on the server.
+      </t>
+
+      <t>
+        PUTPUBFH also clears the current stateid.
+      </t>
+
+      <t>
+        The public filehandle represents the concepts embodied in RFC 2054
+        <xref target="RFC2054" />, RFC 2055 <xref target="RFC2055" />, and RFC 2224 <xref target="RFC2224" />.  The intent for NFSv4.1 is
+        that the public filehandle (represented by the PUTPUBFH operation) be
+        used as a method of providing WebNFS server compatibility with NFSv3.
+      </t>
+
+      <t>
+        The public filehandle and the root filehandle (represented by the
+        PUTROOTFH operation) SHOULD be equivalent.  If the public and root
+        filehandles are not equivalent, then the directory corresponding to
+        the public filehandle MUST be a descendant of the directory
+        corresponding to the root filehandle.
+      </t>
+
+      <t>
+        See <xref target="ss:proc_COMPOUND:CF" /> for more details on the current filehandle.
+      </t>
+
+      <t>
+        See <xref target="ss:proc_COMPOUND:CS" /> for more details on the current stateid.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_PUTPUBFH:I" title="IMPLEMENTATION">
+      <t>
+        This operation is used in an NFS request to set the context for file
+        accessing operations that follow in the same COMPOUND request.
+      </t>
+
+      <t>
+        With the NFSv3 public filehandle, the client is able to specify
+        whether the pathname provided in the LOOKUP should be evaluated as
+        either an absolute path relative to the server's root or relative to
+        the public filehandle.  RFC 2224 <xref target="RFC2224" /> contains further discussion of
+        the functionality.  With NFSv4.1, that type of specification is not
+        directly available in the LOOKUP operation.  The reason for this is
+        because the component separators needed to specify absolute vs.
+        relative are not allowed in NFSv4.  Therefore, the client is
+        responsible for constructing its request such that the use of either
+        PUTROOTFH or PUTPUBFH signifies absolute or relative evaluation of an
+        NFS URL, respectively.
+      </t>
+
+      <t>
+        Note that there are warnings mentioned in RFC 2224 <xref target="RFC2224" /> with respect
+        to the use of absolute evaluation and the restrictions the server may
+        place on that evaluation with respect to how much of its namespace
+        has been made available.  These same warnings apply to NFSv4.1.  It
+        is likely, therefore, that because of server implementation details,
+        an NFSv3 absolute public filehandle look up may behave differently
+        than an NFSv4.1 absolute resolution.
+      </t>
+
+      <t>
+        There is a form of security negotiation as described in RFC 2755 <xref target="RFC2755" />
+        that uses the public filehandle and an overloading of the pathname.
+        This method is not available with NFSv4.1 as filehandles are not
+        overloaded with special meaning and therefore do not provide the same
+        framework as NFSv3.  Clients should therefore use the security
+        negotiation mechanisms described in <xref target="ss:core_infrastructure:SSN" />.
+      </t>
+    </section>
+  </section>
+

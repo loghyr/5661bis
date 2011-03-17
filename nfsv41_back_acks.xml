@@ -1,0 +1,165 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+<section title="Acknowledgments">
+  <t>
+    The initial text for the SECINFO extensions were edited by Mike
+    Eisler with contributions from Peng Dai, Sergey Klyushin, and Carl
+    Burnett.
+  </t>
+
+  <t>
+    The initial text for the SESSIONS extensions were edited by Tom
+    Talpey, Spencer Shepler, Jon Bauman with contributions from Charles
+    Antonelli, Brent Callaghan, Mike Eisler, John Howard, Chet Juszczak,
+    Trond Myklebust, Dave Noveck, John Scott, Mike Stolarchuk, and Mark
+    Wittle.
+  </t>
+
+  <t>
+    Initial text relating to multi-server namespace features, including
+    the concept of referrals, were contributed by Dave Noveck, Carl
+    Burnett, and Charles Fan with contributions from Ted Anderson, Neil
+    Brown, and Jon Haswell.
+  </t>
+
+  <t>
+    The initial text for the Directory Delegations support were
+    contributed by Saadia Khan with input from Dave Noveck, Mike Eisler,
+    Carl Burnett, Ted Anderson, and Tom Talpey.
+  </t>
+
+  <t>
+    The initial text for the ACL explanations were contributed by Sam
+    Falkner and Lisa Week.
+  </t>
+
+  <t>
+    The pNFS work was inspired by the NASD and OSD work done by Garth
+    Gibson.  Gary Grider has also been a champion of high-performance
+    parallel I/O. Garth Gibson and Peter Corbett started the pNFS effort
+    with a problem statement document for the IETF that formed the basis
+    for the pNFS work in NFSv4.1.
+  </t>
+
+  <t>
+    The initial text for the parallel NFS support was edited by Brent
+    Welch and Garth Goodson.  Additional authors for those documents were
+    Benny Halevy, David Black, and Andy Adamson.  Additional input came
+    from the informal group that contributed to the construction of the
+    initial pNFS drafts; specific acknowledgment goes to Gary Grider,
+    Peter Corbett, Dave Noveck, Peter Honeyman, and Stephen Fridella.
+  </t>
+
+  <t>
+    Fredric Isaman found several errors in draft versions of the ONC RPC
+    XDR description of the NFSv4.1 protocol.
+  </t>
+
+  <t>
+    Audrey Van Belleghem provided, in numerous ways, essential
+    co-ordination and management of the process of editing the specification
+    documents.
+  </t>
+
+  <t>
+    Richard Jernigan gave feedback on the file layout's striping pattern
+    design.
+  </t>
+
+  <t>
+    Several formal inspection teams were formed to review various areas
+    of the protocol.  All the inspections found significant errors and
+    room for improvement.  NFSv4.1's inspection teams were:
+  </t>
+
+  <t>
+    <list style='symbols'>
+      <t>
+        ACLs, with the following inspectors: Sam Falkner, Bruce Fields,
+        Rahul Iyer, Saadia Khan, Dave Noveck, Lisa Week, Mario Wurzl, and
+        Alan Yoder.
+      </t>
+
+      <t>
+        Sessions, with the following inspectors: William Brown, Tom
+        Doeppner, Robert Gordon, Benny Halevy, Fredric Isaman, Rick
+        Macklem, Trond Myklebust, Dave Noveck, Karen Rochford, John Scott,
+        and Peter Shah.
+      </t>
+
+      <t>
+        Initial pNFS inspection, with the following inspectors: Andy
+        Adamson, David Black, Mike Eisler, Marc Eshel, Sam Falkner, Garth
+        Goodson, Benny Halevy, Rahul Iyer, Trond Myklebust, Spencer
+        Shepler, and Lisa Week.
+      </t>
+
+      <t>
+        Global namespace, with the following inspectors: Mike Eisler, Dan
+        Ellard, Craig Everhart, Fredric Isaman, Trond Myklebust, Dave
+        Noveck, Theresa Raj, Spencer Shepler, Renu Tewari, and Robert
+        Thurlow.
+      </t>
+
+      <t>
+        NFSv4.1 file layout type, with the following inspectors: Andy
+        Adamson, Marc Eshel, Sam Falkner, Garth Goodson, Rahul Iyer, Trond
+        Myklebust, and Lisa Week.
+      </t>
+
+      <t>
+        NFSv4.1 locking and directory delegations, with the following
+        inspectors: Mike Eisler, Pranoop Erasani, Robert Gordon, Saadia
+        Khan, Eric Kustarz, Dave Noveck, Spencer Shepler, and Amy Weaver.
+      </t>
+
+      <t>
+        EXCHANGE_ID and DESTROY_CLIENTID, with the following inspectors:
+        Mike Eisler, Pranoop Erasani, Robert Gordon, Benny Halevy, Fredric
+        Isaman, Saadia Khan, Ricardo Labiaga, Rick Macklem, Trond
+        Myklebust, Spencer Shepler, and Brent Welch.
+      </t>
+
+      <t>
+        Final pNFS inspection, with the following inspectors: Andy
+        Adamson, Mike Eisler, Mark Eshel, Sam Falkner, Jason Glasgow,
+        Garth Goodson, Robert Gordon, Benny Halevy, Dean Hildebrand, Rahul
+        Iyer, Suchit Kaura, Trond Myklebust, Anatoly Pinchuk, Spencer
+        Shepler, Renu Tewari, Lisa Week, and Brent Welch.
+      </t>
+    </list>
+  </t>
+
+  <t>
+    A review team worked together to generate the tables of assignments
+    of error sets to operations and make sure that each such assignment
+    had two or more people validating it.  Participating in the process
+    were Andy Adamson, Mike Eisler, Sam Falkner, Garth Goodson, Robert
+    Gordon, Trond Myklebust, Dave Noveck, Spencer Shepler, Tom Talpey,
+    Amy Weaver, and Lisa Week.
+  </t>
+
+  <t>
+    Jari Arkko, David Black, Scott Bradner, Lisa Dusseault, Lars Eggert,
+    Chris Newman, and Tim Polk provided valuable review and guidance.
+  </t>
+
+  <t>
+    Olga Kornievskaia found several errors in the SSV specification.
+  </t>
+
+  <t>
+    Ricardo Labiaga found several places where the use of RPCSEC_GSS was
+    underspecified.
+  </t>
+
+  <t>
+    Those who provided miscellaneous comments include: Andy Adamson,
+    Sunil Bhargo, Alex Burlyga, Pranoop Erasani, Bruce Fields, Vadim
+    Finkelstein, Jason Goldschmidt, Vijay K. Gurbani, Sergey Klyushin,
+    Ricardo Labiaga, James Lentini, Anshul Madan, Daniel Muntz, Daniel
+    Picken, Archana Ramani, Jim Rees, Mahesh Siddheshwar, Tom Talpey, and
+    Peter Varga.
+  </t>
+</section>

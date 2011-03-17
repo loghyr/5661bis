@@ -1,0 +1,42 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_SAVEFH" title="Operation 32: SAVEFH - Save Current Filehandle">
+    <section toc='exclude' anchor="ss:op_SAVEFH:A" title="ARGUMENT">
+      <figure>
+        <artwork>
+/* CURRENT_FH: */
+void;
+        </artwork>
+      </figure>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_SAVEFH:R" title="RESULT">
+      <?rfc include='autogen/savefh_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_SAVEFH:D" title="DESCRIPTION">
+      <t>
+        The SAVEFH operation saves the current filehandle and stateid.  If a
+        previous filehandle was saved, then it is no longer accessible.  The
+        saved filehandle can be restored as the current filehandle with the
+        RESTOREFH operator.
+      </t>
+
+      <t>
+        On success, the current filehandle retains its value.
+      </t>
+
+      <t>
+        See <xref target="ss:proc_COMPOUND:CF" /> for more details on the current filehandle.
+      </t>
+
+      <t>
+        See <xref target="ss:proc_COMPOUND:CS" /> for more details on the current stateid.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_SAVEFH:I" title="IMPLEMENTATION">
+    </section>
+  </section>
+

@@ -1,0 +1,2105 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+<section anchor="sec:client-side_caching" title="Client-Side Caching">
+  <t>
+    Client-side caching of data, of file attributes, and of file names is
+    essential to providing good performance with the NFS protocol.
+    Providing distributed cache coherence is a difficult problem, and
+    previous versions of the NFS protocol have not attempted it.
+    Instead, several NFS client implementation techniques have been used
+    to reduce the problems that a lack of coherence poses for users.
+    These techniques have not been clearly defined by earlier protocol
+    specifications, and it is often unclear what is valid or invalid
+    client behavior.
+  </t>
+ 
+  <t>
+    The NFSv4.1 protocol uses many techniques similar to those that have
+    been used in previous protocol versions.  The NFSv4.1 protocol does
+    not provide distributed cache coherence.  However, it defines a more
+    limited set of caching guarantees to allow locks and share
+    reservations to be used without destructive interference from
+    client-side caching.
+  </t>
+ 
+  <t>
+    In addition, the NFSv4.1 protocol introduces a delegation mechanism,
+    which allows many decisions normally made by the server to be made
+    locally by clients.  This mechanism provides efficient support of the
+    common cases where sharing is infrequent or where sharing is read-only.
+  </t>
+
+  <section anchor="ss:client-side_caching:PCfCC" title="Performance Challenges for Client-Side Caching">
+    <t>
+      Caching techniques used in previous versions of the NFS protocol have
+      been successful in providing good performance.  However, several
+      scalability challenges can arise when those techniques are used with
+      very large numbers of clients.  This is particularly true when
+      clients are geographically distributed, which classically increases
+      the latency for cache revalidation requests.
+    </t>
+
+    <t>
+      The previous versions of the NFS protocol repeat their file data
+      cache validation requests at the time the file is opened.  This
+      behavior can have serious performance drawbacks.  A common case is
+      one in which a file is only accessed by a single client.  Therefore,
+      sharing is infrequent.
+    </t>
+
+    <t>
+      In this case, repeated references to the server to find that no
+      conflicts exist are expensive.  A better option with regards to
+      performance is to allow a client that repeatedly opens a file to do
+      so without reference to the server.  This is done until potentially
+      conflicting operations from another client actually occur.
+    </t>
+
+    <t>
+      A similar situation arises in connection with byte-range locking.
+      Sending LOCK and LOCKU operations as well as the READ and WRITE
+      operations necessary to make data caching consistent with the locking
+      semantics (see <xref target="ss:client-side_caching:DCaFL" />) can severely limit performance.  When
+      locking is used to provide protection against infrequent conflicts, a
+      large penalty is incurred.  This penalty may discourage the use of
+      byte-range locking by applications.
+    </t>
+
+    <t>
+      The NFSv4.1 protocol provides more aggressive caching strategies with
+      the following design goals:
+    </t>
+
+    <t>
+      <list style='symbols'>
+        <t>
+          Compatibility with a large range of server semantics.
+        </t>
+
+        <t>
+          Providing the same caching benefits as previous versions of the
+          NFS protocol when unable to support the more aggressive model.
+        </t>
+
+        <t>
+          Requirements for aggressive caching are organized so that a large
+          portion of the benefit can be obtained even when not all of the
+          requirements can be met.
+        </t>
+      </list>
+    </t>
+
+    <t>
+      The appropriate requirements for the server are discussed in later
+      sections in which specific forms of caching are covered (see
+      <xref target="ss:client-side_caching:OD" />).
+    </t>
+  </section>
+
+  <section anchor="ss:client-side_caching:DaC" title="Delegation and Callbacks">
+    <t>
+      Recallable delegation of server responsibilities for a file to a
+      client improves performance by avoiding repeated requests to the
+      server in the absence of inter-client conflict.  With the use of a
+      "callback" RPC from server to client, a server recalls delegated
+      responsibilities when another client engages in sharing of a
+      delegated file.
+    </t>
+    
+    <t>
+      A delegation is passed from the server to the client, specifying the
+      object of the delegation and the type of delegation.  There are
+      different types of delegations, but each type contains a stateid to
+      be used to represent the delegation when performing operations that
+      depend on the delegation.  This stateid is similar to those
+      associated with locks and share reservations but differs in that the
+      stateid for a delegation is associated with a client ID and may be
+      used on behalf of all the open-owners for the given client.  A
+      delegation is made to the client as a whole and not to any specific
+      process or thread of control within it.
+    </t>
+    
+    <t>
+      The backchannel is established by CREATE_SESSION and
+      BIND_CONN_TO_SESSION, and the client is required to maintain it.
+      Because the backchannel may be down, even temporarily, correct
+      protocol operation does not depend on them.  Preliminary testing of
+      backchannel functionality by means of a CB_COMPOUND procedure with a
+      single operation, CB_SEQUENCE, can be used to check the continuity of
+      the backchannel.  A server avoids delegating responsibilities until
+      it has determined that the backchannel exists.  Because the granting
+      of a delegation is always conditional upon the absence of conflicting
+      access, clients MUST NOT assume that a delegation will be granted and
+      they MUST always be prepared for OPENs, WANT_DELEGATIONs, and
+      GET_DIR_DELEGATIONs to be processed without any delegations being
+      granted.
+    </t>
+    
+    <t>
+      Unlike locks, an operation by a second client to a delegated file
+      will cause the server to recall a delegation through a callback.  For
+      individual operations, we will describe, under IMPLEMENTATION, when
+      such operations are required to effect a recall.  A number of points
+      should be noted, however.
+    </t>
+    
+    <t>
+      <list style='symbols'>
+        <t>
+          The server is free to recall a delegation whenever it feels it is
+          desirable and may do so even if no operations requiring recall are
+          being done.
+        </t>
+    
+        <t>
+          Operations done outside the NFSv4.1 protocol, due to, for example,
+          access by other protocols, or by local access, also need to result
+          in delegation recall when they make analogous changes to file
+          system data.  What is crucial is if the change would invalidate
+          the guarantees provided by the delegation.  When this is possible,
+          the delegation needs to be recalled and MUST be returned or
+          revoked before allowing the operation to proceed.
+        </t>
+    
+        <t>
+          The semantics of the file system are crucial in defining when
+          delegation recall is required.  If a particular change within a
+          specific implementation causes change to a file attribute, then
+          delegation recall is required, whether that operation has been
+          specifically listed as requiring delegation recall.  Again, what
+          is critical is whether the guarantees provided by the delegation
+          are being invalidated.
+        </t>
+      </list>
+    </t>
+    
+    <t>
+      Despite those caveats, the implementation sections for a number of
+      operations describe situations in which delegation recall would be
+      required under some common circumstances:
+    </t>
+    
+    <t>
+      <list style='symbols'>
+        <t>
+          For GETATTR, see <xref target="ss:op_GETATTR:I" />.
+        </t>
+    
+        <t>
+          For OPEN, see <xref target="ss:op_OPEN:I" />.
+        </t>
+    
+        <t>
+          For READ, see <xref target="ss:op_READ:I" />.
+        </t>
+    
+        <t>
+          For REMOVE, see <xref target="ss:op_REMOVE:I" />.
+        </t>
+    
+        <t>
+          For RENAME, see <xref target="ss:op_RENAME:I" />.
+        </t>
+    
+        <t>
+          For SETATTR, see <xref target="ss:op_SETATTR:I" />.
+        </t>
+    
+        <t>
+          For WRITE, see <xref target="ss:op_WRITE:I" />.
+        </t>
+      </list>
+    </t>
+    
+    <t>
+      On recall, the client holding the delegation needs to flush modified
+      state (such as modified data) to the server and return the
+      delegation.  The conflicting request will not be acted on until the
+      recall is complete.  The recall is considered complete when the
+      client returns the delegation or the server times its wait for the
+      delegation to be returned and revokes the delegation as a result of
+      the timeout.  In the interim, the server will either delay responding
+      to conflicting requests or respond to them with NFS4ERR_DELAY.
+      Following the resolution of the recall, the server has the
+      information necessary to grant or deny the second client's request.
+    </t>
+    
+    <t>
+      At the time the client receives a delegation recall, it may have
+      substantial state that needs to be flushed to the server.  Therefore,
+      the server should allow sufficient time for the delegation to be
+      returned since it may involve numerous RPCs to the server.  If the
+      server is able to determine that the client is diligently flushing
+      state to the server as a result of the recall, the server may extend
+      the usual time allowed for a recall.  However, the time allowed for
+      recall completion should not be unbounded.
+    </t>
+    
+    <t>
+      An example of this is when responsibility to mediate opens on a given
+      file is delegated to a client (see <xref target="ss:client-side_caching:OD" />).  The server will
+      not know what opens are in effect on the client.  Without this
+      knowledge, the server will be unable to determine if the access and
+      deny states for the file allow any particular open until the
+      delegation for the file has been returned.
+    </t>
+    
+    <t>
+      A client failure or a network partition can result in failure to
+      respond to a recall callback.  In this case, the server will revoke
+      the delegation, which in turn will render useless any modified state
+      still on the client.
+    </t>
+
+    <section toc='exclude' anchor="ss:client-side_caching:DR" title="Delegation Recovery">
+      <t>
+        There are three situations that delegation recovery needs to deal
+        with:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            client restart
+          </t>
+
+          <t>
+            server restart
+          </t>
+
+          <t>
+            network partition (full or backchannel-only)
+          </t>
+        </list>
+      </t>
+
+      <t>
+        In the event the client restarts, the failure to renew the lease will
+        result in the revocation of byte-range locks and share reservations.
+        Delegations, however, may be treated a bit differently.
+      </t>
+
+      <t>
+        There will be situations in which delegations will need to be
+        reestablished after a client restarts.  The reason for this is that the
+        client may have file data stored locally and this data was associated
+        with the previously held delegations.  The client will need to
+        reestablish the appropriate file state on the server.
+      </t>
+
+      <t>
+        To allow for this type of client recovery, the server MAY extend the
+        period for delegation recovery beyond the typical lease expiration
+        period.  This implies that requests from other clients that conflict
+        with these delegations will need to wait.  Because the normal recall
+        process may require significant time for the client to flush changed
+        state to the server, other clients need be prepared for delays that
+        occur because of a conflicting delegation.  This longer interval
+        would increase the window for clients to restart and consult stable
+        storage so that the delegations can be reclaimed.  For OPEN
+        delegations, such delegations are reclaimed using OPEN with a claim
+        type of CLAIM_DELEGATE_PREV or CLAIM_DELEG_PREV_FH
+        (see Sections <xref target="ss:client-side_caching:DCaR" format='counter' />
+        and <xref target="op_OPEN" format='counter' /> for discussion of OPEN delegation and the details of OPEN,
+        respectively).
+      </t>
+
+      <t>
+        A server MAY support claim types of CLAIM_DELEGATE_PREV and
+        CLAIM_DELEG_PREV_FH, and if it does, it MUST NOT remove delegations
+        upon a CREATE_SESSION that confirm a client ID created by
+        EXCHANGE_ID.  Instead, the server MUST, for a period of time no less
+        than that of the value of the lease_time attribute, maintain the
+        client's delegations to allow time for the client to send
+        CLAIM_DELEGATE_PREV and/or CLAIM_DELEG_PREV_FH requests.  The server
+        that supports CLAIM_DELEGATE_PREV and/or CLAIM_DELEG_PREV_FH MUST
+        support the DELEGPURGE operation.
+      </t>
+
+      <t>
+        When the server restarts, delegations are reclaimed (using the OPEN
+        operation with CLAIM_PREVIOUS) in a similar fashion to byte-range
+        locks and share reservations.  However, there is a slight semantic
+        difference.  In the normal case, if the server decides that a
+        delegation should not be granted, it performs the requested action
+        (e.g., OPEN) without granting any delegation.  For reclaim, the
+        server grants the delegation but a special designation is applied so
+        that the client treats the delegation as having been granted but
+        recalled by the server.  Because of this, the client has the duty to
+        write all modified state to the server and then return the
+        delegation.  This process of handling delegation reclaim reconciles
+        three principles of the NFSv4.1 protocol:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            Upon reclaim, a client reporting resources assigned to it by an
+            earlier server instance must be granted those resources.
+          </t>
+
+          <t>
+            The server has unquestionable authority to determine whether
+            delegations are to be granted and, once granted, whether they are
+            to be continued.
+          </t>
+
+          <t>
+            The use of callbacks should not be depended upon until the client
+            has proven its ability to receive them.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        When a client needs to reclaim a delegation and there is no
+        associated open, the client may use the CLAIM_PREVIOUS variant of the
+        WANT_DELEGATION operation.  However, since the server is not required
+        to support this operation, an alternative is to reclaim via a dummy
+        OPEN together with the delegation using an OPEN of type
+        CLAIM_PREVIOUS.  The dummy open file can be released using a CLOSE to
+        re-establish the original state to be reclaimed, a delegation without
+        an associated open.
+      </t>
+
+      <t>
+        When a client has more than a single open associated with a
+        delegation, state for those additional opens can be established using
+        OPEN operations of type CLAIM_DELEGATE_CUR.  When these are used to
+        establish opens associated with reclaimed delegations, the server
+        MUST allow them when made within the grace period.
+      </t>
+
+      <t>
+        When a network partition occurs, delegations are subject to freeing
+        by the server when the lease renewal period expires.  This is similar
+        to the behavior for locks and share reservations.  For delegations,
+        however, the server may extend the period in which conflicting
+        requests are held off.  Eventually, the occurrence of a conflicting
+        request from another client will cause revocation of the delegation.
+        A loss of the backchannel (e.g., by later network configuration
+        change) will have the same effect.  A recall request will fail and
+        revocation of the delegation will result.
+      </t>
+
+      <t>
+        A client normally finds out about revocation of a delegation when it
+        uses a stateid associated with a delegation and receives one of the
+        errors NFS4ERR_EXPIRED, NFS4ERR_ADMIN_REVOKED, or
+        NFS4ERR_DELEG_REVOKED.  It also may find out about delegation
+        revocation after a client restart when it attempts to reclaim a
+        delegation and receives that same error.  Note that in the case of a
+        revoked OPEN_DELEGATE_WRITE delegation, there are issues because data
+        may have been modified by the client whose delegation is revoked and
+        separately by other clients.  See <xref target="ss:client-side_caching:RRfWOD" /> for a discussion of
+        such issues.  Note also that when delegations are revoked,
+        information about the revoked delegation will be written by the
+        server to stable storage (as described in <xref target="ss:state_management:NPaR" />).  This is
+        done to deal with the case in which a server restarts after revoking
+        a delegation but before the client holding the revoked delegation is
+        notified about the revocation.
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:client-side_caching:DC" title="Data Caching">
+    <t>
+      When applications share access to a set of files, they need to be
+      implemented so as to take account of the possibility of conflicting
+      access by another application.  This is true whether the applications
+      in question execute on different clients or reside on the same
+      client.
+    </t>
+
+    <t>
+      Share reservations and byte-range locks are the facilities the
+      NFSv4.1 protocol provides to allow applications to coordinate access
+      by using mutual exclusion facilities.  The NFSv4.1 protocol's data
+      caching must be implemented such that it does not invalidate the
+      assumptions on which those using these facilities depend.
+    </t>
+
+    <section toc='exclude' anchor="ss:client-side_caching:DCaO" title="Data Caching and OPENs">
+      <t>
+        In order to avoid invalidating the sharing assumptions on which
+        applications rely, NFSv4.1 clients should not provide cached data to
+        applications or modify it on behalf of an application when it would
+        not be valid to obtain or modify that same data via a READ or WRITE
+        operation.
+      </t>
+
+      <t>
+        Furthermore, in the absence of an OPEN delegation (see <xref target="ss:client-side_caching:OD" />),
+        two additional rules apply.  Note that these rules are obeyed in
+        practice by many NFSv3 clients.
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            First, cached data present on a client must be revalidated after
+            doing an OPEN.  Revalidating means that the client fetches the
+            change attribute from the server, compares it with the cached
+            change attribute, and if different, declares the cached data (as
+            well as the cached attributes) as invalid.  This is to ensure that
+            the data for the OPENed file is still correctly reflected in the
+            client's cache.  This validation must be done at least when the
+            client's OPEN operation includes a deny of OPEN4_SHARE_DENY_WRITE
+            or OPEN4_SHARE_DENY_BOTH, thus terminating a period in which other
+            clients may have had the opportunity to open the file with
+            OPEN4_SHARE_ACCESS_WRITE/OPEN4_SHARE_ACCESS_BOTH access.  Clients
+            may choose to do the revalidation more often (i.e., at OPENs
+            specifying a deny mode of OPEN4_SHARE_DENY_NONE) to parallel the
+            NFSv3 protocol's practice for the benefit of users assuming this
+            degree of cache revalidation.
+            <vspace blankLines="1"/>
+            Since the change attribute is updated for data and metadata
+            modifications, some client implementors may be tempted to use the
+            time_modify attribute and not the change attribute to validate
+            cached data, so that metadata changes do not spuriously invalidate
+            clean data.  The implementor is cautioned in this approach.  The
+            change attribute is guaranteed to change for each update to the
+            file, whereas time_modify is guaranteed to change only at the
+            granularity of the time_delta attribute.  Use by the client's data
+            cache validation logic of time_modify and not change runs the risk
+            of the client incorrectly marking stale data as valid.  Thus, any
+            cache validation approach by the client MUST include the use of
+            the change attribute.
+         </t>
+
+         <t>
+            Second, modified data must be flushed to the server before closing
+            a file OPENed for OPEN4_SHARE_ACCESS_WRITE.  This is complementary
+            to the first rule.  If the data is not flushed at CLOSE, the
+            revalidation done after the client OPENs a file is unable to
+            achieve its purpose.  The other aspect to flushing the data before
+            close is that the data must be committed to stable storage, at the
+            server, before the CLOSE operation is requested by the client.  In
+            the case of a server restart and a CLOSEd file, it may not be
+            possible to retransmit the data to be written to the file, hence,
+            this requirement.
+          </t>
+        </list>
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:client-side_caching:DCaFL" title="Data Caching and File Locking">
+      <t>
+        For those applications that choose to use byte-range locking instead
+        of share reservations to exclude inconsistent file access, there is
+        an analogous set of constraints that apply to client-side data
+        caching.  These rules are effective only if the byte-range locking is
+        used in a way that matches in an equivalent way the actual READ and
+        WRITE operations executed.  This is as opposed to byte-range locking
+        that is based on pure convention.  For example, it is possible to
+        manipulate a two-megabyte file by dividing the file into two
+        one-megabyte ranges and protecting access to the two byte-ranges by
+        byte-range locks on bytes zero and one.  A WRITE_LT lock on byte zero
+        of the file would represent the right to perform READ and WRITE
+        operations on the first byte-range.  A WRITE_LT lock on byte one of
+        the file would represent the right to perform READ and WRITE
+        operations on the second byte-range.  As long as all applications
+        manipulating the file obey this convention, they will work on a local
+        file system.  However, they may not work with the NFSv4.1 protocol
+        unless clients refrain from data caching.
+      </t>
+     
+      <t>
+        The rules for data caching in the byte-range locking environment are:
+      </t>
+     
+      <t>
+        <list style='symbols'>
+          <t>
+            First, when a client obtains a byte-range lock for a particular
+            byte-range, the data cache corresponding to that byte-range (if
+            any cache data exists) must be revalidated.  If the change
+            attribute indicates that the file may have been updated since the
+            cached data was obtained, the client must flush or invalidate the
+            cached data for the newly locked byte-range.  A client might
+            choose to invalidate all of the non-modified cached data that it
+            has for the file, but the only requirement for correct operation
+            is to invalidate all of the data in the newly locked byte-range.
+          </t>
+     
+          <t>
+            Second, before releasing a WRITE_LT lock for a byte-range, all
+            modified data for that byte-range must be flushed to the server.
+            The modified data must also be written to stable storage.
+          </t>
+        </list>
+      </t>
+     
+      <t>
+        Note that flushing data to the server and the invalidation of cached
+        data must reflect the actual byte-ranges locked or unlocked.
+        Rounding these up or down to reflect client cache block boundaries
+        will cause problems if not carefully done.  For example, writing a
+        modified block when only half of that block is within an area being
+        unlocked may cause invalid modification to the byte-range outside the
+        unlocked area.  This, in turn, may be part of a byte-range locked by
+        another client.  Clients can avoid this situation by synchronously
+        performing portions of WRITE operations that overlap that portion
+        (initial or final) that is not a full block.  Similarly, invalidating
+        a locked area that is not an integral number of full buffer blocks
+        would require the client to read one or two partial blocks from the
+        server if the revalidation procedure shows that the data that the
+        client possesses may not be valid.
+      </t>
+     
+      <t>
+        The data that is written to the server as a prerequisite to the
+        unlocking of a byte-range must be written, at the server, to stable
+        storage.  The client may accomplish this either with synchronous
+        writes or by following asynchronous writes with a COMMIT operation.
+        This is required because retransmission of the modified data after a
+        server restart might conflict with a lock held by another client.
+      </t>
+     
+      <t>
+        A client implementation may choose to accommodate applications that
+        use byte-range locking in non-standard ways (e.g., using a byte-range
+        lock as a global semaphore) by flushing to the server more data upon
+        a LOCKU than is covered by the locked range.  This may include
+        modified data within files other than the one for which the unlocks
+        are being done.  In such cases, the client must not interfere with
+        applications whose READs and WRITEs are being done only within the
+        bounds of byte-range locks that the application holds.  For example,
+        an application locks a single byte of a file and proceeds to write
+        that single byte.  A client that chose to handle a LOCKU by flushing
+        all modified data to the server could validly write that single byte
+        in response to an unrelated LOCKU operation.  However, it would not
+        be valid to write the entire block in which that single written byte
+        was located since it includes an area that is not locked and might be
+        locked by another client.  Client implementations can avoid this
+        problem by dividing files with modified data into those for which all
+        modifications are done to areas covered by an appropriate byte-range
+        lock and those for which there are modifications not covered by a
+        byte-range lock.  Any writes done for the former class of files must
+        not include areas not locked and thus not modified on the client.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:client-side_caching:DCaMFL" title="Data Caching and Mandatory File Locking">
+      <t>
+        Client-side data caching needs to respect mandatory byte-range
+        locking when it is in effect.  The presence of mandatory byte-range
+        locking for a given file is indicated when the client gets back
+        NFS4ERR_LOCKED from a READ or WRITE operation on a file for which it
+        has an appropriate share reservation.  When mandatory locking is in
+        effect for a file, the client must check for an appropriate
+        byte-range lock for data being read or written.  If a byte-range lock
+        exists for the range being read or written, the client may satisfy
+        the request using the client's validated cache.  If an appropriate
+        byte-range lock is not held for the range of the read or write, the
+        read or write request must not be satisfied by the client's cache and
+        the request must be sent to the server for processing.  When a read
+        or write request partially overlaps a locked byte-range, the request
+        should be subdivided into multiple pieces with each byte-range
+        (locked or not) treated appropriately.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:client-side_caching:DCaFI" title="Data Caching and File Identity">
+      <t>
+        When clients cache data, the file data needs to be organized
+        according to the file system object to which the data belongs.  For
+        NFSv3 clients, the typical practice has been to assume for the
+        purpose of caching that distinct filehandles represent distinct file
+        system objects.  The client then has the choice to organize and
+        maintain the data cache on this basis.
+      </t>
+     
+      <t>
+        In the NFSv4.1 protocol, there is now the possibility to have
+        significant deviations from a "one filehandle per object" model
+        because a filehandle may be constructed on the basis of the object's
+        pathname.  Therefore, clients need a reliable method to determine if
+        two filehandles designate the same file system object.  If clients
+        were simply to assume that all distinct filehandles denote distinct
+        objects and proceed to do data caching on this basis, caching
+        inconsistencies would arise between the distinct client-side objects
+        that mapped to the same server-side object.
+      </t>
+     
+      <t>
+        By providing a method to differentiate filehandles, the NFSv4.1
+        protocol alleviates a potential functional regression in comparison
+        with the NFSv3 protocol.  Without this method, caching
+        inconsistencies within the same client could occur, and this has not
+        been present in previous versions of the NFS protocol.  Note that it
+        is possible to have such inconsistencies with applications executing
+        on multiple clients, but that is not the issue being addressed here.
+      </t>
+     
+      <t>
+        For the purposes of data caching, the following steps allow an
+        NFSv4.1 client to determine whether two distinct filehandles denote
+        the same server-side object:
+      </t>
+     
+      <t>
+        <list style='symbols'>
+          <t>
+            If GETATTR directed to two filehandles returns different values of
+            the fsid attribute, then the filehandles represent distinct
+            objects.
+          </t>
+     
+          <t>
+            If GETATTR for any file with an fsid that matches the fsid of the
+            two filehandles in question returns a unique_handles attribute
+            with a value of TRUE, then the two objects are distinct.
+          </t>
+     
+          <t>
+            If GETATTR directed to the two filehandles does not return the
+            fileid attribute for both of the handles, then it cannot be
+            determined whether the two objects are the same.  Therefore,
+            operations that depend on that knowledge (e.g., client-side data
+            caching) cannot be done reliably.  Note that if GETATTR does not
+            return the fileid attribute for both filehandles, it will return
+            it for neither of the filehandles, since the fsid for both
+            filehandles is the same.
+          </t>
+     
+          <t>
+            If GETATTR directed to the two filehandles returns different
+            values for the fileid attribute, then they are distinct objects.
+          </t>
+     
+          <t>
+            Otherwise, they are the same object.
+          </t>
+        </list>
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:client-side_caching:OD" title="Open Delegation">
+    <t>
+      When a file is being OPENed, the server may delegate further handling
+      of opens and closes for that file to the opening client.  Any such
+      delegation is recallable since the circumstances that allowed for the
+      delegation are subject to change.  In particular, if the server
+      receives a conflicting OPEN from another client, the server must
+      recall the delegation before deciding whether the OPEN from the other
+      client may be granted.  Making a delegation is up to the server, and
+      clients should not assume that any particular OPEN either will or
+      will not result in an OPEN delegation.  The following is a typical
+      set of conditions that servers might use in deciding whether an OPEN
+      should be delegated:
+    </t>
+   
+    <t>
+      <list style='symbols'>
+        <t>
+          The client must be able to respond to the server's callback
+          requests.  If a backchannel has been established, the server will
+          send a CB_COMPOUND request, containing a single operation,
+          CB_SEQUENCE, for a test of backchannel availability.
+        </t>
+   
+        <t>
+          The client must have responded properly to previous recalls.
+        </t>
+   
+        <t>
+          There must be no current OPEN conflicting with the requested
+          delegation.
+        </t>
+   
+        <t>
+          There should be no current delegation that conflicts with the
+          delegation being requested.
+        </t>
+   
+        <t>
+          The probability of future conflicting open requests should be low
+          based on the recent history of the file.
+        </t>
+   
+        <t>
+          The existence of any server-specific semantics of OPEN/CLOSE that
+          would make the required handling incompatible with the prescribed
+          handling that the delegated client would apply (see below).
+        </t>
+      </list>
+    </t>
+   
+    <t>
+      There are two types of OPEN delegations: OPEN_DELEGATE_READ and
+      OPEN_DELEGATE_WRITE.  An OPEN_DELEGATE_READ delegation allows a
+      client to handle, on its own, requests to open a file for reading
+      that do not deny OPEN4_SHARE_ACCESS_READ access to others.  Multiple
+      OPEN_DELEGATE_READ delegations may be outstanding simultaneously and
+      do not conflict.  An OPEN_DELEGATE_WRITE delegation allows the client
+      to handle, on its own, all opens.  Only OPEN_DELEGATE_WRITE
+      delegation may exist for a given file at a given time, and it is
+      inconsistent with any OPEN_DELEGATE_READ delegations.
+    </t>
+   
+    <t>
+      When a client has an OPEN_DELEGATE_READ delegation, it is assured
+      that neither the contents, the attributes (with the exception of
+      time_access), nor the names of any links to the file will change
+      without its knowledge, so long as the delegation is held.  When a
+      client has an OPEN_DELEGATE_WRITE delegation, it may modify the file
+      data locally since no other client will be accessing the file's data.
+      The client holding an OPEN_DELEGATE_WRITE delegation may only locally
+      affect file attributes that are intimately connected with the file
+      data: size, change, time_access, time_metadata, and time_modify.  All
+      other attributes must be reflected on the server.
+    </t>
+   
+    <t>
+      When a client has an OPEN delegation, it does not need to send OPENs
+      or CLOSEs to the server.  Instead, the client may update the
+      appropriate status internally.  For an OPEN_DELEGATE_READ delegation,
+      opens that cannot be handled locally (opens that are for
+      OPEN4_SHARE_ACCESS_WRITE/OPEN4_SHARE_ACCESS_BOTH or that deny
+      OPEN4_SHARE_ACCESS_READ access) must be sent to the server.
+    </t>
+   
+    <t>
+      When an OPEN delegation is made, the reply to the OPEN contains an
+      OPEN delegation structure that specifies the following:
+    </t>
+   
+    <t>
+      <list style='symbols'>
+        <t>
+          the type of delegation (OPEN_DELEGATE_READ or
+          OPEN_DELEGATE_WRITE).
+        </t>
+   
+        <t>
+          space limitation information to control flushing of data on close
+          (OPEN_DELEGATE_WRITE delegation only; see <xref target="ss:client-side_caching:ODaDC" />)
+        </t>
+   
+        <t>
+          an nfsace4 specifying read and write permissions
+        </t>
+   
+        <t>
+          a stateid to represent the delegation
+        </t>
+      </list>
+    </t>
+   
+    <t>
+      The delegation stateid is separate and distinct from the stateid for
+      the OPEN proper.  The standard stateid, unlike the delegation
+      stateid, is associated with a particular lock-owner and will continue
+      to be valid after the delegation is recalled and the file remains
+      open.
+    </t>
+   
+    <t>
+      When a request internal to the client is made to open a file and an
+      OPEN delegation is in effect, it will be accepted or rejected solely
+      on the basis of the following conditions.  Any requirement for other
+      checks to be made by the delegate should result in the OPEN
+      delegation being denied so that the checks can be made by the server
+      itself.
+    </t>
+   
+    <t>
+      <list style='symbols'>
+        <t>
+          The access and deny bits for the request and the file as described
+          in <xref target="ss:file_locking:SR" />.
+        </t>
+   
+        <t>
+          The read and write permissions as determined below.
+        </t>
+      </list>
+    </t>
+   
+    <t>
+      The nfsace4 passed with delegation can be used to avoid frequent
+      ACCESS calls.  The permission check should be as follows:
+    </t>
+   
+    <t>
+      <list style='symbols'>
+        <t>
+          If the nfsace4 indicates that the open may be done, then it should
+          be granted without reference to the server.
+        </t>
+   
+        <t>
+          If the nfsace4 indicates that the open may not be done, then an
+          ACCESS request must be sent to the server to obtain the definitive
+          answer.
+        </t>
+      </list>
+    </t>
+   
+    <t>
+      The server may return an nfsace4 that is more restrictive than the
+      actual ACL of the file.  This includes an nfsace4 that specifies
+      denial of all access.  Note that some common practices such as
+      mapping the traditional user "root" to the user "nobody" (see
+      <xref target="ss:file_attributes:Ioao" />) may make it incorrect to return the actual ACL of the
+      file in the delegation response.
+    </t>
+   
+    <t>
+      The use of a delegation together with various other forms of caching
+      creates the possibility that no server authentication and
+      authorization will ever be performed for a given user since all of
+      the user's requests might be satisfied locally.  Where the client is
+      depending on the server for authentication and authorization, the
+      client should be sure authentication and authorization occurs for
+      each user by use of the ACCESS operation.  This should be the case
+      even if an ACCESS operation would not be required otherwise.  As
+      mentioned before, the server may enforce frequent authentication by
+      returning an nfsace4 denying all access with every OPEN delegation.
+    </t>
+
+    <section toc='exclude' anchor="ss:client-side_caching:ODaDC" title="Open Delegation and Data Caching">
+      <t>
+        An OPEN delegation allows much of the message overhead associated
+        with the opening and closing files to be eliminated.  An open when an
+        OPEN delegation is in effect does not require that a validation
+        message be sent to the server.  The continued endurance of the
+        "OPEN_DELEGATE_READ delegation" provides a guarantee that no OPEN for
+        OPEN4_SHARE_ACCESS_WRITE/OPEN4_SHARE_ACCESS_BOTH, and thus no write,
+        has occurred.  Similarly, when closing a file opened for
+        OPEN4_SHARE_ACCESS_WRITE/OPEN4_SHARE_ACCESS_BOTH and if an
+        OPEN_DELEGATE_WRITE delegation is in effect, the data written does
+        not have to be written to the server until the OPEN delegation is
+        recalled.  The continued endurance of the OPEN delegation provides a
+        guarantee that no open, and thus no READ or WRITE, has been done by
+        another client.
+      </t>
+     
+      <t>
+        For the purposes of OPEN delegation, READs and WRITEs done without an
+        OPEN are treated as the functional equivalents of a corresponding
+        type of OPEN.  Although a client SHOULD NOT use special stateids when
+        an open exists, delegation handling on the server can use the client
+        ID associated with the current session to determine if the operation
+        has been done by the holder of the delegation (in which case, no
+        recall is necessary) or by another client (in which case, the
+        delegation must be recalled and I/O not proceed until the delegation
+        is recalled or revoked).
+      </t>
+     
+      <t>
+        With delegations, a client is able to avoid writing data to the
+        server when the CLOSE of a file is serviced.  The file close system
+        call is the usual point at which the client is notified of a lack of
+        stable storage for the modified file data generated by the
+        application.  At the close, file data is written to the server and,
+        through normal accounting, the server is able to determine if the
+        available file system space for the data has been exceeded (i.e., the
+        server returns NFS4ERR_NOSPC or NFS4ERR_DQUOT).  This accounting
+        includes quotas.  The introduction of delegations requires that an
+        alternative method be in place for the same type of communication to
+        occur between client and server.
+      </t>
+     
+      <t>
+        In the delegation response, the server provides either the limit of
+        the size of the file or the number of modified blocks and associated
+        block size.  The server must ensure that the client will be able to
+        write modified data to the server of a size equal to that provided in
+        the original delegation.  The server must make this assurance for all
+        outstanding delegations.  Therefore, the server must be careful in
+        its management of available space for new or modified data, taking
+        into account available file system space and any applicable quotas.
+        The server can recall delegations as a result of managing the
+        available file system space.  The client should abide by the server's
+        state space limits for delegations.  If the client exceeds the stated
+        limits for the delegation, the server's behavior is undefined.
+      </t>
+     
+      <t>
+        Based on server conditions, quotas, or available file system space,
+        the server may grant OPEN_DELEGATE_WRITE delegations with very
+        restrictive space limitations.  The limitations may be defined in a
+        way that will always force modified data to be flushed to the server
+        on close.
+      </t>
+     
+      <t>
+        With respect to authentication, flushing modified data to the server
+        after a CLOSE has occurred may be problematic.  For example, the user
+        of the application may have logged off the client, and unexpired
+        authentication credentials may not be present.  In this case, the
+        client may need to take special care to ensure that local unexpired
+        credentials will in fact be available.  This may be accomplished by
+        tracking the expiration time of credentials and flushing data well in
+        advance of their expiration or by making private copies of
+        credentials to assure their availability when needed.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:client-side_caching:ODaFL" title="Open Delegation and File Locks">
+      <t>
+        When a client holds an OPEN_DELEGATE_WRITE delegation, lock
+        operations are performed locally.  This includes those required for
+        mandatory byte-range locking.  This can be done since the delegation
+        implies that there can be no conflicting locks.  Similarly, all of
+        the revalidations that would normally be associated with obtaining
+        locks and the flushing of data associated with the releasing of locks
+        need not be done.
+      </t>
+
+      <t>
+        When a client holds an OPEN_DELEGATE_READ delegation, lock operations
+        are not performed locally.  All lock operations, including those
+        requesting non-exclusive locks, are sent to the server for
+        resolution.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:client-side_caching:HoC" title="Handling of CB_GETATTR">
+      <t>
+         The server needs to employ special handling for a GETATTR where the
+         target is a file that has an OPEN_DELEGATE_WRITE delegation in
+         effect.  The reason for this is that the client holding the
+         OPEN_DELEGATE_WRITE delegation may have modified the data, and the
+         server needs to reflect this change to the second client that
+         submitted the GETATTR.  Therefore, the client holding the
+         OPEN_DELEGATE_WRITE delegation needs to be interrogated.  The server
+         will use the CB_GETATTR operation.  The only attributes that the
+         server can reliably query via CB_GETATTR are size and change.
+      </t>
+
+      <t>
+         Since CB_GETATTR is being used to satisfy another client's GETATTR
+         request, the server only needs to know if the client holding the
+         delegation has a modified version of the file.  If the client's copy
+         of the delegated file is not modified (data or size), the server can
+         satisfy the second client's GETATTR request from the attributes
+         stored locally at the server.  If the file is modified, the server
+         only needs to know about this modified state.  If the server
+         determines that the file is currently modified, it will respond to
+         the second client's GETATTR as if the file had been modified locally
+         at the server.
+      </t>
+
+      <t>
+         Since the form of the change attribute is determined by the server
+         and is opaque to the client, the client and server need to agree on a
+         method of communicating the modified state of the file.  For the size
+         attribute, the client will report its current view of the file size.
+         For the change attribute, the handling is more involved.
+      </t>
+
+      <t>
+         For the client, the following steps will be taken when receiving an
+         OPEN_DELEGATE_WRITE delegation:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            The value of the change attribute will be obtained from the server
+            and cached.  Let this value be represented by c.
+          </t>
+
+          <t>
+            The client will create a value greater than c that will be used
+            for communicating that modified data is held at the client.  Let
+            this value be represented by d.
+          </t>
+
+          <t>
+            When the client is queried via CB_GETATTR for the change
+            attribute, it checks to see if it holds modified data.  If the
+            file is modified, the value d is returned for the change attribute
+            value.  If this file is not currently modified, the client returns
+            the value c for the change attribute.
+          </t>
+        </list>
+      </t>
+
+      <t>
+         For simplicity of implementation, the client MAY for each CB_GETATTR
+         return the same value d.  This is true even if, between successive
+         CB_GETATTR operations, the client again modifies the file's data or
+         metadata in its cache.  The client can return the same value because
+         the only requirement is that the client be able to indicate to the
+         server that the client holds modified data.  Therefore, the value of
+         d may always be c + 1.
+      </t>
+
+      <t>
+         While the change attribute is opaque to the client in the sense that
+         it has no idea what units of time, if any, the server is counting
+         change with, it is not opaque in that the client has to treat it as
+         an unsigned integer, and the server has to be able to see the results
+         of the client's changes to that integer.  Therefore, the server MUST
+         encode the change attribute in network order when sending it to the
+         client.  The client MUST decode it from network order to its native
+         order when receiving it, and the client MUST encode it in network
+         order when sending it to the server.  For this reason, change is
+         defined as an unsigned integer rather than an opaque array of bytes.
+      </t>
+
+      <t>
+         For the server, the following steps will be taken when providing an
+         OPEN_DELEGATE_WRITE delegation:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            Upon providing an OPEN_DELEGATE_WRITE delegation, the server will
+            cache a copy of the change attribute in the data structure it uses
+            to record the delegation.  Let this value be represented by sc.
+          </t>
+
+          <t>
+            When a second client sends a GETATTR operation on the same file to
+            the server, the server obtains the change attribute from the first
+            client.  Let this value be cc.
+          </t>
+
+          <t>
+            If the value cc is equal to sc, the file is not modified and the
+            server returns the current values for change, time_metadata, and
+            time_modify (for example) to the second client.
+          </t>
+
+          <t>
+            If the value cc is NOT equal to sc, the file is currently modified
+            at the first client and most likely will be modified at the server
+            at a future time.  The server then uses its current time to
+            construct attribute values for time_metadata and time_modify.  A
+            new value of sc, which we will call nsc, is computed by the
+            server, such that nsc >= sc + 1.  The server then returns the
+            constructed time_metadata, time_modify, and nsc values to the
+            requester.  The server replaces sc in the delegation record with
+            nsc.  To prevent the possibility of time_modify, time_metadata,
+            and change from appearing to go backward (which would happen if
+            the client holding the delegation fails to write its modified data
+            to the server before the delegation is revoked or returned), the
+            server SHOULD update the file's metadata record with the
+            constructed attribute values.  For reasons of reasonable
+            performance, committing the constructed attribute values to stable
+            storage is OPTIONAL.
+          </t>
+        </list>
+      </t>
+
+      <t>
+         As discussed earlier in this section, the client MAY return the same
+         cc value on subsequent CB_GETATTR calls, even if the file was
+         modified in the client's cache yet again between successive
+         CB_GETATTR calls.  Therefore, the server must assume that the file
+         has been modified yet again, and MUST take care to ensure that the
+         new nsc it constructs and returns is greater than the previous nsc it
+         returned.  An example implementation's delegation record would
+         satisfy this mandate by including a boolean field (let us call it
+         "modified") that is set to FALSE when the delegation is granted, and
+         an sc value set at the time of grant to the change attribute value.
+         The modified field would be set to TRUE the first time cc != sc, and
+         would stay TRUE until the delegation is returned or revoked.  The
+         processing for constructing nsc, time_modify, and time_metadata would
+         use this pseudo code:
+      </t>
+
+      <figure>
+        <artwork>
+if (!modified) {
+    do CB_GETATTR for change and size;
+
+    if (cc != sc)
+        modified = TRUE;
+} else {
+    do CB_GETATTR for size;
+}
+
+if (modified) {
+    sc = sc + 1;
+    time_modify = time_metadata = current_time;
+    update sc, time_modify, time_metadata into file's metadata;
+}
+        </artwork>
+      </figure>
+
+      <t>
+         This would return to the client (that sent GETATTR) the attributes it
+         requested, but make sure size comes from what CB_GETATTR returned.
+         The server would not update the file's metadata with the client's
+         modified size.
+      </t>
+
+      <t>
+         In the case that the file attribute size is different than the
+         server's current value, the server treats this as a modification
+         regardless of the value of the change attribute retrieved via
+         CB_GETATTR and responds to the second client as in the last step.
+      </t>
+
+      <t>
+         This methodology resolves issues of clock differences between client
+         and server and other scenarios where the use of CB_GETATTR break
+         down.
+      </t>
+
+      <t>
+         It should be noted that the server is under no obligation to use
+         CB_GETATTR, and therefore the server MAY simply recall the delegation
+         to avoid its use.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:client-side_caching:RoOD" title="Recall of Open Delegation">
+      <t>
+        The following events necessitate recall of an OPEN delegation:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            potentially conflicting OPEN request (or a READ or WRITE operation
+            done with a special stateid)
+          </t>
+
+          <t>
+            SETATTR sent by another client
+          </t>
+
+          <t>
+            REMOVE request for the file
+          </t>
+
+          <t>
+            RENAME request for the file as either the source or target of the
+            RENAME
+          </t>
+        </list>
+      </t>
+
+      <t>
+        Whether a RENAME of a directory in the path leading to the file
+        results in recall of an OPEN delegation depends on the semantics of
+        the server's file system.  If that file system denies such RENAMEs
+        when a file is open, the recall must be performed to determine
+        whether the file in question is, in fact, open.
+      </t>
+
+      <t>
+        In addition to the situations above, the server may choose to recall
+        OPEN delegations at any time if resource constraints make it
+        advisable to do so.  Clients should always be prepared for the
+        possibility of recall.
+      </t>
+
+      <t>
+        When a client receives a recall for an OPEN delegation, it needs to
+        update state on the server before returning the delegation.  These
+        same updates must be done whenever a client chooses to return a
+        delegation voluntarily.  The following items of state need to be
+        dealt with:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            If the file associated with the delegation is no longer open and
+            no previous CLOSE operation has been sent to the server, a CLOSE
+            operation must be sent to the server.
+          </t>
+
+          <t>
+            If a file has other open references at the client, then OPEN
+            operations must be sent to the server.  The appropriate stateids
+            will be provided by the server for subsequent use by the client
+            since the delegation stateid will no longer be valid.  These OPEN
+            requests are done with the claim type of CLAIM_DELEGATE_CUR.  This
+            will allow the presentation of the delegation stateid so that the
+            client can establish the appropriate rights to perform the OPEN.
+            (see <xref target="op_OPEN" />, which describes the OPEN operation, for
+            details.)
+          </t>
+
+          <t>
+            If there are granted byte-range locks, the corresponding LOCK
+            operations need to be performed.  This applies to the
+            OPEN_DELEGATE_WRITE delegation case only.
+          </t>
+
+          <t>
+            For an OPEN_DELEGATE_WRITE delegation, if at the time of recall
+            the file is not open for OPEN4_SHARE_ACCESS_WRITE/
+            OPEN4_SHARE_ACCESS_BOTH, all modified data for the file must be
+            flushed to the server.  If the delegation had not existed, the
+            client would have done this data flush before the CLOSE operation.
+          </t>
+
+          <t>
+            For an OPEN_DELEGATE_WRITE delegation when a file is still open at
+            the time of recall, any modified data for the file needs to be
+            flushed to the server.
+          </t>
+
+          <t>
+            With the OPEN_DELEGATE_WRITE delegation in place, it is possible
+            that the file was truncated during the duration of the delegation.
+            For example, the truncation could have occurred as a result of an
+            OPEN UNCHECKED with a size attribute value of zero.  Therefore, if
+            a truncation of the file has occurred and this operation has not
+            been propagated to the server, the truncation must occur before
+            any modified data is written to the server.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        In the case of OPEN_DELEGATE_WRITE delegation, byte-range locking
+        imposes some additional requirements.  To precisely maintain the
+        associated invariant, it is required to flush any modified data in
+        any byte-range for which a WRITE_LT lock was released while the
+        OPEN_DELEGATE_WRITE delegation was in effect.  However, because the
+        OPEN_DELEGATE_WRITE delegation implies no other locking by other
+        clients, a simpler implementation is to flush all modified data for
+        the file (as described just above) if any WRITE_LT lock has been
+        released while the OPEN_DELEGATE_WRITE delegation was in effect.
+      </t>
+
+      <t>
+        An implementation need not wait until delegation recall (or the
+        decision to voluntarily return a delegation) to perform any of the
+        above actions, if implementation considerations (e.g., resource
+        availability constraints) make that desirable.  Generally, however,
+        the fact that the actual OPEN state of the file may continue to
+        change makes it not worthwhile to send information about opens and
+        closes to the server, except as part of delegation return.  An
+        exception is when the client has no more internal opens of the file.
+        In this case, sending a CLOSE is useful because it reduces resource
+        utilization on the client and server.  Regardless of the client's
+        choices on scheduling these actions, all must be performed before the
+        delegation is returned, including (when applicable) the close that
+        corresponds to the OPEN that resulted in the delegation.  These
+        actions can be performed either in previous requests or in previous
+        operations in the same COMPOUND request.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:client-side_caching:CTFtHDR" title="Clients That Fail to Honor Delegation Recalls">
+      <t>
+        A client may fail to respond to a recall for various reasons, such as
+        a failure of the backchannel from server to the client.  The client
+        may be unaware of a failure in the backchannel.  This lack of
+        awareness could result in the client finding out long after the
+        failure that its delegation has been revoked, and another client has
+        modified the data for which the client had a delegation.  This is
+        especially a problem for the client that held an OPEN_DELEGATE_WRITE
+        delegation.
+      </t>
+
+      <t>
+        Status bits returned by SEQUENCE operations help to provide an
+        alternate way of informing the client of issues regarding the status
+        of the backchannel and of recalled delegations.  When the backchannel
+        is not available, the server returns the status bit
+        SEQ4_STATUS_CB_PATH_DOWN on SEQUENCE operations.  The client can
+        react by attempting to re-establish the backchannel and by returning
+        recallable objects if a backchannel cannot be successfully
+        reestablished.
+      </t>
+
+      <t>
+        Whether the backchannel is functioning or not, it may be that the
+        recalled delegation is not returned.  Note that the client's lease
+        might still be renewed, even though the recalled delegation is not
+        returned.  In this situation, servers SHOULD revoke delegations that
+        are not returned in a period of time equal to the lease period.  This
+        period of time should allow the client time to note the
+        backchannel-down status and re-establish the backchannel.
+      </t>
+
+      <t>
+        When delegations are revoked, the server will return with the
+        SEQ4_STATUS_RECALLABLE_STATE_REVOKED status bit set on subsequent
+        SEQUENCE operations.  The client should note this and then use
+        TEST_STATEID to find which delegations have been revoked.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:client-side_caching:DR1" title="Delegation Revocation">
+      <t>
+        At the point a delegation is revoked, if there are associated opens
+        on the client, these opens may or may not be revoked.  If no
+        byte-range lock or open is granted that is inconsistent with the existing
+        open, the stateid for the open may remain valid and be disconnected
+        from the revoked delegation, just as would be the case if the
+        delegation were returned.
+      </t>
+
+      <t>
+        For example, if an OPEN for OPEN4_SHARE_ACCESS_BOTH with a deny of
+        OPEN4_SHARE_DENY_NONE is associated with the delegation, granting of
+        another such OPEN to a different client will revoke the delegation
+        but need not revoke the OPEN, since the two OPENs are consistent with
+        each other.  On the other hand, if an OPEN denying write access is
+        granted, then the existing OPEN must be revoked.
+      </t>
+
+      <t>
+        When opens and/or locks are revoked, the applications holding these
+        opens or locks need to be notified.  This notification usually occurs
+        by returning errors for READ/WRITE operations or when a close is
+        attempted for the open file.
+      </t>
+
+      <t>
+        If no opens exist for the file at the point the delegation is
+        revoked, then notification of the revocation is unnecessary.
+        However, if there is modified data present at the client for the
+        file, the user of the application should be notified.  Unfortunately,
+        it may not be possible to notify the user since active applications
+        may not be present at the client.  See <xref target="ss:client-side_caching:RRfWOD" /> for additional
+        details.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:client-side_caching:DvW" title="Delegations via WANT_DELEGATION">
+      <t>
+        In addition to providing delegations as part of the reply to OPEN
+        operations, servers MAY provide delegations separate from open, via
+        the OPTIONAL WANT_DELEGATION operation.  This allows delegations to
+        be obtained in advance of an OPEN that might benefit from them, for
+        objects that are not a valid target of OPEN, or to deal with cases in
+        which a delegation has been recalled and the client wants to make an
+        attempt to re-establish it if the absence of use by other clients
+        allows that.
+      </t>
+
+      <t>
+        The WANT_DELEGATION operation may be performed on any type of file
+        object other than a directory.
+      </t>
+
+      <t>
+        When a delegation is obtained using WANT_DELEGATION, any open files
+        for the same filehandle held by that client are to be treated as
+        subordinate to the delegation, just as if they had been created using
+        an OPEN of type CLAIM_DELEGATE_CUR.  They are otherwise unchanged as
+        to seqid, access and deny modes, and the relationship with byte-range
+        locks.  Similarly, because existing byte-range locks are subordinate
+        to an open, those byte-range locks also become indirectly subordinate
+        to that new delegation.
+      </t>
+
+      <t>
+        The WANT_DELEGATION operation provides for delivery of delegations
+        via callbacks, when the delegations are not immediately available.
+        When a requested delegation is available, it is delivered to the
+        client via a CB_PUSH_DELEG operation.  When this happens, open files
+        for the same filehandle become subordinate to the new delegation at
+        the point at which the delegation is delivered, just as if they had
+        been created using an OPEN of type CLAIM_DELEGATE_CUR.  Similarly,
+        this occurs for existing byte-range locks subordinate to an open.
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:client-side_caching:DCaR" title="Data Caching and Revocation">
+    <t>
+      When locks and delegations are revoked, the assumptions upon which
+      successful caching depends are no longer guaranteed.  For any locks
+      or share reservations that have been revoked, the corresponding
+      state-owner needs to be notified.  This notification includes
+      applications with a file open that has a corresponding delegation
+      that has been revoked.  Cached data associated with the revocation
+      must be removed from the client.  In the case of modified data
+      existing in the client's cache, that data must be removed from the
+      client without being written to the server.  As mentioned, the
+      assumptions made by the client are no longer valid at the point when
+      a lock or delegation has been revoked.  For example, another client
+      may have been granted a conflicting byte-range lock after the
+      revocation of the byte-range lock at the first client.  Therefore,
+      the data within the lock range may have been modified by the other
+      client.  Obviously, the first client is unable to guarantee to the
+      application what has occurred to the file in the case of revocation.
+    </t>
+
+    <t>
+      Notification to a state-owner will in many cases consist of simply
+      returning an error on the next and all subsequent READs/WRITEs to the
+      open file or on the close.  Where the methods available to a client
+      make such notification impossible because errors for certain
+      operations may not be returned, more drastic action such as signals
+      or process termination may be appropriate.  The justification here is
+      that an invariant on which an application depends may be violated.
+      Depending on how errors are typically treated for the
+      client-operating environment, further levels of notification including
+      logging, console messages, and GUI pop-ups may be appropriate.
+    </t>
+
+    <section toc='exclude' anchor="ss:client-side_caching:RRfWOD" title="Revocation Recovery for Write Open Delegation">
+      <t>
+        Revocation recovery for an OPEN_DELEGATE_WRITE delegation poses the
+        special issue of modified data in the client cache while the file is
+        not open.  In this situation, any client that does not flush modified
+        data to the server on each close must ensure that the user receives
+        appropriate notification of the failure as a result of the
+        revocation.  Since such situations may require human action to
+        correct problems, notification schemes in which the appropriate user
+        or administrator is notified may be necessary.  Logging and console
+        messages are typical examples.
+      </t>
+
+      <t>
+        If there is modified data on the client, it must not be flushed
+        normally to the server.  A client may attempt to provide a copy of
+        the file data as modified during the delegation under a different
+        name in the file system namespace to ease recovery.  Note that when
+        the client can determine that the file has not been modified by any
+        other client, or when the client has a complete cached copy of the
+        file in question, such a saved copy of the client's view of the file
+        may be of particular value for recovery.  In another case, recovery
+        using a copy of the file based partially on the client's cached data
+        and partially on the server's copy as modified by other clients will
+        be anything but straightforward, so clients may avoid saving file
+        contents in these situations or specially mark the results to warn
+        users of possible problems.
+      </t>
+
+      <t>
+        Saving of such modified data in delegation revocation situations may
+        be limited to files of a certain size or might be used only when
+        sufficient disk space is available within the target file system.
+        Such saving may also be restricted to situations when the client has
+        sufficient buffering resources to keep the cached copy available
+        until it is properly stored to the target file system.
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:client-side_caching:AC" title="Attribute Caching">
+    <t>
+      This section pertains to the caching of a file's attributes on a
+      client when that client does not hold a delegation on the file.
+    </t>
+
+    <t>
+      The attributes discussed in this section do not include named
+      attributes.  Individual named attributes are analogous to files, and
+      caching of the data for these needs to be handled just as data
+      caching is for ordinary files.  Similarly, LOOKUP results from an
+      OPENATTR directory (as well as the directory's contents) are to be
+      cached on the same basis as any other pathnames.
+    </t>
+
+    <t>
+      Clients may cache file attributes obtained from the server and use
+      them to avoid subsequent GETATTR requests.  Such caching is write
+      through in that modification to file attributes is always done by
+      means of requests to the server and should not be done locally and
+      should not be cached.  The exception to this are modifications to
+      attributes that are intimately connected with data caching.
+      Therefore, extending a file by writing data to the local data cache
+      is reflected immediately in the size as seen on the client without
+      this change being immediately reflected on the server.  Normally,
+      such changes are not propagated directly to the server, but when the
+      modified data is flushed to the server, analogous attribute changes
+      are made on the server.  When OPEN delegation is in effect, the
+      modified attributes may be returned to the server in reaction to a
+      CB_RECALL call.
+    </t>
+
+    <t>
+      The result of local caching of attributes is that the attribute
+      caches maintained on individual clients will not be coherent.
+      Changes made in one order on the server may be seen in a different
+      order on one client and in a third order on another client.
+    </t>
+
+    <t>
+      The typical file system application programming interfaces do not
+      provide means to atomically modify or interrogate attributes for
+      multiple files at the same time.  The following rules provide an
+      environment where the potential incoherencies mentioned above can be
+      reasonably managed.  These rules are derived from the practice of
+      previous NFS protocols.
+    </t>
+
+    <t>
+      <list style='symbols'>
+        <t>
+          All attributes for a given file (per-fsid attributes excepted) are
+          cached as a unit at the client so that no non-serializability can
+          arise within the context of a single file.
+        </t>
+
+        <t>
+          An upper time boundary is maintained on how long a client cache
+          entry can be kept without being refreshed from the server.
+        </t>
+
+        <t>
+          When operations are performed that change attributes at the
+          server, the updated attribute set is requested as part of the
+          containing RPC.  This includes directory operations that update
+          attributes indirectly.  This is accomplished by following the
+          modifying operation with a GETATTR operation and then using the
+          results of the GETATTR to update the client's cached attributes.
+        </t>
+      </list>
+    </t>
+
+    <t>
+      Note that if the full set of attributes to be cached is requested by
+      READDIR, the results can be cached by the client on the same basis as
+      attributes obtained via GETATTR.
+    </t>
+
+    <t>
+      A client may validate its cached version of attributes for a file by
+      fetching both the change and time_access attributes and assuming that
+      if the change attribute has the same value as it did when the
+      attributes were cached, then no attributes other than time_access
+      have changed.  The reason why time_access is also fetched is because
+      many servers operate in environments where the operation that updates
+      change does not update time_access.  For example, POSIX file
+      semantics do not update access time when a file is modified by the
+      write system call <xref target="openg_write" />.  Therefore, the client that wants a current
+      time_access value should fetch it with change during the attribute
+      cache validation processing and update its cached time_access.
+    </t>
+
+    <t>
+      The client may maintain a cache of modified attributes for those
+      attributes intimately connected with data of modified regular files
+      (size, time_modify, and change).  Other than those three attributes,
+      the client MUST NOT maintain a cache of modified attributes.
+      Instead, attribute changes are immediately sent to the server.
+    </t>
+
+    <t>
+      In some operating environments, the equivalent to time_access is
+      expected to be implicitly updated by each read of the content of the
+      file object.  If an NFS client is caching the content of a file
+      object, whether it is a regular file, directory, or symbolic link,
+      the client SHOULD NOT update the time_access attribute (via SETATTR
+      or a small READ or READDIR request) on the server with each read that
+      is satisfied from cache.  The reason is that this can defeat the
+      performance benefits of caching content, especially since an explicit
+      SETATTR of time_access may alter the change attribute on the server.
+      If the change attribute changes, clients that are caching the content
+      will think the content has changed, and will re-read unmodified data
+      from the server.  Nor is the client encouraged to maintain a modified
+      version of time_access in its cache, since the client either would
+      eventually have to write the access time to the server with bad
+      performance effects or never update the server's time_access, thereby
+      resulting in a situation where an application that caches access time
+      between a close and open of the same file observes the access time
+      oscillating between the past and present.  The time_access attribute
+      always means the time of last access to a file by a read that was
+      satisfied by the server.  This way clients will tend to see only
+      time_access changes that go forward in time.
+    </t>
+  </section>
+
+  <section anchor="ss:client-side_caching:DaMCaMMF" title="Data and Metadata Caching and Memory Mapped Files">
+    <t>
+      Some operating environments include the capability for an application
+      to map a file's content into the application's address space.  Each
+      time the application accesses a memory location that corresponds to a
+      block that has not been loaded into the address space, a page fault
+      occurs and the file is read (or if the block does not exist in the
+      file, the block is allocated and then instantiated in the
+      application's address space).
+    </t>
+
+    <t>
+      As long as each memory-mapped access to the file requires a page
+      fault, the relevant attributes of the file that are used to detect
+      access and modification (time_access, time_metadata, time_modify, and
+      change) will be updated.  However, in many operating environments,
+      when page faults are not required, these attributes will not be
+      updated on reads or updates to the file via memory access (regardless
+      of whether the file is local or is accessed remotely).  A client or
+      server MAY fail to update attributes of a file that is being accessed
+      via memory-mapped I/O.  This has several implications:
+    </t>
+
+    <t>
+      <list style='symbols'>
+        <t>
+          If there is an application on the server that has memory mapped a
+          file that a client is also accessing, the client may not be able
+          to get a consistent value of the change attribute to determine
+          whether or not its cache is stale.  A server that knows that the
+          file is memory-mapped could always pessimistically return updated
+          values for change so as to force the application to always get the
+          most up-to-date data and metadata for the file.  However, due to
+          the negative performance implications of this, such behavior is
+          OPTIONAL.
+        </t>
+
+        <t>
+          If the memory-mapped file is not being modified on the server, and
+          instead is just being read by an application via the memory-mapped
+          interface, the client will not see an updated time_access
+          attribute.  However, in many operating environments, neither will
+          any process running on the server.  Thus, NFS clients are at no
+          disadvantage with respect to local processes.
+        </t>
+
+        <t>
+          If there is another client that is memory mapping the file, and if
+          that client is holding an OPEN_DELEGATE_WRITE delegation, the same
+          set of issues as discussed in the previous two bullet points
+          apply.  So, when a server does a CB_GETATTR to a file that the
+          client has modified in its cache, the reply from CB_GETATTR will
+          not necessarily be accurate.  As discussed earlier, the client's
+          obligation is to report that the file has been modified since the
+          delegation was granted, not whether it has been modified again
+          between successive CB_GETATTR calls, and the server MUST assume
+          that any file the client has modified in cache has been modified
+          again between successive CB_GETATTR calls.  Depending on the
+          nature of the client's memory management system, this weak
+          obligation may not be possible.  A client MAY return stale
+          information in CB_GETATTR whenever the file is memory-mapped.
+        </t>
+
+        <t>
+          The mixture of memory mapping and byte-range locking on the same
+          file is problematic.  Consider the following scenario, where a
+          page size on each client is 8192 bytes.
+
+          <list style='symbols'>
+            <t>
+              Client A memory maps the first page (8192 bytes) of file X.
+            </t>
+
+            <t>
+              Client B memory maps the first page (8192 bytes) of file X.
+            </t>
+
+            <t>
+              Client A WRITE_LT locks the first 4096 bytes.
+            </t>
+
+            <t>
+              Client B WRITE_LT locks the second 4096 bytes.
+            </t>
+
+            <t>
+              Client A, via a STORE instruction, modifies part of its locked
+              byte-range.
+            </t>
+
+            <t>
+              Simultaneous to client A, client B executes a STORE on part of
+              its locked byte-range.
+            </t>
+          </list>
+        </t>
+      </list>
+    </t>
+
+    <t>
+      Here the challenge is for each client to resynchronize to get a
+      correct view of the first page.  In many operating environments, the
+      virtual memory management systems on each client only know a page is
+      modified, not that a subset of the page corresponding to the
+      respective lock byte-ranges has been modified.  So it is not possible
+      for each client to do the right thing, which is to write to the
+      server only that portion of the page that is locked.  For example, if
+      client A simply writes out the page, and then client B writes out the
+      page, client A's data is lost.
+    </t>
+
+    <t>
+      Moreover, if mandatory locking is enabled on the file, then we have a
+      different problem.  When clients A and B execute the STORE
+      instructions, the resulting page faults require a byte-range lock on
+      the entire page.  Each client then tries to extend their locked range
+      to the entire page, which results in a deadlock.  Communicating the
+      NFS4ERR_DEADLOCK error to a STORE instruction is difficult at best.
+    </t>
+
+    <t>
+      If a client is locking the entire memory-mapped file, there is no
+      problem with advisory or mandatory byte-range locking, at least until
+      the client unlocks a byte-range in the middle of the file.
+    </t>
+
+    <t>
+      Given the above issues, the following are permitted:
+    </t>
+
+    <t>
+      <list style='symbols'>
+        <t>
+          Clients and servers MAY deny memory mapping a file for which they
+          know there are byte-range locks.
+        </t>
+
+        <t>
+          Clients and servers MAY deny a byte-range lock on a file they know
+          is memory-mapped.
+        </t>
+
+        <t>
+          A client MAY deny memory mapping a file that it knows requires
+          mandatory locking for I/O.  If mandatory locking is enabled after
+          the file is opened and mapped, the client MAY deny the application
+          further access to its mapped file.
+        </t>
+      </list>
+    </t>
+  </section>
+
+  <section anchor="ss:client-side_caching:NaDCwDD" title="Name and Directory Caching without Directory Delegations">
+    <t>
+      The NFSv4.1 directory delegation facility (described in <xref target="ss:client-side_caching:DD" />
+      below) is OPTIONAL for servers to implement.  Even where it is
+      implemented, it may not always be functional because of resource
+      availability issues or other constraints.  Thus, it is important to
+      understand how name and directory caching are done in the absence of
+      directory delegations.  These topics are discussed in the next two
+      subsections.
+    </t>
+
+    <section toc='exclude' anchor="ss:client-side_caching:NC" title="Name Caching">
+      <t>
+        The results of LOOKUP and READDIR operations may be cached to avoid
+        the cost of subsequent LOOKUP operations.  Just as in the case of
+        attribute caching, inconsistencies may arise among the various client
+        caches.  To mitigate the effects of these inconsistencies and given
+        the context of typical file system APIs, an upper time boundary is
+        maintained for how long a client name cache entry can be kept without
+        verifying that the entry has not been made invalid by a directory
+        change operation performed by another client.
+      </t>
+
+      <t>
+        When a client is not making changes to a directory for which there
+        exist name cache entries, the client needs to periodically fetch
+        attributes for that directory to ensure that it is not being
+        modified.  After determining that no modification has occurred, the
+        expiration time for the associated name cache entries may be updated
+        to be the current time plus the name cache staleness bound.
+      </t>
+
+      <t>
+        When a client is making changes to a given directory, it needs to
+        determine whether there have been changes made to the directory by
+        other clients.  It does this by using the change attribute as
+        reported before and after the directory operation in the associated
+        change_info4 value returned for the operation.  The server is able to
+        communicate to the client whether the change_info4 data is provided
+        atomically with respect to the directory operation.  If the change
+        values are provided atomically, the client has a basis for
+        determining, given proper care, whether other clients are modifying
+        the directory in question.
+      </t>
+
+      <t>
+        The simplest way to enable the client to make this determination is
+        for the client to serialize all changes made to a specific directory.
+        When this is done, and the server provides before and after values of
+        the change attribute atomically, the client can simply compare the
+        after value of the change attribute from one operation on a directory
+        with the before value on the subsequent operation modifying that
+        directory.  When these are equal, the client is assured that no other
+        client is modifying the directory in question.
+      </t>
+
+      <t>
+        When such serialization is not used, and there may be multiple
+        simultaneous outstanding operations modifying a single directory sent
+        from a single client, making this sort of determination can be more
+        complicated.  If two such operations complete in a different order
+        than they were actually performed, that might give an appearance
+        consistent with modification being made by another client.  Where
+        this appears to happen, the client needs to await the completion of
+        all such modifications that were started previously, to see if the
+        outstanding before and after change numbers can be sorted into a
+        chain such that the before value of one change number matches the
+        after value of a previous one, in a chain consistent with this client
+        being the only one modifying the directory.
+      </t>
+
+      <t>
+        In either of these cases, the client is able to determine whether the
+        directory is being modified by another client.  If the comparison
+        indicates that the directory was updated by another client, the name
+        cache associated with the modified directory is purged from the
+        client.  If the comparison indicates no modification, the name cache
+        can be updated on the client to reflect the directory operation and
+        the associated timeout can be extended.  The post-operation change
+        value needs to be saved as the basis for future change_info4
+        comparisons.
+      </t>
+
+      <t>
+        As demonstrated by the scenario above, name caching requires that the
+        client revalidate name cache data by inspecting the change attribute
+        of a directory at the point when the name cache item was cached.
+        This requires that the server update the change attribute for
+        directories when the contents of the corresponding directory is
+        modified.  For a client to use the change_info4 information
+        appropriately and correctly, the server must report the pre- and
+        post-operation change attribute values atomically.  When the server
+        is unable to report the before and after values atomically with
+        respect to the directory operation, the server must indicate that
+        fact in the change_info4 return value.  When the information is not
+        atomically reported, the client should not assume that other clients
+        have not changed the directory.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:client-side_caching:DC1" title="Directory Caching">
+      <t>
+        The results of READDIR operations may be used to avoid subsequent
+        READDIR operations.  Just as in the cases of attribute and name
+        caching, inconsistencies may arise among the various client caches.
+        To mitigate the effects of these inconsistencies, and given the
+        context of typical file system APIs, the following rules should be
+        followed:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            Cached READDIR information for a directory that is not obtained in
+            a single READDIR operation must always be a consistent snapshot of
+            directory contents.  This is determined by using a GETATTR before
+            the first READDIR and after the last READDIR that contributes to
+            the cache.
+          </t>
+
+          <t>
+            An upper time boundary is maintained to indicate the length of
+            time a directory cache entry is considered valid before the client
+            must revalidate the cached information.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        The revalidation technique parallels that discussed in the case of
+        name caching.  When the client is not changing the directory in
+        question, checking the change attribute of the directory with GETATTR
+        is adequate.  The lifetime of the cache entry can be extended at
+        these checkpoints.  When a client is modifying the directory, the
+        client needs to use the change_info4 data to determine whether there
+        are other clients modifying the directory.  If it is determined that
+        no other client modifications are occurring, the client may update
+        its directory cache to reflect its own changes.
+      </t>
+
+      <t>
+        As demonstrated previously, directory caching requires that the
+        client revalidate directory cache data by inspecting the change
+        attribute of a directory at the point when the directory was cached.
+        This requires that the server update the change attribute for
+        directories when the contents of the corresponding directory is
+        modified.  For a client to use the change_info4 information
+        appropriately and correctly, the server must report the pre- and
+        post-operation change attribute values atomically.  When the server
+        is unable to report the before and after values atomically with
+        respect to the directory operation, the server must indicate that
+        fact in the change_info4 return value.  When the information is not
+        atomically reported, the client should not assume that other clients
+        have not changed the directory.
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:client-side_caching:DD" title="Directory Delegations">
+    <section toc='exclude' anchor="ss:client-side_caching:ItDD" title="Introduction to Directory Delegations">
+      <t>
+        Directory caching for the NFSv4.1 protocol, as previously described,
+        is similar to file caching in previous versions.  Clients typically
+        cache directory information for a duration determined by the client.
+        At the end of a predefined timeout, the client will query the server
+        to see if the directory has been updated.  By caching attributes,
+        clients reduce the number of GETATTR calls made to the server to
+        validate attributes.  Furthermore, frequently accessed files and
+        directories, such as the current working directory, have their
+        attributes cached on the client so that some NFS operations can be
+        performed without having to make an RPC call.  By caching name and
+        inode information about most recently looked up entries in a
+        Directory Name Lookup Cache (DNLC), clients do not need to send
+        LOOKUP calls to the server every time these files are accessed.
+      </t>
+
+      <t>
+        This caching approach works reasonably well at reducing network
+        traffic in many environments.  However, it does not address
+        environments where there are numerous queries for files that do not
+        exist.  In these cases of "misses", the client sends requests to the
+        server in order to provide reasonable application semantics and
+        promptly detect the creation of new directory entries.  Examples of
+        high miss activity are compilation in software development
+        environments.  The current behavior of NFS limits its potential
+        scalability and wide-area sharing effectiveness in these types of
+        environments.  Other distributed stateful file system architectures
+        such as AFS and DFS have proven that adding state around directory
+        contents can greatly reduce network traffic in high-miss
+        environments.
+      </t>
+
+      <t>
+        Delegation of directory contents is an OPTIONAL feature of NFSv4.1.
+        Directory delegations provide similar traffic reduction benefits as
+        with file delegations.  By allowing clients to cache directory
+        contents (in a read-only fashion) while being notified of changes,
+        the client can avoid making frequent requests to interrogate the
+        contents of slowly-changing directories, reducing network traffic and
+        improving client performance.  It can also simplify the task of
+        determining whether other clients are making changes to the directory
+        when the client itself is making many changes to the directory and
+        changes are not serialized.
+      </t>
+
+      <t>
+        Directory delegations allow improved namespace cache consistency to
+        be achieved through delegations and synchronous recalls, in the
+        absence of notifications.  In addition, if time-based consistency is
+        sufficient, asynchronous notifications can provide performance
+        benefits for the client, and possibly the server, under some common
+        operating conditions such as slowly-changing and/or very large
+        directories.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:client-side_caching:DDD" title="Directory Delegation Design">
+      <t>
+        NFSv4.1 introduces the GET_DIR_DELEGATION (<xref target="op_GET_DIR_DELEGATION" />) operation
+        to allow the client to ask for a directory delegation.  The
+        delegation covers directory attributes and all entries in the
+        directory.  If either of these change, the delegation will be
+        recalled synchronously.  The operation causing the recall will have
+        to wait before the recall is complete.  Any changes to directory
+        entry attributes will not cause the delegation to be recalled.
+      </t>
+
+      <t>
+        In addition to asking for delegations, a client can also ask for
+        notifications for certain events.  These events include changes to
+        the directory's attributes and/or its contents.  If a client asks for
+        notification for a certain event, the server will notify the client
+        when that event occurs.  This will not result in the delegation being
+        recalled for that client.  The notifications are asynchronous and
+        provide a way of avoiding recalls in situations where a directory is
+        changing enough that the pure recall model may not be effective while
+        trying to allow the client to get substantial benefit.  In the
+        absence of notifications, once the delegation is recalled the client
+        has to refresh its directory cache; this might not be very efficient
+        for very large directories.
+      </t>
+
+      <t>
+        The delegation is read-only and the client may not make changes to
+        the directory other than by performing NFSv4.1 operations that modify
+        the directory or the associated file attributes so that the server
+        has knowledge of these changes.  In order to keep the client's
+        namespace synchronized with the server, the server will notify the
+        delegation-holding client (assuming it has requested notifications)
+        of the changes made as a result of that client's directory-modifying
+        operations.  This is to avoid any need for that client to send
+        subsequent GETATTR or READDIR operations to the server.  If a single
+        client is holding the delegation and that client makes any changes to
+        the directory (i.e., the changes are made via operations sent on a
+        session associated with the client ID holding the delegation), the
+        delegation will not be recalled.  Multiple clients may hold a
+        delegation on the same directory, but if any such client modifies the
+        directory, the server MUST recall the delegation from the other
+        clients, unless those clients have made provisions to be notified of
+        that sort of modification.
+      </t>
+
+      <t>
+        Delegations can be recalled by the server at any time.  Normally, the
+        server will recall the delegation when the directory changes in a way
+        that is not covered by the notification, or when the directory
+        changes and notifications have not been requested.  If another client
+        removes the directory for which a delegation has been granted, the
+        server will recall the delegation.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:client-side_caching:AiSoDN" title="Attributes in Support of Directory Notifications">
+      <t>
+        See <xref target="ss:file_attributes:DNA" /> for a description of the attributes associated with
+        directory notifications.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:client-side_caching:DDR" title="Directory Delegation Recall">
+      <t>
+        The server will recall the directory delegation by sending a callback
+        to the client.  It will use the same callback procedure as used for
+        recalling file delegations.  The server will recall the delegation
+        when the directory changes in a way that is not covered by the
+        notification.  However, the server need not recall the delegation if
+        attributes of an entry within the directory change.
+      </t>
+
+      <t>
+        If the server notices that handing out a delegation for a directory
+        is causing too many notifications to be sent out, it may decide to
+        not hand out delegations for that directory and/or recall those
+        already granted.  If a client tries to remove the directory for which
+        a delegation has been granted, the server will recall all associated
+        delegations.
+      </t>
+
+      <t>
+        The implementation sections for a number of operations describe
+        situations in which notification or delegation recall would be
+        required under some common circumstances.  In this regard, a similar
+        set of caveats to those listed in <xref target="ss:client-side_caching:DaC" /> apply.
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            For CREATE, see <xref target="ss:op_CREATE:I" />.
+          </t>
+
+          <t>
+            For LINK, see <xref target="ss:op_LINK:I" />.
+          </t>
+
+          <t>
+            For OPEN, see <xref target="ss:op_OPEN:I" />.
+          </t>
+
+          <t>
+            For REMOVE, see <xref target="ss:op_REMOVE:I" />.
+          </t>
+
+          <t>
+            For RENAME, see <xref target="ss:op_RENAME:I" />.
+          </t>
+
+          <t>
+            For SETATTR, see <xref target="ss:op_SETATTR:I" />.
+          </t>
+        </list>
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:client-side_caching:DDR1" title="Directory Delegation Recovery">
+      <t>
+         Recovery from client or server restart for state on regular files has
+         two main goals: avoiding the necessity of breaking application
+         guarantees with respect to locked files and delivery of updates
+         cached at the client.  Neither of these goals applies to directories
+         protected by OPEN_DELEGATE_READ delegations and notifications.  Thus,
+         no provision is made for reclaiming directory delegations in the
+         event of client or server restart.  The client can simply establish a
+         directory delegation in the same fashion as was done initially.
+      </t>
+    </section>
+  </section>
+</section>

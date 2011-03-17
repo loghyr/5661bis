@@ -1,0 +1,617 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+<section anchor="sec:file_locking" title="File Locking and Share Reservations">
+  <t>
+    To support Win32 share reservations, it is necessary to provide
+    operations that atomically open or create files.  Having a separate
+    share/unshare operation would not allow correct implementation of the
+    Win32 OpenFile API.  In order to correctly implement share semantics,
+    the previous NFS protocol mechanisms used when a file is opened or
+    created (LOOKUP, CREATE, ACCESS) need to be replaced.  The NFSv4.1
+    protocol defines an OPEN operation that is capable of atomically
+    looking up, creating, and locking a file on the server.
+  </t>
+
+  <section anchor="ss:file_locking:OaBL" title="Opens and Byte-Range Locks">
+    <t>
+      It is assumed that manipulating a byte-range lock is rare when
+      compared to READ and WRITE operations.  It is also assumed that
+      server restarts and network partitions are relatively rare.
+      Therefore, it is important that the READ and WRITE operations have a
+      lightweight mechanism to indicate if they possess a held lock.  A
+      LOCK operation contains the heavyweight information required to
+      establish a byte-range lock and uniquely define the owner of the
+      lock.
+    </t>
+
+    <section toc='exclude' anchor="ss:file_locking:SD" title="State-Owner Definition">
+      <t>
+        When opening a file or requesting a byte-range lock, the client must
+        specify an identifier that represents the owner of the requested
+        lock.  This identifier is in the form of a state-owner, represented
+        in the protocol by a state_owner4, a variable-length opaque array
+        that, when concatenated with the current client ID, uniquely defines
+        the owner of a lock managed by the client.  This may be a thread ID,
+        process ID, or other unique value.
+      </t>
+     
+      <t>
+        Owners of opens and owners of byte-range locks are separate entities
+        and remain separate even if the same opaque arrays are used to
+        designate owners of each.  The protocol distinguishes between
+        open-owners (represented by open_owner4 structures) and lock-owners
+        (represented by lock_owner4 structures).
+      </t>
+     
+      <t>
+        Each open is associated with a specific open-owner while each
+        byte-range lock is associated with a lock-owner and an open-owner, the
+        latter being the open-owner associated with the open file under which
+        the LOCK operation was done.  Delegations and layouts, on the other
+        hand, are not associated with a specific owner but are associated
+        with the client as a whole (identified by a client ID).
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:file_locking:UotSaL" title="Use of the Stateid and Locking">
+      <t>
+        All READ, WRITE, and SETATTR operations contain a stateid.  For the
+        purposes of this section, SETATTR operations that change the size
+        attribute of a file are treated as if they are writing the area
+        between the old and new sizes (i.e., the byte-range truncated or
+        added to the file by means of the SETATTR), even where SETATTR is not
+        explicitly mentioned in the text.  The stateid passed to one of these
+        operations must be one that represents an open, a set of byte-range
+        locks, or a delegation, or it may be a special stateid representing
+        anonymous access or the special bypass stateid.
+      </t>
+     
+      <t>
+        If the state-owner performs a READ or WRITE operation in a situation
+        in which it has established a byte-range lock or share reservation on
+        the server (any OPEN constitutes a share reservation), the stateid
+        (previously returned by the server) must be used to indicate what
+        locks, including both byte-range locks and share reservations, are
+        held by the state-owner.  If no state is established by the client,
+        either a byte-range lock or a share reservation, a special stateid
+        for anonymous state (zero as the value for "other" and "seqid") is
+        used.  (See <xref target="ss:state_management:SS1" /> for a description of 'special' stateids in
+        general.)  Regardless of whether a stateid for anonymous state or a
+        stateid returned by the server is used, if there is a conflicting
+        share reservation or mandatory byte-range lock held on the file, the
+        server MUST refuse to service the READ or WRITE operation.
+      </t>
+     
+      <t>
+        Share reservations are established by OPEN operations and by their
+        nature are mandatory in that when the OPEN denies READ or WRITE
+        operations, that denial results in such operations being rejected
+        with error NFS4ERR_LOCKED.  Byte-range locks may be implemented by
+        the server as either mandatory or advisory, or the choice of
+        mandatory or advisory behavior may be determined by the server on the
+        basis of the file being accessed (for example, some UNIX-based
+        servers support a "mandatory lock bit" on the mode attribute such
+        that if set, byte-range locks are required on the file before I/O is
+        possible).  When byte-range locks are advisory, they only prevent the
+        granting of conflicting lock requests and have no effect on READs or
+        WRITEs.  Mandatory byte-range locks, however, prevent conflicting I/O
+        operations.  When they are attempted, they are rejected with
+        NFS4ERR_LOCKED.  When the client gets NFS4ERR_LOCKED on a file for
+        which it knows it has the proper share reservation, it will need to
+        send a LOCK operation on the byte-range of the file that includes the
+        byte-range the I/O was to be performed on, with an appropriate
+        locktype field of the LOCK operation's arguments (i.e., READ*_LT for
+        a READ operation, WRITE*_LT for a WRITE operation).
+      </t>
+     
+      <t>
+        Note that for UNIX environments that support mandatory byte-range
+        locking, the distinction between advisory and mandatory locking is
+        subtle.  In fact, advisory and mandatory byte-range locks are exactly
+        the same as far as the APIs and requirements on implementation.  If
+        the mandatory lock attribute is set on the file, the server checks to
+        see if the lock-owner has an appropriate shared (READ_LT) or
+        exclusive (WRITE_LT) byte-range lock on the byte-range it wishes to
+        READ from or WRITE to.  If there is no appropriate lock, the server
+        checks if there is a conflicting lock (which can be done by
+        attempting to acquire the conflicting lock on behalf of the
+        lock-owner, and if successful, release the lock after the READ or WRITE
+        operation is done), and if there is, the server returns
+        NFS4ERR_LOCKED.
+      </t>
+     
+      <t>
+        For Windows environments, byte-range locks are always mandatory, so
+        the server always checks for byte-range locks during I/O requests.
+      </t>
+     
+      <t>
+        Thus, the LOCK operation does not need to distinguish between
+        advisory and mandatory byte-range locks.  It is the server's
+        processing of the READ and WRITE operations that introduces the
+        distinction.
+      </t>
+     
+      <t>
+        Every stateid that is validly passed to READ, WRITE, or SETATTR, with
+        the exception of special stateid values, defines an access mode for
+        the file (i.e., OPEN4_SHARE_ACCESS_READ, OPEN4_SHARE_ACCESS_WRITE, or
+        OPEN4_SHARE_ACCESS_BOTH).
+      </t>
+     
+      <t>
+        <list style='symbols'>
+          <t>
+            For stateids associated with opens, this is the mode defined by
+            the original OPEN that caused the allocation of the OPEN stateid
+            and as modified by subsequent OPENs and OPEN_DOWNGRADEs for the
+            same open-owner/file pair.
+          </t>
+     
+          <t>
+            For stateids returned by byte-range LOCK operations, the
+            appropriate mode is the access mode for the OPEN stateid
+            associated with the lock set represented by the stateid.
+          </t>
+     
+          <t>
+            For delegation stateids, the access mode is based on the type of
+            delegation.
+          </t>
+        </list>
+      </t>
+     
+      <t>
+        When a READ, WRITE, or SETATTR (that specifies the size attribute)
+        operation is done, the operation is subject to checking against the
+        access mode to verify that the operation is appropriate given the
+        stateid with which the operation is associated.
+      </t>
+     
+      <t>
+        In the case of WRITE-type operations (i.e., WRITEs and SETATTRs that
+        set size), the server MUST verify that the access mode allows writing
+        and MUST return an NFS4ERR_OPENMODE error if it does not.  In the
+        case of READ, the server may perform the corresponding check on the
+        access mode, or it may choose to allow READ on OPENs for
+        OPEN4_SHARE_ACCESS_WRITE, to accommodate clients whose WRITE
+        implementation may unavoidably do reads (e.g., due to buffer cache
+        constraints).  However, even if READs are allowed in these
+        circumstances, the server MUST still check for locks that conflict
+        with the READ (e.g., another OPEN specified OPEN4_SHARE_DENY_READ or
+        OPEN4_SHARE_DENY_BOTH).  Note that a server that does enforce the
+        access mode check on READs need not explicitly check for conflicting
+        share reservations since the existence of OPEN for
+        OPEN4_SHARE_ACCESS_READ guarantees that no conflicting share
+        reservation can exist.
+      </t>
+     
+      <t>
+        The READ bypass special stateid (all bits of "other" and "seqid" set
+        to one) indicates a desire to bypass locking checks.  The server MAY
+        allow READ operations to bypass locking checks at the server, when
+        this special stateid is used.  However, WRITE operations with this
+        special stateid value MUST NOT bypass locking checks and are treated
+        exactly the same as if a special stateid for anonymous state were
+        used.
+      </t>
+     
+      <t>
+        A lock may not be granted while a READ or WRITE operation using one
+        of the special stateids is being performed and the scope of the lock
+        to be granted would conflict with the READ or WRITE operation.  This
+        can occur when:
+      </t>
+     
+      <t>
+        <list style='symbols'>
+          <t>
+            A mandatory byte-range lock is requested with a byte-range that
+            conflicts with the byte-range of the READ or WRITE operation.  For
+            the purposes of this paragraph, a conflict occurs when a shared
+            lock is requested and a WRITE operation is being performed, or an
+            exclusive lock is requested and either a READ or a WRITE operation
+            is being performed.
+          </t>
+     
+          <t>
+            A share reservation is requested that denies reading and/or
+            writing and the corresponding operation is being performed.
+          </t>
+     
+          <t>
+            A delegation is to be granted and the delegation type would
+            prevent the I/O operation, i.e., READ and WRITE conflict with an
+            OPEN_DELEGATE_WRITE delegation and WRITE conflicts with an
+            OPEN_DELEGATE_READ delegation.
+          </t>
+        </list>
+      </t>
+     
+      <t>
+        When a client holds a delegation, it needs to ensure that the stateid
+        sent conveys the association of operation with the delegation, to
+        avoid the delegation from being avoidably recalled.  When the
+        delegation stateid, a stateid open associated with that delegation,
+        or a stateid representing byte-range locks derived from such an open
+        is used, the server knows that the READ, WRITE, or SETATTR does not
+        conflict with the delegation but is sent under the aegis of the
+        delegation.  Even though it is possible for the server to determine
+        from the client ID (via the session ID) that the client does in fact
+        have a delegation, the server is not obliged to check this, so using
+        a special stateid can result in avoidable recall of the delegation.
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:file_locking:LR" title="Lock Ranges">
+    <t>
+      The protocol allows a lock-owner to request a lock with a byte-range
+      and then either upgrade, downgrade, or unlock a sub-range of the
+      initial lock, or a byte-range that overlaps -- fully or partially --
+      either with that initial lock or a combination of a set of existing
+      locks for the same lock-owner.  It is expected that this will be an
+      uncommon type of request.  In any case, servers or server file
+      systems may not be able to support sub-range lock semantics.  In the
+      event that a server receives a locking request that represents a
+      sub-range of current locking state for the lock-owner, the server is
+      allowed to return the error NFS4ERR_LOCK_RANGE to signify that it
+      does not support sub-range lock operations.  Therefore, the client
+      should be prepared to receive this error and, if appropriate, report
+      the error to the requesting application.
+    </t>
+
+    <t>
+      The client is discouraged from combining multiple independent locking
+      ranges that happen to be adjacent into a single request since the
+      server may not support sub-range requests for reasons related to the
+      recovery of byte-range locking state in the event of server failure.
+      As discussed in <xref target="ss:state_management:SFaR" />, the server may employ certain
+      optimizations during recovery that work effectively only when the
+      client's behavior during lock recovery is similar to the client's
+      locking behavior prior to server failure.
+    </t>
+  </section>
+
+  <section anchor="ss:file_locking:UaDL" title="Upgrading and Downgrading Locks">
+    <t>
+      If a client has a WRITE_LT lock on a byte-range, it can request an
+      atomic downgrade of the lock to a READ_LT lock via the LOCK
+      operation, by setting the type to READ_LT.  If the server supports
+      atomic downgrade, the request will succeed.  If not, it will return
+      NFS4ERR_LOCK_NOTSUPP.  The client should be prepared to receive this
+      error and, if appropriate, report the error to the requesting
+      application.
+    </t>
+
+    <t>
+      If a client has a READ_LT lock on a byte-range, it can request an
+      atomic upgrade of the lock to a WRITE_LT lock via the LOCK operation
+      by setting the type to WRITE_LT or WRITEW_LT.  If the server does not
+      support atomic upgrade, it will return NFS4ERR_LOCK_NOTSUPP.  If the
+      upgrade can be achieved without an existing conflict, the request
+      will succeed.  Otherwise, the server will return either
+      NFS4ERR_DENIED or NFS4ERR_DEADLOCK.  The error NFS4ERR_DEADLOCK is
+      returned if the client sent the LOCK operation with the type set to
+      WRITEW_LT and the server has detected a deadlock.  The client should
+      be prepared to receive such errors and, if appropriate, report the
+      error to the requesting application.
+    </t>
+  </section>
+
+  <section anchor="ss:file_locking:SSVaBL" title="Stateid Seqid Values and Byte-Range Locks">
+    <t>
+      When a LOCK or LOCKU operation is performed, the stateid returned has
+      the same "other" value as the argument's stateid, and a "seqid" value
+      that is incremented (relative to the argument's stateid) to reflect
+      the occurrence of the LOCK or LOCKU operation.  The server MUST
+      increment the value of the "seqid" field whenever there is any change
+      to the locking status of any byte offset as described by any of the
+      locks covered by the stateid.  A change in locking status includes a
+      change from locked to unlocked or the reverse or a change from being
+      locked for READ_LT to being locked for WRITE_LT or the reverse.
+    </t>
+
+    <t>
+      When there is no such change, as, for example, when a range already
+      locked for WRITE_LT is locked again for WRITE_LT, the server MAY
+      increment the "seqid" value.
+    </t>
+  </section>
+
+  <section anchor="ss:file_locking:IwMO" title="Issues with Multiple Open-Owners">
+    <t>
+      When the same file is opened by multiple open-owners, a client will
+      have multiple OPEN stateids for that file, each associated with a
+      different open-owner.  In that case, there can be multiple LOCK and
+      LOCKU requests for the same lock-owner sent using the different OPEN
+      stateids, and so a situation may arise in which there are multiple
+      stateids, each representing byte-range locks on the same file and
+      held by the same lock-owner but each associated with a different
+      open-owner.
+    </t>
+
+    <t>
+      In such a situation, the locking status of each byte (i.e., whether
+      it is locked, the READ_LT or WRITE_LT type of the lock, and the
+      lock-owner holding the lock) MUST reflect the last LOCK or LOCKU operation
+      done for the lock-owner in question, independent of the stateid
+      through which the request was sent.
+    </t>
+
+    <t>
+      When a byte is locked by the lock-owner in question, the open-owner
+      to which that byte-range lock is assigned SHOULD be that of the
+      open-owner associated with the stateid through which the last LOCK of that
+      byte was done.  When there is a change in the open-owner associated
+      with locks for the stateid through which a LOCK or LOCKU was done,
+      the "seqid" field of the stateid MUST be incremented, even if the
+      locking, in terms of lock-owners has not changed.  When there is a
+      change to the set of locked bytes associated with a different stateid
+      for the same lock-owner, i.e., associated with a different
+      open-owner, the "seqid" value for that stateid MUST NOT be incremented.
+    </t>
+  </section>
+
+  <section anchor="ss:file_locking:BL" title="Blocking Locks">
+    <t>
+      Some clients require the support of blocking locks.  While NFSv4.1
+      provides a callback when a previously unavailable lock becomes
+      available, this is an OPTIONAL feature and clients cannot depend on
+      its presence.  Clients need to be prepared to continually poll for
+      the lock.  This presents a fairness problem.  Two of the lock types,
+      READW_LT and WRITEW_LT, are used to indicate to the server that the
+      client is requesting a blocking lock.  When the callback is not used,
+      the server should maintain an ordered list of pending blocking locks.
+      When the conflicting lock is released, the server may wait for the
+      period of time equal to lease_time for the first waiting client to
+      re-request the lock.  After the lease period expires, the next
+      waiting client request is allowed the lock.  Clients are required to
+      poll at an interval sufficiently small that it is likely to acquire
+      the lock in a timely manner.  The server is not required to maintain
+      a list of pending blocked locks as it is used to increase fairness
+      and not correct operation.  Because of the unordered nature of crash
+      recovery, storing of lock state to stable storage would be required
+      to guarantee ordered granting of blocking locks.
+    </t>
+
+    <t>
+      Servers may also note the lock types and delay returning denial of
+      the request to allow extra time for a conflicting lock to be
+      released, allowing a successful return.  In this way, clients can
+      avoid the burden of needless frequent polling for blocking locks.
+      The server should take care in the length of delay in the event the
+      client retransmits the request.
+    </t>
+
+    <t>
+      If a server receives a blocking LOCK operation, denies it, and then
+      later receives a nonblocking request for the same lock, which is also
+      denied, then it should remove the lock in question from its list of
+      pending blocking locks.  Clients should use such a nonblocking
+      request to indicate to the server that this is the last time they
+      intend to poll for the lock, as may happen when the process
+      requesting the lock is interrupted.  This is a courtesy to the
+      server, to prevent it from unnecessarily waiting a lease period
+      before granting other LOCK operations.  However, clients are not
+      required to perform this courtesy, and servers must not depend on
+      them doing so.  Also, clients must be prepared for the possibility
+      that this final locking request will be accepted.
+    </t>
+
+    <t>
+      When a server indicates, via the flag OPEN4_RESULT_MAY_NOTIFY_LOCK,
+      that CB_NOTIFY_LOCK callbacks might be done for the current open
+      file, the client should take notice of this, but, since this is a
+      hint, cannot rely on a CB_NOTIFY_LOCK always being done.  A client
+      may reasonably reduce the frequency with which it polls for a denied
+      lock, since the greater latency that might occur is likely to be
+      eliminated given a prompt callback, but it still needs to poll.  When
+      it receives a CB_NOTIFY_LOCK, it should promptly try to obtain the
+      lock, but it should be aware that other clients may be polling and
+      that the server is under no obligation to reserve the lock for that
+      particular client.
+    </t>
+  </section>
+
+  <section anchor="ss:file_locking:SR" title="Share Reservations">
+    <t>
+      A share reservation is a mechanism to control access to a file.  It
+      is a separate and independent mechanism from byte-range locking.
+      When a client opens a file, it sends an OPEN operation to the server
+      specifying the type of access required (READ, WRITE, or BOTH) and the
+      type of access to deny others (OPEN4_SHARE_DENY_NONE,
+      OPEN4_SHARE_DENY_READ, OPEN4_SHARE_DENY_WRITE, or
+      OPEN4_SHARE_DENY_BOTH).  If the OPEN fails, the client will fail the
+      application's open request.
+    </t>
+
+    <t>
+      Pseudo-code definition of the semantics:
+    </t>
+
+    <figure>
+      <artwork>
+    if (request.access == 0) {
+      return (NFS4ERR_INVAL)
+    } else {
+      if ((request.access &amp; file_state.deny)) ||
+         (request.deny &amp; file_state.access)) {
+        return (NFS4ERR_SHARE_DENIED)
+    }
+    return (NFS4ERR_OK);
+      </artwork>
+    </figure>
+
+    <t>
+      When doing this checking of share reservations on OPEN, the current
+      file_state used in the algorithm includes bits that reflect all
+      current opens, including those for the open-owner making the new OPEN
+      request.
+    </t>
+
+    <t>
+      The constants used for the OPEN and OPEN_DOWNGRADE operations for the
+      access and deny fields are as follows:
+    </t>
+
+    <t>
+      <?rfc include='autogen/const_access_deny.xml'?>
+    </t>
+  </section>
+
+  <section anchor="ss:file_locking:OO" title="OPEN/CLOSE Operations">
+    <t>
+      To provide correct share semantics, a client MUST use the OPEN
+      operation to obtain the initial filehandle and indicate the desired
+      access and what access, if any, to deny.  Even if the client intends
+      to use a special stateid for anonymous state or READ bypass, it must
+      still obtain the filehandle for the regular file with the OPEN
+      operation so the appropriate share semantics can be applied.  Clients
+      that do not have a deny mode built into their programming interfaces
+      for opening a file should request a deny mode of
+      OPEN4_SHARE_DENY_NONE.
+    </t>
+
+    <t>
+      The OPEN operation with the CREATE flag also subsumes the CREATE
+      operation for regular files as used in previous versions of the NFS
+      protocol.  This allows a create with a share to be done atomically.
+    </t>
+
+    <t>
+      The CLOSE operation removes all share reservations held by the
+      open-owner on that file.  If byte-range locks are held, the client SHOULD
+      release all locks before sending a CLOSE operation.  The server MAY
+      free all outstanding locks on CLOSE, but some servers may not support
+      the CLOSE of a file that still has byte-range locks held.  The server
+      MUST return failure, NFS4ERR_LOCKS_HELD, if any locks would exist
+      after the CLOSE.
+    </t>
+
+    <t>
+      The LOOKUP operation will return a filehandle without establishing
+      any lock state on the server.  Without a valid stateid, the server
+      will assume that the client has the least access.  For example, if
+      one client opened a file with OPEN4_SHARE_DENY_BOTH and another
+      client accesses the file via a filehandle obtained through LOOKUP,
+      the second client could only read the file using the special read
+      bypass stateid.  The second client could not WRITE the file at all
+      because it would not have a valid stateid from OPEN and the special
+      anonymous stateid would not be allowed access.
+    </t>
+  </section>
+
+  <section anchor="ss:file_locking:OUaD" title="Open Upgrade and Downgrade">
+    <t>
+      When an OPEN is done for a file and the open-owner for which the OPEN
+      is being done already has the file open, the result is to upgrade the
+      open file status maintained on the server to include the access and
+      deny bits specified by the new OPEN as well as those for the existing
+      OPEN.  The result is that there is one open file, as far as the
+      protocol is concerned, and it includes the union of the access and
+      deny bits for all of the OPEN requests completed.  The OPEN is
+      represented by a single stateid whose "other" value matches that of
+      the original open, and whose "seqid" value is incremented to reflect
+      the occurrence of the upgrade.  The increment is required in cases in
+      which the "upgrade" results in no change to the open mode (e.g., an
+      OPEN is done for read when the existing open file is opened for
+      OPEN4_SHARE_ACCESS_BOTH).  Only a single CLOSE will be done to reset
+      the effects of both OPENs.  The client may use the stateid returned
+      by the OPEN effecting the upgrade or with a stateid sharing the same
+      "other" field and a seqid of zero, although care needs to be taken as
+      far as upgrades that happen while the CLOSE is pending.  Note that
+      the client, when sending the OPEN, may not know that the same file is
+      in fact being opened.  The above only applies if both OPENs result in
+      the OPENed object being designated by the same filehandle.
+    </t>
+
+    <t>
+      When the server chooses to export multiple filehandles corresponding
+      to the same file object and returns different filehandles on two
+      different OPENs of the same file object, the server MUST NOT "OR"
+      together the access and deny bits and coalesce the two open files.
+      Instead, the server must maintain separate OPENs with separate
+      stateids and will require separate CLOSEs to free them.
+    </t>
+
+    <t>
+      When multiple open files on the client are merged into a single OPEN
+      file object on the server, the close of one of the open files (on the
+      client) may necessitate change of the access and deny status of the
+      open file on the server.  This is because the union of the access and
+      deny bits for the remaining opens may be smaller (i.e., a proper
+      subset) than previously.  The OPEN_DOWNGRADE operation is used to
+      make the necessary change and the client should use it to update the
+      server so that share reservation requests by other clients are
+      handled properly.  The stateid returned has the same "other" field as
+      that passed to the server.  The "seqid" value in the returned stateid
+      MUST be incremented, even in situations in which there is no change
+      to the access and deny bits for the file.
+    </t>
+  </section>
+
+  <section anchor="ss:file_locking:PO" title="Parallel OPENs">
+    <t>
+      Unlike the case of NFSv4.0, in which OPEN operations for the same
+      open-owner are inherently serialized because of the owner-based
+      seqid, multiple OPENs for the same open-owner may be done in
+      parallel.  When clients do this, they may encounter situations in
+      which, because of the existence of hard links, two OPEN operations
+      may turn out to open the same file, with a later OPEN performed being
+      an upgrade of the first, with this fact only visible to the client
+      once the operations complete.
+    </t>
+
+    <t>
+      In this situation, clients may determine the order in which the OPENs
+      were performed by examining the stateids returned by the OPENs.
+      Stateids that share a common value of the "other" field can be
+      recognized as having opened the same file, with the order of the
+      operations determinable from the order of the "seqid" fields, mod any
+      possible wraparound of the 32-bit field.
+    </t>
+
+    <t>
+      When the possibility exists that the client will send multiple OPENs
+      for the same open-owner in parallel, it may be the case that an open
+      upgrade may happen without the client knowing beforehand that this
+      could happen.  Because of this possibility, CLOSEs and
+      OPEN_DOWNGRADEs should generally be sent with a non-zero seqid in the
+      stateid, to avoid the possibility that the status change associated
+      with an open upgrade is not inadvertently lost.
+    </t>
+  </section>
+
+  <section anchor="ss:file_locking:RoOaBL" title="Reclaim of Open and Byte-Range Locks">
+    <t>
+      Special forms of the LOCK and OPEN operations are provided when it is
+      necessary to re-establish byte-range locks or opens after a server
+      failure.
+    </t>
+
+    <t>
+      <list style='symbols'>
+        <t>
+          To reclaim existing opens, an OPEN operation is performed using a
+          CLAIM_PREVIOUS.  Because the client, in this type of situation,
+          will have already opened the file and have the filehandle of the
+          target file, this operation requires that the current filehandle
+          be the target file, rather than a directory, and no file name is
+          specified.
+        </t>
+
+        <t>
+          To reclaim byte-range locks, a LOCK operation with the reclaim
+          parameter set to true is used.
+        </t>
+      </list>
+    </t>
+
+    <t>
+      Reclaims of opens associated with delegations are discussed in
+      <xref target="ss:client-side_caching:DR" />.
+    </t>
+  </section>
+</section>

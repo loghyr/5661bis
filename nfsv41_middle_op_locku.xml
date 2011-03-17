@@ -1,0 +1,76 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_LOCKU" title="Operation 14: LOCKU - Unlock File">
+    <section toc='exclude' anchor="ss:op_LOCKU:A" title="ARGUMENT">
+      <?rfc include='autogen/locku_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LOCKU:R" title="RESULT">
+      <?rfc include='autogen/locku_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LOCKU:D" title="DESCRIPTION">
+      <t>
+        The LOCKU operation unlocks the byte-range lock specified by the
+        parameters.  The client may set the locktype field to any value that
+        is legal for the nfs_lock_type4 enumerated type, and the server MUST
+        accept any legal value for locktype.  Any legal value for locktype
+        has no effect on the success or failure of the LOCKU operation.
+      </t>
+
+      <t>
+        The ranges are specified as for LOCK.  The NFS4ERR_INVAL and
+        NFS4ERR_BAD_RANGE errors are returned under the same circumstances as
+        for LOCK.
+      </t>
+
+      <t>
+        The seqid parameter MAY be any value and the server MUST ignore it.
+      </t>
+
+      <t>
+        If the current filehandle is not an ordinary file, an error will be
+        returned to the client.  In the case that the current filehandle
+        represents an object of type NF4DIR, NFS4ERR_ISDIR is returned.  If
+        the current filehandle designates a symbolic link, NFS4ERR_SYMLINK is
+        returned.  In all other cases, NFS4ERR_WRONG_TYPE is returned.
+      </t>
+
+      <t>
+        On success, the current filehandle retains its value.
+      </t>
+
+      <t>
+        The server MAY require that the principal, security flavor, and if
+        applicable, the GSS mechanism, combination that sent a LOCK operation
+        also be the one to send LOCKU on the file.  This might not be
+        possible if credentials for the principal are no longer available.
+        The server MAY allow the machine credential or SSV credential (see
+        <xref target="op_EXCHANGE_ID" />) to send LOCKU.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LOCKU:I" title="IMPLEMENTATION">
+      <t>
+        If the area to be unlocked does not correspond exactly to a lock
+        actually held by the lock-owner, the server may return the error
+        NFS4ERR_LOCK_RANGE.  This includes the case in which the area is not
+        locked, where the area is a sub-range of the area locked, where it
+        overlaps the area locked without matching exactly, or the area
+        specified includes multiple locks held by the lock-owner.  In all of
+        these cases, allowed by POSIX locking <xref target="openg_fcntl" /> semantics, a client
+        receiving this error should, if it desires support for such
+        operations, simulate the operation using LOCKU on ranges
+        corresponding to locks it actually holds, possibly followed by LOCK
+        operations for the sub-ranges not being unlocked.
+      </t>
+
+      <t>
+        When a client holds an OPEN_DELEGATE_WRITE delegation, it may choose
+        (see <xref target="ss:op_LOCK:I" />) to handle LOCK requests locally.  In such a
+        case, LOCKU operations will similarly be handled locally.
+      </t>
+    </section>
+  </section>
+

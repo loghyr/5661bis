@@ -1,0 +1,155 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_CB_LAYOUTRECALL" title="Operation 5: CB_LAYOUTRECALL - Recall Layout from Client">
+    <section toc='exclude' anchor="ss:op_CB_LAYOUTRECALL:A" title="ARGUMENT">
+      <?rfc include='autogen/cb_layoutrecall_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_LAYOUTRECALL:R" title="RESULT">
+      <?rfc include='autogen/cb_layoutrecall_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_LAYOUTRECALL:D" title="DESCRIPTION">
+      <t>
+        The CB_LAYOUTRECALL operation is used by the server to recall layouts
+        from the client; as a result, the client will begin the process of
+        returning layouts via LAYOUTRETURN.  The CB_LAYOUTRECALL operation
+        specifies one of three forms of recall processing with the value of
+        layoutrecall_type4.  The recall is for one of the following: a
+        specific layout of a specific file (LAYOUTRECALL4_FILE), an entire
+        file system ID (LAYOUTRECALL4_FSID), or all file systems
+        (LAYOUTRECALL4_ALL).
+      </t>
+
+      <t>
+        The behavior of the operation varies based on the value of the
+        layoutrecall_type4.  The value and behaviors are:
+      </t>
+
+      <t>
+        <list style='hanging'>
+          <t hangText='LAYOUTRECALL4_FILE'><vspace />
+            For a layout to match the recall request, the values of the
+            following fields must match those of the layout: clora_type,
+            clora_iomode, lor_fh, and the byte-range specified by lor_offset
+            and lor_length.  The clora_iomode field may have a special value
+            of LAYOUTIOMODE4_ANY.  The special value LAYOUTIOMODE4_ANY will
+            match any iomode originally returned in a layout; therefore, it
+            acts as a wild card.  The other special value used is for
+            lor_length.  If lor_length has a value of NFS4_UINT64_MAX, the
+            lor_length field means the maximum possible file size.  If a
+            matching layout is found, it MUST be returned using the
+            LAYOUTRETURN operation (see <xref target="op_LAYOUTRETURN" />).  An example of the
+            field's special value use is if clora_iomode is LAYOUTIOMODE4_ANY,
+            lor_offset is zero, and lor_length is NFS4_UINT64_MAX, then the
+            entire layout is to be returned.
+            <vspace blankLines='1' />
+            The NFS4ERR_NOMATCHING_LAYOUT error is only returned when the
+            client does not hold layouts for the file or if the client does
+            not have any overlapping layouts for the specification in the
+            layout recall.
+          </t>
+
+          <t hangText='LAYOUTRECALL4_FSID and LAYOUTRECALL4_ALL'><vspace />
+            If LAYOUTRECALL4_FSID is specified, the fsid specifies the file
+            system for which any outstanding layouts MUST be returned.  If
+            LAYOUTRECALL4_ALL is specified, all outstanding layouts MUST be
+            returned.  In addition, LAYOUTRECALL4_FSID and LAYOUTRECALL4_ALL
+            specify that all the storage device ID to storage device address
+            mappings in the affected file system(s) are also recalled.  The
+            respective LAYOUTRETURN with either LAYOUTRETURN4_FSID or
+            LAYOUTRETURN4_ALL acknowledges to the server that the client
+            invalidated the said device mappings.  See <xref target="ss:parallel_nfs:BRaR" />
+            for considerations with "bulk" recall of layouts.
+            <vspace blankLines='1' />
+            The NFS4ERR_NOMATCHING_LAYOUT error is only returned when the
+            client does not hold layouts and does not have valid deviceid
+            mappings.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        In processing the layout recall request, the client also varies its
+        behavior based on the value of the clora_changed field.  This field
+        is used by the server to provide additional context for the reason
+        why the layout is being recalled.  A FALSE value for clora_changed
+        indicates that no change in the layout is expected and the client may
+        write modified data to the storage devices involved; this must be
+        done prior to returning the layout via LAYOUTRETURN.  A TRUE value
+        for clora_changed indicates that the server is changing the layout.
+        Examples of layout changes and reasons for a TRUE indication are the
+        following: the metadata server is restriping the file or a permanent
+        error has occurred on a storage device and the metadata server would
+        like to provide a new layout for the file.  Therefore, a
+        clora_changed value of TRUE indicates some level of change for the
+        layout and the client SHOULD NOT write and commit modified data to
+        the storage devices.  In this case, the client writes and commits
+        data through the metadata server.
+      </t>
+
+      <t>
+        See <xref target="ss:parallel_nfs:LS1" /> for a description of how the lor_stateid field in
+        the arguments is to be constructed.  Note that the "seqid" field of
+        lor_stateid MUST NOT be zero.  See Sections <xref target='ss:state_management:SD' format='counter' />,
+        <xref target="ss:parallel_nfs:LS1" format='counter' />, and <xref target="ss:parallel_nfs:SoLO" format='counter' />
+        for a further discussion and requirements.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_LAYOUTRECALL:I" title="IMPLEMENTATION">
+      <t>
+        The client's processing for CB_LAYOUTRECALL is similar to CB_RECALL
+        (recall of file delegations) in that the client responds to the
+        request before actually returning layouts via the LAYOUTRETURN
+        operation.  While the client responds to the CB_LAYOUTRECALL
+        immediately, the operation is not considered complete (i.e.,
+        considered pending) until all affected layouts are returned to the
+        server via the LAYOUTRETURN operation.
+      </t>
+
+      <t>
+        Before returning the layout to the server via LAYOUTRETURN, the
+        client should wait for the response from in-process or in-flight
+        READ, WRITE, or COMMIT operations that use the recalled layout.
+      </t>
+
+      <t>
+        If the client is holding modified data that is affected by a recalled
+        layout, the client has various options for writing the data to the
+        server.  As always, the client may write the data through the
+        metadata server.  In fact, the client may not have a choice other
+        than writing to the metadata server when the clora_changed argument
+        is TRUE and a new layout is unavailable from the server.  However,
+        the client may be able to write the modified data to the storage
+        device if the clora_changed argument is FALSE; this needs to be done
+        before returning the layout via LAYOUTRETURN.  If the client were to
+        obtain a new layout covering the modified data's byte-range, then
+        writing to the storage devices is an available alternative.  Note
+        that before obtaining a new layout, the client must first return the
+        original layout.
+      </t>
+
+      <t>
+        In the case of modified data being written while the layout is held,
+        the client must use LAYOUTCOMMIT operations at the appropriate time;
+        as required LAYOUTCOMMIT must be done before the LAYOUTRETURN.  If a
+        large amount of modified data is outstanding, the client may send
+        LAYOUTRETURNs for portions of the recalled layout; this allows the
+        server to monitor the client's progress and adherence to the original
+        recall request.  However, the last LAYOUTRETURN in a sequence of
+        returns MUST specify the full range being recalled (see
+        <xref target="ss:parallel_nfs:LRCR" /> for details).
+      </t>
+
+      <t>
+        If a server needs to delete a device ID and there are layouts
+        referring to the device ID, CB_LAYOUTRECALL MUST be invoked to cause
+        the client to return all layouts referring to the device ID before
+        the server can delete the device ID.  If the client does not return
+        the affected layouts, the server MAY revoke the layouts.
+      </t>
+    </section>
+  </section>
+

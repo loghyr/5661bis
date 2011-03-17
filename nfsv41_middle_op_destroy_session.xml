@@ -1,0 +1,91 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_DESTROY_SESSION" title="Operation 44: DESTROY_SESSION - Destroy a Session">
+    <section toc='exclude' anchor="ss:op_DESTROY_SESSION:A" title="ARGUMENT">
+      <?rfc include='autogen/destroy_session_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_DESTROY_SESSION:R" title="RESULT">
+      <?rfc include='autogen/destroy_session_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_DESTROY_SESSION:D" title="DESCRIPTION">
+      <t>
+        The DESTROY_SESSION operation closes the session and discards the
+        session's reply cache, if any.  Any remaining connections associated
+        with the session are immediately disassociated.  If the connection
+        has no remaining associated sessions, the connection MAY be closed by
+        the server.  Locks, delegations, layouts, wants, and the lease, which
+        are all tied to the client ID, are not affected by DESTROY_SESSION.
+      </t>
+
+      <t>
+        DESTROY_SESSION MUST be invoked on a connection that is associated
+        with the session being destroyed.  In addition, if SP4_MACH_CRED
+        state protection was specified when the client ID was created, the
+        RPCSEC_GSS principal that created the session MUST be the one that
+        destroys the session, using RPCSEC_GSS privacy or integrity.  If
+        SP4_SSV state protection was specified when the client ID was
+        created, RPCSEC_GSS using the SSV mechanism (<xref target="ss:core_infrastructure:TSSVGM" />) MUST be
+        used, with integrity or privacy.
+      </t>
+
+      <t>
+        If the COMPOUND request starts with SEQUENCE, and if the sessionids
+        specified in SEQUENCE and DESTROY_SESSION are the same, then
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            DESTROY_SESSION MUST be the final operation in the COMPOUND
+            request.
+          </t>
+
+          <t>
+            It is advisable to avoid placing DESTROY_SESSION in a COMPOUND
+            request with other state-modifying operations, because the
+            DESTROY_SESSION will destroy the reply cache.
+          </t>
+
+          <t>
+            Because the session and its reply cache are destroyed, a client
+            that retries the request may receive an error in reply to the
+            retry, even though the original request was successful.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        If the COMPOUND request starts with SEQUENCE, and if the sessionids
+        specified in SEQUENCE and DESTROY_SESSION are different, then
+        DESTROY_SESSION can appear in any position of the COMPOUND request
+        (except for the first position).  The two sessionids can belong to
+        different client IDs.
+      </t>
+
+      <t>
+        If the COMPOUND request does not start with SEQUENCE, and if
+        DESTROY_SESSION is not the sole operation, then server MUST return
+        NFS4ERR_NOT_ONLY_OP.
+      </t>
+
+      <t>
+        If there is a backchannel on the session and the server has
+        outstanding CB_COMPOUND operations for the session which have not
+        been replied to, then the server MAY refuse to destroy the session
+        and return an error.  If so, then in the event the backchannel is
+        down, the server SHOULD return NFS4ERR_CB_PATH_DOWN to inform the
+        client that the backchannel needs to be repaired before the server
+      </t>
+
+      <t>
+        will allow the session to be destroyed.  Otherwise, the error
+        CB_BACK_CHAN_BUSY SHOULD be returned to indicate that there are
+        CB_COMPOUNDs that need to be replied to.  The client SHOULD reply to
+        all outstanding CB_COMPOUNDs before re-sending DESTROY_SESSION.
+      </t>
+    </section>
+  </section>
+

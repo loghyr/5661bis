@@ -1,0 +1,128 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_CREATE" title="Operation 6: CREATE - Create a Non-Regular File Object">
+    <section toc='exclude' anchor="ss:op_CREATE:A" title="ARGUMENT">
+      <?rfc include='autogen/create_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CREATE:R" title="RESULT">
+      <?rfc include='autogen/create_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CREATE:D" title="DESCRIPTION">
+      <t>
+        The CREATE operation creates a file object other than an ordinary
+        file in a directory with a given name.  The OPEN operation MUST be
+        used to create a regular file or a named attribute.
+      </t>
+
+      <t>
+        The current filehandle must be a directory: an object of type NF4DIR.
+        If the current filehandle is an attribute directory (type
+        NF4ATTRDIR), the error NFS4ERR_WRONG_TYPE is returned.  If the
+        current file handle designates any other type of object, the error
+        NFS4ERR_NOTDIR results.
+      </t>
+
+      <t>
+        The objname specifies the name for the new object.  The objtype
+        determines the type of object to be created: directory, symlink, etc.
+        If the object type specified is that of an ordinary file, a named
+        attribute, or a named attribute directory, the error NFS4ERR_BADTYPE
+        results.
+      </t>
+
+      <t>
+        If an object of the same name already exists in the directory, the
+        server will return the error NFS4ERR_EXIST.
+      </t>
+
+      <t>
+        For the directory where the new file object was created, the server
+        returns change_info4 information in cinfo.  With the atomic field of
+        the change_info4 data type, the server will indicate if the before
+        and after change attributes were obtained atomically with respect to
+        the file object creation.
+      </t>
+
+      <t>
+        If the objname has a length of zero, or if objname does not obey the
+        UTF-8 definition, the error NFS4ERR_INVAL will be returned.
+      </t>
+
+      <t>
+        The current filehandle is replaced by that of the new object.
+      </t>
+
+      <t>
+        The createattrs specifies the initial set of attributes for the
+        object.  The set of attributes may include any writable attribute
+        valid for the object type.  When the operation is successful, the
+        server will return to the client an attribute mask signifying which
+        attributes were successfully set for the object.
+      </t>
+
+      <t>
+        If createattrs includes neither the owner attribute nor an ACL with
+        an ACE for the owner, and if the server's file system both supports
+        and requires an owner attribute (or an owner ACE), then the server
+        MUST derive the owner (or the owner ACE).  This would typically be
+        from the principal indicated in the RPC credentials of the call, but
+        the server's operating environment or file system semantics may
+        dictate other methods of derivation.  Similarly, if createattrs
+        includes neither the group attribute nor a group ACE, and if the
+        server's file system both supports and requires the notion of a group
+        attribute (or group ACE), the server MUST derive the group attribute
+        (or the corresponding owner ACE) for the file.  This could be from
+        the RPC call's credentials, such as the group principal if the
+        credentials include it (such as with AUTH_SYS), from the group
+        identifier associated with the principal in the credentials (e.g.,
+        POSIX systems have a user database <xref target="openg_getpwnam" /> that has a group identifier
+        for every user identifier), inherited from the directory in which the
+        object is created, or whatever else the server's operating
+        environment or file system semantics dictate.  This applies to the
+        OPEN operation too.
+      </t>
+
+      <t>
+        Conversely, it is possible that the client will specify in
+        createattrs an owner attribute, group attribute, or ACL that the
+        principal indicated the RPC call's credentials does not have
+        permissions to create files for.  The error to be returned in this
+        instance is NFS4ERR_PERM.  This applies to the OPEN operation too.
+      </t>
+
+      <t>
+        If the current filehandle designates a directory for which another
+        client holds a directory delegation, then, unless the delegation is
+        such that the situation can be resolved by sending a notification,
+        the delegation MUST be recalled, and the CREATE operation MUST NOT
+        proceed until the delegation is returned or revoked.  Except where
+        this happens very quickly, one or more NFS4ERR_DELAY errors will be
+        returned to requests made while delegation remains outstanding.
+      </t>
+
+      <t>
+        When the current filehandle designates a directory for which one or
+        more directory delegations exist, then, when those delegations
+        request such notifications, NOTIFY4_ADD_ENTRY will be generated as a
+        result of this operation.
+      </t>
+
+      <t>
+        If the capability FSCHARSET_CAP4_ALLOWS_ONLY_UTF8 is set
+        (<xref target="ss:internationalization:UC" />), and a symbolic link is being created, then the
+        content of the symbolic link MUST be in UTF-8 encoding.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CREATE:I" title="IMPLEMENTATION">
+      <t>
+        If the client desires to set attribute values after the create, a
+        SETATTR operation can be added to the COMPOUND request so that the
+        appropriate attributes will be set.
+      </t>
+    </section>
+  </section>
+

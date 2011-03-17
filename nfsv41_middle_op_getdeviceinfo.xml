@@ -1,0 +1,143 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_GETDEVICEINFO" title="Operation 47: GETDEVICEINFO - Get Device Information">
+    <section toc='exclude' anchor="ss:op_GETDEVICEINFO:A" title="ARGUMENT">
+      <?rfc include='autogen/getdeviceinfo_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_GETDEVICEINFO:R" title="RESULT">
+      <?rfc include='autogen/getdeviceinfo_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_GETDEVICEINFO:D" title="DESCRIPTION">
+      <t>
+        The GETDEVICEINFO operation returns pNFS storage device address
+        information for the specified device ID.  The client identifies the
+        device information to be returned by providing the gdia_device_id and
+        gdia_layout_type that uniquely identify the device.  The client
+        provides gdia_maxcount to limit the number of bytes for the result.
+        This maximum size represents all of the data being returned within
+        the GETDEVICEINFO4resok structure and includes the XDR overhead.  The
+        server may return less data.  If the server is unable to return any
+        information within the gdia_maxcount limit, the error
+        NFS4ERR_TOOSMALL will be returned.  However, if gdia_maxcount is
+        zero, NFS4ERR_TOOSMALL MUST NOT be returned.
+      </t>
+
+      <t>
+        The da_layout_type field of the gdir_device_addr returned by the
+        server MUST be equal to the gdia_layout_type specified by the client.
+        If it is not equal, the client SHOULD ignore the response as invalid
+        and behave as if the server returned an error, even if the client
+        does have support for the layout type returned.
+      </t>
+
+      <t>
+        The client also provides a notification bitmap, gdia_notify_types,
+        for the device ID mapping notification for which it is interested in
+        receiving; the server must support device ID notifications for the
+        notification request to have affect.  The notification mask is
+        composed in the same manner as the bitmap for file attributes
+        (<xref target="ss:protocol_constants:f1" />).  The numbers of bit positions are listed in the
+        notify_device_type4 enumeration type (<xref target="op_CB_NOTIFY_DEVICEID" />).  Only two
+        enumerated values of notify_device_type4 currently apply to
+        GETDEVICEINFO: NOTIFY_DEVICEID4_CHANGE and NOTIFY_DEVICEID4_DELETE
+        (see <xref target="op_CB_NOTIFY_DEVICEID" />).
+      </t>
+
+      <t>
+        The notification bitmap applies only to the specified device ID.  If
+        a client sends a GETDEVICEINFO operation on a deviceID multiple
+        times, the last notification bitmap is used by the server for
+        subsequent notifications.  If the bitmap is zero or empty, then the
+        device ID's notifications are turned off.
+      </t>
+
+      <t>
+        If the client wants to just update or turn off notifications, it MAY
+        send a GETDEVICEINFO operation with gdia_maxcount set to zero.  In
+        that event, if the device ID is valid, the reply's da_addr_body field
+        of the gdir_device_addr field will be of zero length.
+      </t>
+
+      <t>
+        If an unknown device ID is given in gdia_device_id, the server
+        returns NFS4ERR_NOENT.  Otherwise, the device address information is
+        returned in gdir_device_addr.  Finally, if the server supports
+        notifications for device ID mappings, the gdir_notification result
+        will contain a bitmap of which notifications it will actually send to
+        the client (via CB_NOTIFY_DEVICEID, see <xref target="op_CB_NOTIFY_DEVICEID" />).
+      </t>
+
+      <t>
+        If NFS4ERR_TOOSMALL is returned, the results also contain
+        gdir_mincount.  The value of gdir_mincount represents the minimum
+        size necessary to obtain the device information.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_GETDEVICEINFO:I" title="IMPLEMENTATION">
+      <t>
+        Aside from updating or turning off notifications, another use case
+        for gdia_maxcount being set to zero is to validate a device ID.
+      </t>
+
+      <t>
+        The client SHOULD request a notification for changes or deletion of a
+        device ID to device address mapping so that the server can allow the
+        client gracefully use a new mapping, without having pending I/O fail
+        abruptly, or force layouts using the device ID to be recalled or
+        revoked.
+      </t>
+
+      <t>
+        It is possible that GETDEVICEINFO (and GETDEVICELIST) will race with
+        CB_NOTIFY_DEVICEID, i.e., CB_NOTIFY_DEVICEID arrives before the
+        client gets and processes the response to GETDEVICEINFO or
+        GETDEVICELIST.  The analysis of the race leverages the fact that the
+        server MUST NOT delete a device ID that is referred to by a layout
+        the client has.
+      </t>
+
+      <t>
+        <list style='hanging'>
+          <t hangText='CB_NOTIFY_DEVICEID'>
+            deletes a device ID.  If the client believes it
+            has layouts that refer to the device ID, then it is possible that
+            layouts referring to the deleted device ID have been revoked.  The
+            client should send a TEST_STATEID request using the stateid for
+            each layout that might have been revoked.  If TEST_STATEID
+            indicates that any layouts have been revoked, the client must
+            recover from layout revocation as described in <xref target="ss:parallel_nfs:RL1" />.  If
+            TEST_STATEID indicates that at least one layout has not been
+            revoked, the client should send a GETDEVICEINFO operation on the
+            supposedly deleted device ID to verify that the device ID has been
+            deleted.
+            <vspace blankLines='1' />
+            If GETDEVICEINFO indicates that the device ID does not exist, then
+            the client assumes the server is faulty and recovers by sending an
+            EXCHANGE_ID operation.  If GETDEVICEINFO indicates that the device
+            ID does exist, then while the server is faulty for sending an
+            erroneous device ID deletion notification, the degree to which it
+            is faulty does not require the client to create a new client ID.
+            <vspace blankLines='1' />
+            If the client does not have layouts that refer to the device ID,
+            no harm is done.  The client should mark the device ID as deleted,
+            and when GETDEVICEINFO or GETDEVICELIST results are received that
+            indicate that the device ID has been in fact deleted, the device
+            ID should be removed from the client's cache.
+          </t>
+
+          <t hangText='CB_NOTIFY_DEVICEID'>
+            indicates that a device ID's device addressing
+            mappings have changed.  The client should assume that the results
+            from the in-progress GETDEVICEINFO will be stale for the device ID
+            once received, and so it should send another GETDEVICEINFO on the
+            device ID.
+          </t>
+        </list>
+      </t>
+    </section>
+  </section>
+

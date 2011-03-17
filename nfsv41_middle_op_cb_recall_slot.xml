@@ -1,0 +1,50 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_CB_RECALL_SLOT" title="Operation 10: CB_RECALL_SLOT - Change Flow Control Limits">
+    <section toc='exclude' anchor="ss:op_CB_RECALL_SLOT:A" title="ARGUMENT">
+      <?rfc include='autogen/cb_recall_slot_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_RECALL_SLOT:R" title="RESULT">
+      <?rfc include='autogen/cb_recall_slot_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_RECALL_SLOT:D" title="DESCRIPTION">
+      <t>
+        The CB_RECALL_SLOT operation requests the client to return session
+        slots, and if applicable, transport credits (e.g., RDMA credits for
+        connections associated with the operations channel) of the session's
+        fore channel.  CB_RECALL_SLOT specifies rsa_target_highest_slotid,
+        the value of the target highest slot ID the server wants for the
+        session.  The client MUST then progress toward reducing the session's
+        highest slot ID to the target value.
+      </t>
+
+      <t>
+        If the session has only non-RDMA connections associated with its
+        operations channel, then the client need only wait for all
+        outstanding requests with a slot ID > rsa_target_highest_slotid to
+        complete, then send a single COMPOUND consisting of a single SEQUENCE
+        operation, with the sa_highestslot field set to
+        rsa_target_highest_slotid.  If there are RDMA-based connections
+        associated with operation channel, then the client needs to also send
+        enough zero-length "RDMA Send" messages to take the total RDMA credit
+        count to rsa_target_highest_slotid + 1 or below.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_RECALL_SLOT:I" title="IMPLEMENTATION">
+      <t>
+        If the client fails to reduce highest slot it has on the fore channel
+        to what the server requests, the server can force the issue by
+        asserting flow control on the receive side of all connections bound
+        to the fore channel, and then finish servicing all outstanding
+        requests that are in slots greater than rsa_target_highest_slotid.
+        Once that is done, the server can then open the flow control, and any
+        time the client sends a new request on a slot greater than
+        rsa_target_highest_slotid, the server can return NFS4ERR_BADSLOT.
+      </t>
+    </section>
+  </section>
+

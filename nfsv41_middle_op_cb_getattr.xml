@@ -1,0 +1,37 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_CB_GETATTR" title="Operation 3: CB_GETATTR - Get Attributes">
+    <section toc='exclude' anchor="ss:op_CB_GETATTR:A" title="ARGUMENT">
+      <?rfc include='autogen/cb_getattr_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_GETATTR:R" title="RESULT">
+      <?rfc include='autogen/cb_getattr_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_GETATTR:D" title="DESCRIPTION">
+      <t>
+        The CB_GETATTR operation is used by the server to obtain the current
+        modified state of a file that has been OPEN_DELEGATE_WRITE delegated.
+        The size and change attributes are the only ones guaranteed to be
+        serviced by the client.  See <xref target="ss:client-side_caching:HoC" /> for a full description of
+        how the client and server are to interact with the use of CB_GETATTR.
+      </t>
+
+      <t>
+        If the filehandle specified is not one for which the client holds an
+        OPEN_DELEGATE_WRITE delegation, an NFS4ERR_BADHANDLE error is
+        returned.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_GETATTR:I" title="IMPLEMENTATION">
+      <t>
+        The client returns attrmask bits and the associated attribute values
+        only for the change attribute, and attributes that it may change
+        (time_modify, and size).
+      </t>
+    </section>
+  </section>
+

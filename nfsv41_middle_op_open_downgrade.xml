@@ -1,0 +1,88 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_OPEN_DOWNGRADE" title="Operation 21: OPEN_DOWNGRADE - Reduce Open File Access">
+    <section toc='exclude' anchor="ss:op_OPEN_DOWNGRADE:A" title="ARGUMENT">
+      <?rfc include='autogen/open_downgrade_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_OPEN_DOWNGRADE:R" title="RESULT">
+      <?rfc include='autogen/open_downgrade_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_OPEN_DOWNGRADE:D" title="DESCRIPTION">
+      <t>
+        This operation is used to adjust the access and deny states for a
+        given open.  This is necessary when a given open-owner opens the same
+        file multiple times with different access and deny values.  In this
+        situation, a close of one of the opens may change the appropriate
+        share_access and share_deny flags to remove bits associated with
+        opens no longer in effect.
+      </t>
+
+      <t>
+        Valid values for the expression (share_access &amp;
+        ~OPEN4_SHARE_ACCESS_WANT_DELEG_MASK) are OPEN4_SHARE_ACCESS_READ,
+        OPEN4_SHARE_ACCESS_WRITE, or OPEN4_SHARE_ACCESS_BOTH.  If the client
+        specifies other values, the server MUST reply with NFS4ERR_INVAL.
+      </t>
+
+      <t>
+        Valid values for the share_deny field are OPEN4_SHARE_DENY_NONE,
+        OPEN4_SHARE_DENY_READ, OPEN4_SHARE_DENY_WRITE, or
+        OPEN4_SHARE_DENY_BOTH.  If the client specifies other values, the
+        server MUST reply with NFS4ERR_INVAL.
+      </t>
+
+      <t>
+        After checking for valid values of share_access and share_deny, the
+        server replaces the current access and deny modes on the file with
+        share_access and share_deny subject to the following constraints:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            The bits in share_access SHOULD equal the union of the
+            share_access bits (not including OPEN4_SHARE_WANT_* bits)
+            specified for some subset of the OPENs in effect for the current
+            open-owner on the current file.
+          </t>
+
+          <t>
+            The bits in share_deny SHOULD equal the union of the share_deny
+            bits specified for some subset of the OPENs in effect for the
+            current open-owner on the current file.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        If the above constraints are not respected, the server SHOULD return
+        the error NFS4ERR_INVAL.  Since share_access and share_deny bits
+        should be subsets of those already granted, short of a defect in the
+        client or server implementation, it is not possible for the
+        OPEN_DOWNGRADE request to be denied because of conflicting share
+        reservations.
+      </t>
+
+      <t>
+        The seqid argument is not used in NFSv4.1, MAY be any value, and MUST
+        be ignored by the server.
+      </t>
+
+      <t>
+        On success, the current filehandle retains its value.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_OPEN_DOWNGRADE:I" title="IMPLEMENTATION">
+      <t>
+        An OPEN_DOWNGRADE operation may make OPEN_DELEGATE_READ delegations
+        grantable where they were not previously.  Servers may choose to
+        respond immediately if there are pending delegation want requests or
+        may respond to the situation at a later time.
+      </t>
+    </section>
+  </section>
+

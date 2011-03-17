@@ -1,0 +1,52 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_READLINK" title="Operation 27: READLINK - Read Symbolic Link">
+    <section toc='exclude' anchor="ss:op_READLINK:A" title="ARGUMENT">
+      <figure>
+        <artwork>
+/* CURRENT_FH: symlink */
+void;
+        </artwork>
+      </figure>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_READLINK:R" title="RESULT">
+      <?rfc include='autogen/readlink_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_READLINK:D" title="DESCRIPTION">
+      <t>
+        READLINK reads the data associated with a symbolic link.  Depending
+        on the value of the UTF-8 capability attribute (<xref target="ss:internationalization:UC" />), the
+        data is encoded in UTF-8.  Whether created by an NFS client or
+        created locally on the server, the data in a symbolic link is not
+        interpreted (except possibly to check for proper UTF-8 encoding) when
+        created, but is simply stored.
+      </t>
+
+      <t>
+        On success, the current filehandle retains its value.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_READLINK:I" title="IMPLEMENTATION">
+      <t>
+        A symbolic link is nominally a pointer to another file.  The data is
+        not necessarily interpreted by the server, just stored in the file.
+        It is possible for a client implementation to store a pathname that
+        is not meaningful to the server operating system in a symbolic link.
+        A READLINK operation returns the data to the client for
+        interpretation.  If different implementations want to share access to
+        symbolic links, then they must agree on the interpretation of the
+        data in the symbolic link.
+      </t>
+
+      <t>
+        The READLINK operation is only allowed on objects of type NF4LNK.
+        The server should return the error NFS4ERR_WRONG_TYPE if the object
+        is not of type NF4LNK.
+      </t>
+    </section>
+  </section>
+

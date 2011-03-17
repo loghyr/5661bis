@@ -1,0 +1,61 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_VERIFY" title="Operation 37: VERIFY - Verify Same Attributes">
+    <section toc='exclude' anchor="ss:op_VERIFY:A" title="ARGUMENT">
+      <?rfc include='autogen/verify_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_VERIFY:R" title="RESULT">
+      <?rfc include='autogen/verify_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_VERIFY:D" title="DESCRIPTION">
+      <t>
+        The VERIFY operation is used to verify that attributes have the value
+        assumed by the client before proceeding with the following operations
+        in the COMPOUND request.  If any of the attributes do not match, then
+        the error NFS4ERR_NOT_SAME must be returned.  The current filehandle
+        retains its value after successful completion of the operation.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_VERIFY:I" title="IMPLEMENTATION">
+      <t>
+        One possible use of the VERIFY operation is the following series of
+        operations.  With this, the client is attempting to verify that the
+        file being removed will match what the client expects to be removed.
+        This series can help prevent the unintended deletion of a file.
+      </t>
+
+      <figure>
+        <artwork>
+    PUTFH (directory filehandle)
+    LOOKUP (file name)
+    VERIFY (filehandle == fh)
+    PUTFH (directory filehandle)
+    REMOVE (file name)
+        </artwork>
+      </figure>
+
+      <t>
+        This series does not prevent a second client from removing and
+        creating a new file in the middle of this sequence, but it does help
+        avoid the unintended result.
+      </t>
+
+      <t>
+        In the case that a RECOMMENDED attribute is specified in the VERIFY
+        operation and the server does not support that attribute for the file
+        system object, the error NFS4ERR_ATTRNOTSUPP is returned to the
+        client.
+      </t>
+
+      <t>
+        When the attribute rdattr_error or any set-only attribute (e.g.,
+        time_modify_set) is specified, the error NFS4ERR_INVAL is returned to
+        the client.
+      </t>
+    </section>
+  </section>
+

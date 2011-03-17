@@ -1,0 +1,745 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+<section anchor="sec:iana_considerations" title="IANA Considerations">
+  <t>
+    This section uses terms that are defined in <xref target="RFC5226" />.
+  </t>
+
+  <section anchor="ss:iana_considerations:NAD" title="Named Attribute Definitions">
+    <t>
+      IANA created a registry called the "NFSv4 Named Attribute Definitions
+      Registry".
+    </t>
+
+    <t>
+      The NFSv4.1 protocol supports the association of a file with zero or
+      more named attributes.  The namespace identifiers for these
+      attributes are defined as string names.  The protocol does not define
+      the specific assignment of the namespace for these file attributes.
+      The IANA registry promotes interoperability where common interests
+      exist.  While application developers are allowed to define and use
+      attributes as needed, they are encouraged to register the attributes
+      with IANA.
+    </t>
+
+    <t>
+      Such registered named attributes are presumed to apply to all minor
+      versions of NFSv4, including those defined subsequently to the
+      registration.  If the named attribute is intended to be limited to
+      specific minor versions, this will be clearly stated in the
+      registry's assignment.
+    </t>
+
+    <t>
+      All assignments to the registry are made on a First Come First Served
+      basis, per Section 4.1 of <xref target="RFC5226" />.  The policy for each assignment is
+      Specification Required, per Section 4.1 of <xref target="RFC5226" />.
+    </t>
+
+    <t>
+      Under the NFSv4.1 specification, the name of a named attribute can in
+      theory be up to 2^32 - 1 bytes in length, but in practice NFSv4.1
+      clients and servers will be unable to handle a string that long.
+      IANA should reject any assignment request with a named attribute that
+      exceeds 128 UTF-8 characters.  To give the IESG the flexibility to
+      set up bases of assignment of Experimental Use and Standards Action,
+      the prefixes of "EXPE" and "STDS" are Reserved.  The named attribute
+      with a zero-length name is Reserved.
+    </t>
+
+    <t>
+      The prefix "PRIV" is designated for Private Use.  A site that wants
+      to make use of unregistered named attributes without risk of
+      conflicting with an assignment in IANA's registry should use the
+      prefix "PRIV" in all of its named attributes.
+    </t>
+
+    <t>
+      Because some NFSv4.1 clients and servers have case-insensitive
+      semantics, the fifteen additional lower case and mixed case
+      permutations of each of "EXPE", "PRIV", and "STDS" are Reserved
+      (e.g., "expe", "expE", "exPe", etc. are Reserved).  Similarly, IANA
+      must not allow two assignments that would conflict if both named
+      attributes were converted to a common case.
+    </t>
+
+    <t>
+      The registry of named attributes is a list of assignments, each
+      containing three fields for each assignment.
+    </t>
+
+    <t>
+      <list style='numbers'>
+        <t>
+          A US-ASCII string name that is the actual name of the attribute.
+          This name must be unique.  This string name can be 1 to 128 UTF-8
+          characters long.
+        </t>
+
+        <t>
+          A reference to the specification of the named attribute.  The
+          reference can consume up to 256 bytes (or more if IANA permits).
+        </t>
+
+        <t>
+          The point of contact of the registrant.  The point of contact can
+          consume up to 256 bytes (or more if IANA permits).
+        </t>
+      </list>
+    </t>
+
+    <section toc='exclude' anchor="ss:iana_considerations:IR" title="Initial Registry">
+      <t>
+        There is no initial registry.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:iana_considerations:UR" title="Updating Registrations">
+      <t>
+        The registrant is always permitted to update the point of contact
+        field.  Any other change will require Expert Review or IESG Approval.
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:iana_considerations:DIN" title="Device ID Notifications">
+    <t>
+      IANA created a registry called the "NFSv4 Device ID Notifications
+      Registry".
+    </t>
+   
+    <t>
+      The potential exists for new notification types to be added to the
+      CB_NOTIFY_DEVICEID operation (see <xref target="op_CB_NOTIFY_DEVICEID" />).  This can be done
+      via changes to the operations that register notifications, or by
+      adding new operations to NFSv4.  This requires a new minor version of
+      NFSv4, and requires a Standards Track document from the IETF.
+      Another way to add a notification is to specify a new layout type
+      (see <xref target="ss:iana_considerations:LT" />).
+    </t>
+   
+    <t>
+      Hence, all assignments to the registry are made on a Standards Action
+      basis per Section 4.1 of <xref target="RFC5226" />, with Expert Review required.
+    </t>
+   
+    <t>
+      The registry is a list of assignments, each containing five fields
+      per assignment.
+    </t>
+
+    <t>
+      <list style='numbers'>
+        <t>
+          The name of the notification type.  This name must have the
+          prefix "NOTIFY_DEVICEID4_".  This name must be unique.
+        </t>
+
+        <t>
+          The value of the notification.  IANA will assign this number, and
+          the request from the registrant will use TBD1 instead of an
+          actual value.  IANA MUST use a whole number that can be no higher
+          than 2^32-1, and should be the next available value.  The value
+          assigned must be unique.  A Designated Expert must be used to
+          ensure that when the name of the notification type and its value
+          are added to the NFSv4.1 notify_deviceid_type4 enumerated data
+          type in the NFSv4.1 XDR description (<xref target="I-D.ietf-nfsv4-rfc5662bis-dot-x" />), the result continues
+          to be a valid XDR description.
+        </t>
+
+        <t>
+          The Standards Track RFC(s) that describe the notification.  If
+          the RFC(s) have not yet been published, the registrant will use
+          RFCTBD2, RFCTBD3, etc. instead of an actual RFC number.
+        </t>
+
+        <t>
+          How the RFC introduces the notification.  This is indicated by a
+          single US-ASCII value.  If the value is N, it means a minor
+          revision to the NFSv4 protocol.  If the value is L, it means a
+          new pNFS layout type.  Other values can be used with IESG
+          Approval.
+        </t>
+
+        <t>
+          The minor versions of NFSv4 that are allowed to use the
+          notification.  While these are numeric values, IANA will not
+          allocate and assign them; the author of the relevant RFCs with
+          IESG Approval assigns these numbers.  Each time there is a new
+          minor version of NFSv4 approved, a Designated Expert should
+          review the registry to make recommended updates as needed.
+        </t>
+      </list>
+    </t>
+
+    <section toc='exclude' anchor="ss:iana_considerations:IR1" title="Initial Registry">
+      <t>
+        The initial registry is in <xref target='devnotelist' />.  Note that the next available
+        value is zero.
+      </t>
+
+      <texttable title="Initial Device ID Notification Assignments" anchor="devnotelist">
+        <ttcol>Notification Name</ttcol>
+        <ttcol>Value</ttcol>
+        <ttcol>RFC</ttcol>
+        <ttcol>How</ttcol>
+        <ttcol>Minor Versions</ttcol>
+        <c>NOTIFY_DEVICEID4_CHANGE</c> <c>1</c> <c>RFC5661</c> <c>N</c> <c>1</c>
+        <c>NOTIFY_DEVICEID4_DELETE</c> <c>2</c> <c>RFC5661</c> <c>N</c> <c>1</c>
+      </texttable>
+    </section>
+
+    <section toc='exclude' anchor="ss:iana_considerations:UR1" title="Updating Registrations">
+      <t>
+        The update of a registration will require IESG Approval on the advice
+        of a Designated Expert.
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:iana_considerations:ORT" title="Object Recall Types">
+    <t>
+      IANA created a registry called the "NFSv4 Recallable Object Types
+      Registry".
+    </t>
+
+    <t>
+      The potential exists for new object types to be added to the
+      CB_RECALL_ANY operation (see <xref target="op_CB_RECALL_ANY" />).  This can be done via
+      changes to the operations that add recallable types, or by adding new
+      operations to NFSv4.  This requires a new minor version of NFSv4, and
+      requires a Standards Track document from IETF.  Another way to add a
+      new recallable object is to specify a new layout type (see
+      <xref target="ss:iana_considerations:LT" />).
+    </t>
+
+    <t>
+      All assignments to the registry are made on a Standards Action basis
+      per Section 4.1 of <xref target="RFC5226" />, with Expert Review required.
+    </t>
+
+    <t>
+      Recallable object types are 32-bit unsigned numbers.  There are no
+      Reserved values.  Values in the range 12 through 15, inclusive, are
+      designated for Private Use.
+    </t>
+
+    <t>
+      The registry is a list of assignments, each containing five fields
+      per assignment.
+    </t>
+
+    <t>
+      <list style='numbers'>
+        <t>
+          The name of the recallable object type.  This name must have the
+          prefix "RCA4_TYPE_MASK_".  The name must be unique.
+        </t>
+
+        <t>
+          The value of the recallable object type.  IANA will assign this
+          number, and the request from the registrant will use TBD1 instead
+          of an actual value.  IANA MUST use a whole number that can be no
+          higher than 2^32-1, and should be the next available value.  The
+          value must be unique.  A Designated Expert must be used to ensure
+          that when the name of the recallable type and its value are added
+          to the NFSv4 XDR description <xref target="I-D.ietf-nfsv4-rfc5662bis-dot-x" />, the result continues to be a
+          valid XDR description.
+        </t>
+
+        <t>
+          The Standards Track RFC(s) that describe the recallable object
+          type.  If the RFC(s) have not yet been published, the registrant
+          will use RFCTBD2, RFCTBD3, etc. instead of an actual RFC number.
+        </t>
+
+        <t>
+          How the RFC introduces the recallable object type.  This is
+          indicated by a single US-ASCII value.  If the value is N, it
+          means a minor revision to the NFSv4 protocol.  If the value is L,
+          it means a new pNFS layout type.  Other values can be used with
+          IESG Approval.
+        </t>
+
+        <t>
+          The minor versions of NFSv4 that are allowed to use the
+          recallable object type.  While these are numeric values, IANA
+          will not allocate and assign them; the author of the relevant
+          RFCs with IESG Approval assigns these numbers.  Each time there
+          is a new minor version of NFSv4 approved, a Designated Expert
+          should review the registry to make recommended updates as needed.
+        </t>
+      </list>
+    </t>
+
+    <section toc='exclude' anchor="ss:iana_considerations:IR2" title="Initial Registry">
+      <t>
+        The initial registry is in <xref target="recalllist" />.  Note that the next available
+        value is five.
+      </t>
+      <texttable title="Initial Recallable Object Type Assignments" anchor="recalllist">
+        <ttcol>Recallable Object Type Name</ttcol>
+        <ttcol>Value</ttcol>
+        <ttcol>RFC</ttcol>
+        <ttcol>How</ttcol>
+        <ttcol>Minor Versions</ttcol>
+        <c>RCA4_TYPE_MASK_RDATA_DLG</c> <c>0</c> <c>RFC5661</c> <c>N</c> <c>1</c>
+        <c>RCA4_TYPE_MASK_WDATA_DLG</c> <c>1</c> <c>RFC5661</c> <c>N</c> <c>1</c>
+        <c>RCA4_TYPE_MASK_DIR_DLG</c> <c>2</c> <c>RFC5661</c> <c>N</c> <c>1</c>
+        <c>RCA4_TYPE_MASK_FILE_LAYOUT</c> <c>3</c> <c>RFC5661</c> <c>N</c> <c>1</c>
+        <c>RCA4_TYPE_MASK_BLK_LAYOUT</c> <c>4</c> <c>RFC5661</c> <c>L</c> <c>1</c>
+        <c>RCA4_TYPE_MASK_OBJ_LAYOUT_MIN</c> <c>8</c> <c>RFC5661</c> <c>L</c> <c>1</c>
+        <c>RCA4_TYPE_MASK_OBJ_LAYOUT_MAX</c> <c>9</c> <c>RFC5661</c> <c>L</c> <c>1</c>
+      </texttable>
+    </section>
+
+    <section toc='exclude' anchor="ss:iana_considerations:UR2" title="Updating Registrations">
+      <t>
+        The update of a registration will require IESG Approval on the advice
+        of a Designated Expert.
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:iana_considerations:LT" title="Layout Types">
+    <t>
+      IANA created a registry called the "pNFS Layout Types Registry".
+    </t>
+
+    <t>
+      All assignments to the registry are made on a Standards Action basis,
+      with Expert Review required.
+    </t>
+
+    <t>
+      Layout types are 32-bit numbers.  The value zero is Reserved.  Values
+      in the range 0x80000000 to 0xFFFFFFFF inclusive are designated for
+      Private Use.  IANA will assign numbers from the range 0x00000001 to
+      0x7FFFFFFF inclusive.
+    </t>
+
+    <t>
+      The registry is a list of assignments, each containing five fields.
+    </t>
+
+    <t>
+      <list style='numbers'>
+        <t>
+          The name of the layout type.  This name must have the prefix
+          "LAYOUT4_".  The name must be unique.
+        </t>
+
+        <t>
+          The value of the layout type.  IANA will assign this number, and
+          the request from the registrant will use TBD1 instead of an
+          actual value.  The value assigned must be unique.  A Designated
+          Expert must be used to ensure that when the name of the layout
+          type and its value are added to the NFSv4.1 layouttype4
+          enumerated data type in the NFSv4.1 XDR description (<xref target="I-D.ietf-nfsv4-rfc5662bis-dot-x" />), the
+          result continues to be a valid XDR description.
+        </t>
+
+        <t>
+          The Standards Track RFC(s) that describe the notification.  If
+          the RFC(s) have not yet been published, the registrant will use
+          RFCTBD2, RFCTBD3, etc. instead of an actual RFC number.
+          Collectively, the RFC(s) must adhere to the guidelines listed in
+          <xref target="ss:iana_considerations:GfWLTS" />.
+        </t>
+
+        <t>
+          How the RFC introduces the layout type.  This is indicated by a
+          single US-ASCII value.  If the value is N, it means a minor
+          revision to the NFSv4 protocol.  If the value is L, it means a
+          new pNFS layout type.  Other values can be used with IESG
+          Approval.
+        </t>
+
+        <t>
+          The minor versions of NFSv4 that are allowed to use the
+          notification.  While these are numeric values, IANA will not
+          allocate and assign them; the author of the relevant RFCs with
+          IESG Approval assigns these numbers.  Each time there is a new
+          minor version of NFSv4 approved, a Designated Expert should
+          review the registry to make recommended updates as needed.
+        </t>
+      </list>
+    </t>
+
+    <section toc='exclude' anchor="ss:iana_considerations:IR3" title="Initial Registry">
+      <t>
+        The initial registry is in <xref target="layoutlist"/>.
+      </t>
+      <texttable title="Initial Layout Type Assignments" anchor="layoutlist">
+        <ttcol>Layout Type Name</ttcol>
+        <ttcol>Value</ttcol>
+        <ttcol>RFC</ttcol>
+        <ttcol>How</ttcol>
+        <ttcol>Minor Versions</ttcol>
+        <c>LAYOUT4_NFSV4_1_FILES</c> <c>0x1</c> <c>RFC 5661</c> <c>N</c> <c>1</c>
+        <c>LAYOUT4_OSD2_OBJECTS</c> <c>0x2</c> <c>RFC 5664</c> <c>L</c> <c>1</c>
+        <c>LAYOUT4_BLOCK_VOLUME</c> <c>0x3</c> <c>RFC 5663</c> <c>L</c> <c>1</c>
+      </texttable>
+    </section>
+
+    <section toc='exclude' anchor="ss:iana_considerations:UR3" title="Updating Registrations">
+      <t>
+        The update of a registration will require IESG Approval on the advice
+        of a Designated Expert.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:iana_considerations:GfWLTS" title="Guidelines for Writing Layout Type Specifications">
+      <t>
+        The author of a new pNFS layout specification must follow these steps
+        to obtain acceptance of the layout type as a Standards Track RFC:
+      </t>
+
+      <t>
+        <list style='numbers'>
+          <t>
+            The author devises the new layout specification.
+          </t>
+
+          <t>
+            The new layout type specification MUST, at a minimum:
+
+            <list style='symbols'>
+              <t>
+                Define the contents of the layout-type-specific fields of the
+                following data types:
+
+                <list style='symbols'>
+                  <t>
+                    the da_addr_body field of the device_addr4 data type;
+                  </t>
+
+                  <t>
+                    the loh_body field of the layouthint4 data type;
+                  </t>
+
+                  <t>
+                    the loc_body field of layout_content4 data type (which in
+                    turn is the lo_content field of the layout4 data type);
+                  </t>
+
+                  <t>
+                    the lou_body field of the layoutupdate4 data type;
+                  </t>
+                </list>
+              </t>
+
+              <t>
+                Describe or define the storage access protocol used to access
+                the storage devices.
+              </t>
+
+              <t>
+                Describe whether revocation of layouts is supported.
+              </t>
+
+              <t>
+                At a minimum, describe the methods of recovery from:
+
+                <list style='numbers'>
+                  <t>
+                    Failure and restart for client, server, storage device.
+                  </t>
+         
+                  <t>
+                    Lease expiration from perspective of the active client,
+                    server, storage device.
+                  </t>
+         
+                  <t>
+                    Loss of layout state resulting in fencing of client access
+                    to storage devices (for an example, see <xref target="ss:parallel_nfs:DwLoLSotMS" />).
+                  </t>
+                </list>
+              </t>
+
+              <t>
+                Include an IANA considerations section, which will in turn
+                include:
+
+                <list style='symbols'>
+                  <t>
+                    A request to IANA for a new layout type per <xref target="ss:iana_considerations:LT" />.
+                  </t>
+
+                  <t>
+                    A list of requests to IANA for any new recallable object
+                    types for CB_RECALL_ANY; each entry is to be presented in
+                    the form described in <xref target="ss:iana_considerations:ORT" />.
+                  </t>
+
+                  <t>
+                    A list of requests to IANA for any new notification values
+                    for CB_NOTIFY_DEVICEID; each entry is to be presented in
+                    the form described in <xref target="ss:iana_considerations:DIN" />.
+                  </t>
+                </list>
+              </t>
+
+              <t>
+                Include a security considerations section.  This section MUST
+                explain how the NFSv4.1 authentication, authorization, and
+                access-control models are preserved.  That is, if a metadata
+                server would restrict a READ or WRITE operation, how would
+                pNFS via the layout similarly restrict a corresponding input
+                or output operation?
+              </t>
+            </list>
+          </t>
+
+          <t>
+            The author documents the new layout specification as an Internet-Draft.
+          </t>
+
+          <t>
+            The author submits the Internet-Draft for review through the IETF
+            standards process as defined in "The Internet Standards Process--
+            Revision 3" (BCP 9).  The new layout specification will be
+            submitted for eventual publication as a Standards Track RFC.
+          </t>
+
+          <t>
+            The layout specification progresses through the IETF standards
+            process.
+          </t>
+        </list>
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:iana_considerations:PVD" title="Path Variable Definitions">
+    <t>
+      This section deals with the IANA considerations associated with the
+      variable substitution feature for location names as described in
+      <xref target="ss:multi-server_namespace:TfS2" />.  As described there, variables subject to
+      substitution consist of a domain name and a specific name within that
+      domain, with the two separated by a colon.  There are two sets of
+      IANA considerations here:
+    </t>
+
+    <t>
+      <list style='numbers'>
+        <t>
+          The list of variable names.
+        </t>
+
+        <t>
+          For each variable name, the list of possible values.
+        </t>
+      </list>
+    </t>
+
+    <t>
+      Thus, there will be one registry for the list of variable names, and
+      possibly one registry for listing the values of each variable name.
+    </t>
+
+    <section toc='exclude' anchor="ss:iana_considerations:PVR" title="Path Variables Registry">
+      <t>
+        IANA created a registry called the "NFSv4 Path Variables Registry".
+      </t>
+
+      <section toc='exclude' anchor="ss:iana_considerations:PVV" title="Path Variable Values">
+        <t>
+          Variable names are of the form "${", followed by a domain name,
+          followed by a colon (":"), followed by a domain-specific portion of
+          the variable name, followed by "}".  When the domain name is
+          "ietf.org", all variables names must be registered with IANA on a
+          Standards Action basis, with Expert Review required.  Path variables
+          with registered domain names neither part of nor equal to ietf.org
+          are assigned on a Hierarchical Allocation basis (delegating to the
+          domain owner) and thus of no concern to IANA, unless the domain owner
+          chooses to register a variable name from his domain.  If the domain
+          owner chooses to do so, IANA will do so on a First Come First Serve
+          basis.  To accommodate registrants who do not have their own domain,
+          IANA will accept requests to register variables with the prefix
+          "${FCFS.ietf.org:" on a First Come First Served basis.  Assignments
+          on a First Come First Basis do not require Expert Review, unless the
+          registrant also wants IANA to establish a registry for the values of
+          the registered variable.
+        </t>
+       
+        <t>
+          The registry is a list of assignments, each containing three fields.
+        </t>
+
+        <t>
+          <list style='numbers'>
+            <t>
+              The name of the variable.  The name of this variable must start
+              with a "${" followed by a registered domain name, followed by
+              ":", or it must start with "${FCFS.ietf.org".  The name must be
+              no more than 64 UTF-8 characters long.  The name must be unique.
+            </t>
+
+            <t>
+              For assignments made on Standards Action basis, the Standards
+              Track RFC(s) that describe the variable.  If the RFC(s) have not
+              yet been published, the registrant will use RFCTBD1, RFCTBD2,
+              etc. instead of an actual RFC number.  Note that the RFCs do not
+              have to be a part of an NFS minor version.  For assignments made
+              on a First Come First Serve basis, an explanation (consuming no
+              more than 1024 bytes, or more if IANA permits) of the purpose of
+              the variable.  A reference to the explanation can be substituted.
+            </t>
+
+            <t>
+              The point of contact, including an email address.  The point of
+              contact can consume up to 256 bytes (or more if IANA permits).
+              For assignments made on a Standards Action basis, the point of
+              contact is always IESG.
+            </t>
+          </list>
+        </t>
+
+        <section toc='exclude' anchor="ss:iana_considerations:IR4" title="Initial Registry">
+          <t>
+            The initial registry is in <xref target="varlist"/>.
+          </t>
+
+          <texttable title="Initial List of Path Variables" anchor="varlist">
+            <ttcol>Variable Name</ttcol>
+            <ttcol>RFC</ttcol>
+            <ttcol>Point of Contact</ttcol>
+            <c>${ietf.org:CPU_ARCH}</c> <c>RFC 5661</c> <c>IESG</c>
+            <c>${ietf.org:OS_TYPE}</c> <c>RFC 5661</c> <c>IESG</c>
+            <c>${ietf.org:OS_VERSION}</c> <c>RFC 5661</c> <c>IESG</c>
+          </texttable>
+
+          <t>
+            IANA has created registries for the values of the variable names
+            ${ietf.org:CPU_ARCH} and ${ietf.org:OS_TYPE}.  See Sections <xref target="ss:iana_considerations:VftV" format='counter' />
+            and <xref target="ss:iana_considerations:VftV1" format='counter' />.
+          </t>
+
+          <t>
+            For the values of the variable ${ietf.org:OS_VERSION}, no registry is
+            needed as the specifics of the values of the variable will vary with
+            the value of ${ietf.org:OS_TYPE}.  Thus, values for ${ietf.org:
+            OS_VERSION} are on a Hierarchical Allocation basis and are of no
+            concern to IANA.
+          </t>
+        </section>
+
+        <section toc='exclude' anchor="ss:iana_considerations:UR4" title="Updating Registrations">
+          <t>
+            The update of an assignment made on a Standards Action basis will
+            require IESG Approval on the advice of a Designated Expert.
+          </t>
+
+          <t>
+            The registrant can always update the point of contact of an
+            assignment made on a First Come First Serve basis.  Any other update
+            will require Expert Review.
+          </t>
+        </section>
+      </section>
+    </section>
+
+    <section toc='exclude' anchor="ss:iana_considerations:VftV" title="Values for the ${ietf.org:CPU_ARCH} Variable">
+      <t>
+        IANA created a registry called the "NFSv4 ${ietf.org:CPU_ARCH} Value
+        Registry".
+      </t>
+
+      <t>
+        Assignments to the registry are made on a First Come First Serve
+        basis.  The zero-length value of ${ietf.org:CPU_ARCH} is Reserved.
+        Values with a prefix of "PRIV" are designated for Private Use.
+      </t>
+
+      <t>
+        The registry is a list of assignments, each containing three fields.
+      </t>
+
+      <t>
+        <list style='numbers'>
+          <t>
+            A value of the ${ietf.org:CPU_ARCH} variable.  The value must be
+            1 to 32 UTF-8 characters long.  The value must be unique.
+          </t>
+
+          <t>
+            An explanation (consuming no more than 1024 bytes, or more if
+            IANA permits) of what CPU architecture the value denotes.  A
+            reference to the explanation can be substituted.
+          </t>
+
+          <t>
+            The point of contact, including an email address.  The point of
+            contact can consume up to 256 bytes (or more if IANA permits).
+          </t>
+        </list>
+      </t>
+
+      <section toc='exclude' anchor="ss:iana_considerations:IR5" title="Initial Registry">
+        <t>
+          There is no initial registry.
+        </t>
+      </section>
+
+      <section toc='exclude' anchor="ss:iana_considerations:UR5" title="Updating Registrations">
+        <t>
+          The registrant is free to update the assignment, i.e., change the
+          explanation and/or point-of-contact fields.
+        </t>
+      </section>
+    </section>
+
+    <section toc='exclude' anchor="ss:iana_considerations:VftV1" title="Values for the ${ietf.org:OS_TYPE} Variable">
+      <t>
+        IANA created a registry called the "NFSv4 ${ietf.org:OS_TYPE} Value
+        Registry".
+      </t>
+     
+      <t>
+        Assignments to the registry are made on a First Come First Serve
+        basis.  The zero-length value of ${ietf.org:OS_TYPE} is Reserved.
+        Values with a prefix of "PRIV" are designated for Private Use.
+      </t>
+     
+      <t>
+        The registry is a list of assignments, each containing three fields.
+      </t>
+
+      <t>
+        <list style='numbers'>
+          <t>
+            A value of the ${ietf.org:OS_TYPE} variable.  The value must be 1
+            to 32 UTF-8 characters long.  The value must be unique.
+          </t>
+
+          <t>
+            An explanation (consuming no more than 1024 bytes, or more if
+            IANA permits) of what CPU architecture the value denotes.  A
+            reference to the explanation can be substituted.
+          </t>
+
+          <t>
+            The point of contact, including an email address.  The point of
+            contact can consume up to 256 bytes (or more if IANA permits).
+          </t>
+        </list>
+      </t>
+
+      <section toc='exclude' anchor="ss:iana_considerations:IR6" title="Initial Registry">
+        <t>
+          There is no initial registry.
+        </t>
+      </section>
+
+      <section toc='exclude' anchor="ss:iana_considerations:UR6" title="Updating Registrations">
+        <t>
+          The registrant is free to update the assignment, i.e., change the
+          explanation and/or point of contact fields.
+        </t>
+      </section>
+    </section>
+  </section>
+</section>

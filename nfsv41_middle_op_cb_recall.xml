@@ -1,0 +1,48 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_CB_RECALL" title="Operation 4: CB_RECALL - Recall a Delegation">
+    <section toc='exclude' anchor="ss:op_CB_RECALL:A" title="ARGUMENT">
+      <?rfc include='autogen/cb_recall_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_RECALL:R" title="RESULT">
+      <?rfc include='autogen/cb_recall_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_RECALL:D" title="DESCRIPTION">
+      <t>
+        The CB_RECALL operation is used to begin the process of recalling a
+        delegation and returning it to the server.
+      </t>
+
+      <t>
+        The truncate flag is used to optimize recall for a file object that
+        is a regular file and is about to be truncated to zero.  When it is
+        TRUE, the client is freed of the obligation to propagate modified
+        data for the file to the server, since this data is irrelevant.
+      </t>
+
+      <t>
+        If the handle specified is not one for which the client holds a
+        delegation, an NFS4ERR_BADHANDLE error is returned.
+      </t>
+
+      <t>
+        If the stateid specified is not one corresponding to an OPEN
+        delegation for the file specified by the filehandle, an
+        NFS4ERR_BAD_STATEID is returned.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_RECALL:I" title="IMPLEMENTATION">
+      <t>
+        The client SHOULD reply to the callback immediately.  Replying does
+        not complete the recall except when the value of the reply's status
+        field is neither NFS4ERR_DELAY nor NFS4_OK.  The recall is not
+        complete until the delegation is returned using a DELEGRETURN
+        operation.
+      </t>
+    </section>
+  </section>
+

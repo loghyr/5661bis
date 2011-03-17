@@ -1,0 +1,263 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+<section anchor="sec:single-server_namespace" title="Single-Server Namespace">
+  <t>
+    This section describes the NFSv4 single-server namespace.
+    Single-server namespaces may be presented directly to clients, or they may
+    be used as a basis to form larger multi-server namespaces (e.g.,
+    site-wide or organization-wide) to be presented to clients, as
+    described in <xref target="sec:multi-server_namespace" />.
+  </t>
+
+  <section anchor="ss:single-server_namespace:SE" title="Server Exports">
+    <t>
+      On a UNIX server, the namespace describes all the files reachable by
+      pathnames under the root directory or "/".  On a Windows server, the
+      namespace constitutes all the files on disks named by mapped disk
+      letters.  NFS server administrators rarely make the entire server's
+      file system namespace available to NFS clients.  More often, portions
+      of the namespace are made available via an "export" feature.  In
+      previous versions of the NFS protocol, the root filehandle for each
+      export is obtained through the MOUNT protocol; the client sent a
+      string that identified the export name within the namespace and the
+      server returned the root filehandle for that export.  The MOUNT
+      protocol also provided an EXPORTS procedure that enumerated the
+      server's exports.
+    </t>
+  </section>
+
+  <section anchor="ss:single-server_namespace:BE" title="Browsing Exports">
+    <t>
+      The NFSv4.1 protocol provides a root filehandle that clients can use
+      to obtain filehandles for the exports of a particular server, via a
+      series of LOOKUP operations within a COMPOUND, to traverse a path.  A
+      common user experience is to use a graphical user interface (perhaps
+      a file "Open" dialog window) to find a file via progressive browsing
+      through a directory tree.  The client must be able to move from one
+      export to another export via single-component, progressive LOOKUP
+      operations.
+    </t>
+   
+    <t>
+      This style of browsing is not well supported by the NFSv3 protocol.
+      In NFSv3, the client expects all LOOKUP operations to remain within a
+      single server file system.  For example, the device attribute will
+      not change.  This prevents a client from taking namespace paths that
+      span exports.
+    </t>
+   
+    <t>
+      In the case of NFSv3, an automounter on the client can obtain a
+      snapshot of the server's namespace using the EXPORTS procedure of the
+      MOUNT protocol.  If it understands the server's pathname syntax, it
+      can create an image of the server's namespace on the client.  The
+      parts of the namespace that are not exported by the server are filled
+      in with directories that might be constructed similarly to an NFSv4.1
+      "pseudo file system" (see <xref target="ss:single-server_namespace:SPFS" />) that allows the user to browse
+      from one mounted file system to another.  There is a drawback to this
+      representation of the server's namespace on the client: it is static.
+      If the server administrator adds a new export, the client will be
+      unaware of it.
+    </t>
+  </section>
+
+  <section anchor="ss:single-server_namespace:SPFS" title="Server Pseudo File System">
+    <t>
+      NFSv4.1 servers avoid this namespace inconsistency by presenting all
+      the exports for a given server within the framework of a single
+      namespace for that server.  An NFSv4.1 client uses LOOKUP and READDIR
+      operations to browse seamlessly from one export to another.
+    </t>
+   
+    <t>
+      Where there are portions of the server namespace that are not
+      exported, clients require some way of traversing those portions to
+      reach actual exported file systems.  A technique that servers may use
+      to provide for this is to bridge the unexported portion of the
+      namespace via a "pseudo file system" that provides a view of exported
+      directories only.  A pseudo file system has a unique fsid and behaves
+      like a normal, read-only file system.
+    </t>
+   
+    <t>
+      Based on the construction of the server's namespace, it is possible
+      that multiple pseudo file systems may exist.  For example,
+    </t>
+   
+    <figure>
+      <artwork>
+    /a              pseudo file system
+    /a/b            real file system
+    /a/b/c          pseudo file system
+    /a/b/c/d        real file system
+      </artwork>
+    </figure>
+   
+    <t>
+      Each of the pseudo file systems is considered a separate entity and
+      therefore MUST have its own fsid, unique among all the fsids for that
+      server.
+    </t>
+  </section>
+
+  <section anchor="ss:single-server_namespace:MR" title="Multiple Roots">
+    <t>
+      Certain operating environments are sometimes described as having
+      "multiple roots".  In such environments, individual file systems are
+      commonly represented by disk or volume names.  NFSv4 servers for
+      these platforms can construct a pseudo file system above these root
+      names so that disk letters or volume names are simply directory names
+      in the pseudo root.
+    </t>
+  </section>
+
+  <section anchor="ss:single-server_namespace:FV" title="Filehandle Volatility">
+    <t>
+      The nature of the server's pseudo file system is that it is a logical
+      representation of file system(s) available from the server.
+      Therefore, the pseudo file system is most likely constructed
+      dynamically when the server is first instantiated.  It is expected
+      that the pseudo file system may not have an on-disk counterpart from
+      which persistent filehandles could be constructed.  Even though it is
+      preferable that the server provide persistent filehandles for the
+      pseudo file system, the NFS client should expect that pseudo file
+      system filehandles are volatile.  This can be confirmed by checking
+      the associated "fh_expire_type" attribute for those filehandles in
+      question.  If the filehandles are volatile, the NFS client must be
+      prepared to recover a filehandle value (e.g., with a series of LOOKUP
+      operations) when receiving an error of NFS4ERR_FHEXPIRED.
+    </t>
+
+    <t>
+      Because it is quite likely that servers will implement pseudo file
+      systems using volatile filehandles, clients need to be prepared for
+      them, rather than assuming that all filehandles will be persistent.
+    </t>
+  </section>
+
+  <section anchor="ss:single-server_namespace:ER" title="Exported Root">
+    <t>
+      If the server's root file system is exported, one might conclude that
+      a pseudo file system is unneeded.  This is not necessarily so.
+      Assume the following file systems on a server:
+    </t>
+
+    <figure>
+      <artwork>
+    /       fs1  (exported)
+    /a      fs2  (not exported)
+    /a/b    fs3  (exported)
+      </artwork>
+    </figure>
+
+    <t>
+      Because fs2 is not exported, fs3 cannot be reached with simple
+      LOOKUPs.  The server must bridge the gap with a pseudo file system.
+    </t>
+  </section>
+
+  <section anchor="ss:single-server_namespace:MPC" title="Mount Point Crossing">
+    <t>
+      The server file system environment may be constructed in such a way
+      that one file system contains a directory that is 'covered' or
+      mounted upon by a second file system.  For example:
+    </t>
+
+    <figure>
+      <artwork>
+    /a/b            (file system 1)
+    /a/b/c/d        (file system 2)
+      </artwork>
+    </figure>
+
+    <t>
+      The pseudo file system for this server may be constructed to look
+      like:
+    </t>
+
+    <figure>
+      <artwork>
+    /               (place holder/not exported)
+    /a/b            (file system 1)
+    /a/b/c/d        (file system 2)
+      </artwork>
+    </figure>
+
+    <t>
+      It is the server's responsibility to present the pseudo file system
+      that is complete to the client.  If the client sends a LOOKUP request
+      for the path /a/b/c/d, the server's response is the filehandle of the
+      root of the file system /a/b/c/d.  In previous versions of the NFS
+      protocol, the server would respond with the filehandle of directory
+      /a/b/c/d within the file system /a/b.
+    </t>
+
+    <t>
+      The NFS client will be able to determine if it crosses a server mount
+      point by a change in the value of the "fsid" attribute.
+    </t>
+  </section>
+
+  <section anchor="ss:single-server_namespace:SPaNP" title="Security Policy and Namespace Presentation">
+    <t>
+      Because NFSv4 clients possess the ability to change the security
+      mechanisms used, after determining what is allowed, by using SECINFO
+      and SECINFO_NONAME, the server SHOULD NOT present a different view of
+      the namespace based on the security mechanism being used by a client.
+      Instead, it should present a consistent view and return
+      NFS4ERR_WRONGSEC if an attempt is made to access data with an
+      inappropriate security mechanism.
+    </t>
+
+    <t>
+      If security considerations make it necessary to hide the existence of
+      a particular file system, as opposed to all of the data within it,
+      the server can apply the security policy of a shared resource in the
+      server's namespace to components of the resource's ancestors.  For
+      example:
+    </t>
+
+    <figure>
+      <artwork>
+    /                       (place holder/not exported)
+    /a/b                    (file system 1)
+    /a/b/MySecretProject    (file system 2)
+      </artwork>
+    </figure>
+
+    <t>
+      The /a/b/MySecretProject directory is a real file system and is the
+      shared resource.  Suppose the security policy for /a/b/
+      MySecretProject is Kerberos with integrity and it is desired to limit
+      knowledge of the existence of this file system.  In this case, the
+      server should apply the same security policy to /a/b.  This allows
+      for knowledge of the existence of a file system to be secured when
+      desirable.
+    </t>
+
+    <t>
+      For the case of the use of multiple, disjoint security mechanisms in
+      the server's resources, applying that sort of policy would result in
+      the higher-level file system not being accessible using any security
+      flavor.  Therefore, that sort of configuration is not compatible with
+      hiding the existence (as opposed to the contents) from clients using
+      multiple disjoint sets of security flavors.
+    </t>
+
+    <t>
+      In other circumstances, a desirable policy is for the security of a
+      particular object in the server's namespace to include the union of
+      all security mechanisms of all direct descendants.  A common and
+      convenient practice, unless strong security requirements dictate
+      otherwise, is to make the entire the pseudo file system accessible by
+      all of the valid security mechanisms.
+    </t>
+
+    <t>
+      Where there is concern about the security of data on the network,
+      clients should use strong security mechanisms to access the pseudo
+      file system in order to prevent man-in-the-middle attacks.
+    </t>
+  </section>
+</section>

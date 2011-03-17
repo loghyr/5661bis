@@ -1,0 +1,135 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_COMMIT" title="Operation 5: COMMIT - Commit Cached Data">
+    <section toc='exclude' anchor="ss:op_COMMIT:A" title="ARGUMENT">
+      <?rfc include='autogen/commit_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_COMMIT:R" title="RESULT">
+      <?rfc include='autogen/commit_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_COMMIT:D" title="DESCRIPTION">
+      <t>
+        The COMMIT operation forces or flushes uncommitted, modified data to
+        stable storage for the file specified by the current filehandle.  The
+        flushed data is that which was previously written with one or more
+        WRITE operations that had the "committed" field of their results
+        field set to UNSTABLE4.
+      </t>
+
+      <t>
+        The offset specifies the position within the file where the flush is
+        to begin.  An offset value of zero means to flush data starting at
+        the beginning of the file.  The count specifies the number of bytes
+        of data to flush.  If the count is zero, a flush from the offset to
+        the end of the file is done.
+      </t>
+
+      <t>
+        The server returns a write verifier upon successful completion of the
+        COMMIT.  The write verifier is used by the client to determine if the
+        server has restarted between the initial WRITE operations and the
+        COMMIT.  The client does this by comparing the write verifier
+        returned from the initial WRITE operations and the verifier returned
+        by the COMMIT operation.  The server must vary the value of the write
+        verifier at each server event or instantiation that may lead to a
+        loss of uncommitted data.  Most commonly this occurs when the server
+        is restarted; however, other events at the server may result in
+        uncommitted data loss as well.
+      </t>
+
+      <t>
+        On success, the current filehandle retains its value.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_COMMIT:I" title="IMPLEMENTATION">
+      <t>
+        The COMMIT operation is similar in operation and semantics to
+        the POSIX fsync() <xref target="openg_fsync" /> system interface
+        that synchronizes a file's state with the disk (file data and
+        metadata is flushed to disk or stable storage).  COMMIT performs
+        the same operation for a client, flushing any unsynchronized
+        data and metadata on the server to the server's disk or stable
+        storage for the specified file.  Like fsync(), it may be that
+        there is some modified data or no modified data to synchronize.
+        The data may have been synchronized by the server's normal
+        periodic buffer synchronization activity.  COMMIT should return
+        NFS4_OK, unless there has been an unexpected error.
+      </t>
+
+      <t>
+        COMMIT differs from fsync() in that it is possible for the client
+        to flush a range of the file (most likely triggered by a
+        buffer-reclamation scheme on the client before the file has been
+        completely written).
+      </t>
+
+      <t>
+        The server implementation of COMMIT is reasonably simple.  If the
+        server receives a full file COMMIT request, that is, starting at
+        offset zero and count zero, it should do the equivalent of applying
+        fsync() to the entire file.  Otherwise, it should arrange to have the
+        modified data in the range specified by offset and count to be
+        flushed to stable storage.  In both cases, any metadata associated
+        with the file must be flushed to stable storage before returning.  It
+        is not an error for there to be nothing to flush on the server.  This
+        means that the data and metadata that needed to be flushed have
+        already been flushed or lost during the last server failure.
+      </t>
+
+      <t>
+        The client implementation of COMMIT is a little more complex.  There
+        are two reasons for wanting to commit a client buffer to stable
+        storage.  The first is that the client wants to reuse a buffer.  In
+        this case, the offset and count of the buffer are sent to the server
+        in the COMMIT request.  The server then flushes any modified data
+        based on the offset and count, and flushes any modified metadata
+        associated with the file.  It then returns the status of the flush
+        and the write verifier.  The second reason for the client to generate
+        a COMMIT is for a full file flush, such as may be done at close.  In
+        this case, the client would gather all of the buffers for this file
+        that contain uncommitted data, do the COMMIT operation with an offset
+        of zero and count of zero, and then free all of those buffers.  Any
+        other dirty buffers would be sent to the server in the normal
+        fashion.
+      </t>
+
+      <t>
+        After a buffer is written (via the WRITE operation) by the client
+        with the "committed" field in the result of WRITE set to UNSTABLE4,
+        the buffer must be considered as modified by the client until the
+        buffer has either been flushed via a COMMIT operation or written via
+        a WRITE operation with the "committed" field in the result set to
+        FILE_SYNC4 or DATA_SYNC4.  This is done to prevent the buffer from
+        being freed and reused before the data can be flushed to stable
+        storage on the server.
+      </t>
+
+      <t>
+        When a response is returned from either a WRITE or a COMMIT operation
+        and it contains a write verifier that differs from that previously
+        returned by the server, the client will need to retransmit all of the
+        buffers containing uncommitted data to the server.  How this is to be
+        done is up to the implementor.  If there is only one buffer of
+        interest, then it should be sent in a WRITE request with the
+        FILE_SYNC4 stable parameter.  If there is more than one buffer, it
+        might be worthwhile retransmitting all of the buffers in WRITE
+        operations with the stable parameter set to UNSTABLE4 and then
+        retransmitting the COMMIT operation to flush all of the data on the
+        server to stable storage.  However, if the server repeatably returns
+        from COMMIT a verifier that differs from that returned by WRITE, the
+        only way to ensure progress is to retransmit all of the buffers with
+        WRITE requests with the FILE_SYNC4 stable parameter.
+      </t>
+
+      <t>
+        The above description applies to page-cache-based systems as well as
+        buffer-cache-based systems.  In the former systems, the virtual
+        memory system will need to be modified instead of the buffer cache.
+      </t>
+    </section>
+  </section>
+

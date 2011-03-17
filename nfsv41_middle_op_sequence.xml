@@ -1,0 +1,314 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_SEQUENCE" title="Operation 53: SEQUENCE - Supply Per-Procedure Sequencing and Control">
+    <section toc='exclude' anchor="ss:op_SEQUENCE:A" title="ARGUMENT">
+      <?rfc include='autogen/sequence_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_SEQUENCE:R" title="RESULT">
+      <?rfc include='autogen/sequence_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_SEQUENCE:D" title="DESCRIPTION">
+      <t>
+        The SEQUENCE operation is used by the server to implement session
+        request control and the reply cache semantics.
+      </t>
+
+      <t>
+        SEQUENCE MUST appear as the first operation of any COMPOUND in which
+        it appears.  The error NFS4ERR_SEQUENCE_POS will be returned when it
+        is found in any position in a COMPOUND beyond the first.  Operations
+        other than SEQUENCE, BIND_CONN_TO_SESSION, EXCHANGE_ID,
+        CREATE_SESSION, and DESTROY_SESSION, MUST NOT appear as the first
+        operation in a COMPOUND.  Such operations MUST yield the error
+        NFS4ERR_OP_NOT_IN_SESSION if they do appear at the start of a
+        COMPOUND.
+      </t>
+
+      <t>
+        If SEQUENCE is received on a connection not associated with the
+        session via CREATE_SESSION or BIND_CONN_TO_SESSION, and connection
+        association enforcement is enabled (see <xref target="op_EXCHANGE_ID" />), then the
+        server returns NFS4ERR_CONN_NOT_BOUND_TO_SESSION.
+      </t>
+
+      <t>
+        The sa_sessionid argument identifies the session to which this
+        request applies.  The sr_sessionid result MUST equal sa_sessionid.
+      </t>
+
+      <t>
+        The sa_slotid argument is the index in the reply cache for the
+        request.  The sa_sequenceid field is the sequence number of the
+        request for the reply cache entry (slot).  The sr_slotid result MUST
+        equal sa_slotid.  The sr_sequenceid result MUST equal sa_sequenceid.
+      </t>
+
+      <t>
+        The sa_highest_slotid argument is the highest slot ID for which the
+        client has a request outstanding; it could be equal to sa_slotid.
+        The server returns two "highest_slotid" values: sr_highest_slotid and
+        sr_target_highest_slotid.  The former is the highest slot ID the
+        server will accept in future SEQUENCE operation, and SHOULD NOT be
+        less than the value of sa_highest_slotid (but see <xref target="ss:core_infrastructure:SIaRC" />
+        for an exception).  The latter is the highest slot ID the server
+        would prefer the client use on a future SEQUENCE operation.
+      </t>
+
+      <t>
+        If sa_cachethis is TRUE, then the client is requesting that the
+        server cache the entire reply in the server's reply cache; therefore,
+        the server MUST cache the reply (see <xref target="ss:core_infrastructure:ORC" />).  The server
+        MAY cache the reply if sa_cachethis is FALSE.  If the server does not
+        cache the entire reply, it MUST still record that it executed the
+        request at the specified slot and sequence ID.
+      </t>
+
+      <t>
+        The response to the SEQUENCE operation contains a word of status
+        flags (sr_status_flags) that can provide to the client information
+        related to the status of the client's lock state and communications
+        paths.  Note that any status bits relating to lock state MAY be reset
+        when lock state is lost due to a server restart (even if the session
+        is persistent across restarts; session persistence does not imply
+        lock state persistence) or the establishment of a new client
+        instance.
+      </t>
+
+      <t>
+        <list style='hanging'>
+          <t hangText='SEQ4_STATUS_CB_PATH_DOWN'><vspace />
+            When set, indicates that the client has no operational backchannel
+            path for any session associated with the client ID, making
+            it necessary for the client to re-establish one.  This bit
+            remains set on all SEQUENCE responses on all sessions associated
+            with the client ID until at least one backchannel is available
+            on any session associated with the client ID.  If the client
+            fails to re-establish a backchannel for the client ID, it is
+            subject to having recallable state revoked.
+          </t>
+
+          <t hangText='SEQ4_STATUS_CB_PATH_DOWN_SESSION'><vspace />
+            When set, indicates that the session has no operational
+            backchannel.  There are two reasons why
+            SEQ4_STATUS_CB_PATH_DOWN_SESSION may be set and not
+            SEQ4_STATUS_CB_PATH_DOWN.  First is that a callback operation
+            that applies specifically to the session (e.g., CB_RECALL_SLOT,
+            see <xref target="op_CB_RECALL_SLOT" />) needs to be sent.  Second is that the server
+            did send a callback operation, but the connection was lost
+            before the reply.  The server cannot be sure whether or not
+            the client received the callback operation, and so, per rules
+            on request retry, the server MUST retry the callback operation
+            over the same session.  The SEQ4_STATUS_CB_PATH_DOWN_SESSION
+            bit is the indication to the client that it needs to associate
+            a connection to the session's backchannel.  This bit remains
+            set on all SEQUENCE responses of the session until a connection
+            is associated with the session's a backchannel.  If the client
+            fails to re-establish a backchannel for the session, it is
+            subject to having recallable state revoked.
+          </t>
+
+          <t hangText='SEQ4_STATUS_CB_GSS_CONTEXTS_EXPIRING'><vspace />
+            When set, indicates that all GSS contexts or RPCSEC_GSS handles
+            assigned to the session's backchannel will expire within a period
+            equal to the lease time.  This bit remains set on all SEQUENCE
+            replies until at least one of the following are true:
+
+            <list style='symbols'>
+              <t>
+                All SSV RPCSEC_GSS handles on the session's backchannel have
+                been destroyed and all non-SSV GSS contexts have expired.
+              </t>
+
+              <t>
+                At least one more SSV RPCSEC_GSS handle has been added to the
+                backchannel.
+              </t>
+
+              <t>
+                The expiration time of at least one non-SSV GSS context of an
+                RPCSEC_GSS handle is beyond the lease period from the current
+                time (relative to the time of when a SEQUENCE response was
+                sent)
+              </t>
+            </list>
+          </t>
+
+          <t hangText='SEQ4_STATUS_CB_GSS_CONTEXTS_EXPIRED'><vspace />
+            When set, indicates all non-SSV GSS contexts and all SSV
+            RPCSEC_GSS handles assigned to the session's backchannel have
+            expired or have been destroyed.  This bit remains set on all
+            SEQUENCE replies until at least one non-expired non-SSV GSS
+            context for the session's backchannel has been established or at
+            least one SSV RPCSEC_GSS handle has been assigned to the
+            backchannel.
+          </t>
+
+          <t hangText='SEQ4_STATUS_EXPIRED_ALL_STATE_REVOKED'><vspace />
+            When set, indicates that the lease has expired and as a result the
+            server released all of the client's locking state.  This status
+            bit remains set on all SEQUENCE replies until the loss of all such
+            locks has been acknowledged by use of FREE_STATEID (see
+            <xref target="op_FREE_STATEID" />), or by establishing a new client instance by
+            destroying all sessions (via DESTROY_SESSION), the client ID (via
+            DESTROY_CLIENTID), and then invoking EXCHANGE_ID and
+            CREATE_SESSION to establish a new client ID.
+          </t>
+
+          <t hangText='SEQ4_STATUS_EXPIRED_SOME_STATE_REVOKED'><vspace />
+            When set, indicates that some subset of the client's locks have
+            been revoked due to expiration of the lease period followed by
+            another client's conflicting LOCK operation.  This status bit
+            remains set on all SEQUENCE replies until the loss of all such
+            locks has been acknowledged by use of FREE_STATEID.
+          </t>
+
+          <t hangText='SEQ4_STATUS_ADMIN_STATE_REVOKED'><vspace />
+            When set, indicates that one or more locks have been revoked
+            without expiration of the lease period, due to administrative
+            action.  This status bit remains set on all SEQUENCE replies until
+            the loss of all such locks has been acknowledged by use of
+            FREE_STATEID.
+          </t>
+
+          <t hangText='SEQ4_STATUS_RECALLABLE_STATE_REVOKED'><vspace />
+            When set, indicates that one or more recallable objects have been
+            revoked without expiration of the lease period, due to the
+            client's failure to return them when recalled, which may be a
+            consequence of there being no working backchannel and the client
+            failing to re-establish a backchannel per the
+            SEQ4_STATUS_CB_PATH_DOWN, SEQ4_STATUS_CB_PATH_DOWN_SESSION, or
+            SEQ4_STATUS_CB_GSS_CONTEXTS_EXPIRED status flags.  This status bit
+            remains set on all SEQUENCE replies until the loss of all such
+            locks has been acknowledged by use of FREE_STATEID.
+          </t>
+
+          <t hangText='SEQ4_STATUS_LEASE_MOVED'><vspace />
+            When set, indicates that responsibility for lease renewal has been
+            transferred to one or more new servers.  This condition will
+            continue until the client receives an NFS4ERR_MOVED error and the
+            server receives the subsequent GETATTR for the fs_locations or
+            fs_locations_info attribute for an access to each file system for
+            which a lease has been moved to a new server.  See
+            <xref target="ss:multi-server_namespace:LaFST" />.
+          </t>
+
+          <t hangText='SEQ4_STATUS_RESTART_RECLAIM_NEEDED'><vspace />
+            When set, indicates that due to server restart, the client must
+            reclaim locking state.  Until the client sends a global
+            RECLAIM_COMPLETE (<xref target="op_RECLAIM_COMPLETE" />), every SEQUENCE operation will
+            return SEQ4_STATUS_RESTART_RECLAIM_NEEDED.
+          </t>
+
+          <t hangText='SEQ4_STATUS_BACKCHANNEL_FAULT'><vspace />
+            The server has encountered an unrecoverable fault with the
+            backchannel (e.g., it has lost track of the sequence ID for a slot
+            in the backchannel).  The client MUST stop sending more requests
+            on the session's fore channel, wait for all outstanding requests
+            to complete on the fore and back channel, and then destroy the
+            session.
+          </t>
+
+          <t hangText='SEQ4_STATUS_DEVID_CHANGED'><vspace />
+            The client is using device ID notifications and the server has
+            changed a device ID mapping held by the client.  This flag will
+            stay present until the client has obtained the new mapping with
+            GETDEVICEINFO.
+          </t>
+
+          <t hangText='SEQ4_STATUS_DEVID_DELETED'><vspace />
+            The client is using device ID notifications and the server has
+            deleted a device ID mapping held by the client.  This flag will
+            stay in effect until the client sends a GETDEVICEINFO on the
+            device ID with a null value in the argument gdia_notify_types.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        The value of the sa_sequenceid argument relative to the cached
+        sequence ID on the slot falls into one of three cases.
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            If the difference between sa_sequenceid and the server's cached
+            sequence ID at the slot ID is two (2) or more, or if sa_sequenceid
+            is less than the cached sequence ID (accounting for wraparound of
+            the unsigned sequence ID value), then the server MUST return
+            NFS4ERR_SEQ_MISORDERED.
+          </t>
+
+          <t>
+            If sa_sequenceid and the cached sequence ID are the same, this is
+            a retry, and the server replies with what is recorded in the reply
+            cache.  The lease is possibly renewed as described below.
+          </t>
+
+          <t>
+            If sa_sequenceid is one greater (accounting for wraparound) than
+            the cached sequence ID, then this is a new request, and the slot's
+            sequence ID is incremented.  The operations subsequent to
+            SEQUENCE, if any, are processed.  If there are no other
+            operations, the only other effects are to cache the SEQUENCE reply
+            in the slot, maintain the session's activity, and possibly renew
+            the lease.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        If the client reuses a slot ID and sequence ID for a completely
+        different request, the server MAY treat the request as if it is a
+        retry of what it has already executed.  The server MAY however detect
+        the client's illegal reuse and return NFS4ERR_SEQ_FALSE_RETRY.
+      </t>
+
+      <t>
+        If SEQUENCE returns an error, then the state of the slot (sequence
+        ID, cached reply) MUST NOT change, and the associated lease MUST NOT
+        be renewed.
+      </t>
+
+      <t>
+        If SEQUENCE returns NFS4_OK, then the associated lease MUST be
+        renewed (see <xref target="ss:state_management:LR" />), except if
+        SEQ4_STATUS_EXPIRED_ALL_STATE_REVOKED is returned in sr_status_flags.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_SEQUENCE:I" title="IMPLEMENTATION">
+      <t>
+        The server MUST maintain a mapping of session ID to client ID in
+        order to validate any operations that follow SEQUENCE that take a
+        stateid as an argument and/or result.
+      </t>
+
+      <t>
+        If the client establishes a persistent session, then a SEQUENCE
+        received after a server restart might encounter requests performed
+        and recorded in a persistent reply cache before the server restart.
+        In this case, SEQUENCE will be processed successfully, while requests
+        that were not previously performed and recorded are rejected with
+        NFS4ERR_DEADSESSION.
+      </t>
+
+      <t>
+        Depending on which of the operations within the COMPOUND were
+        successfully performed before the server restart, these operations
+        will also have replies sent from the server reply cache.  Note that
+        when these operations establish locking state, it is locking state
+        that applies to the previous server instance and to the previous
+        client ID, even though the server restart, which logically happened
+        after these operations, eliminated that state.  In the case of a
+        partially executed COMPOUND, processing may reach an operation not
+        processed during the earlier server instance, making this operation a
+        new one and not performable on the existing session.  In this case,
+        NFS4ERR_DEADSESSION will be returned from that operation.
+      </t>
+    </section>
+  </section>
+

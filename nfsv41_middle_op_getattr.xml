@@ -1,0 +1,92 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_GETATTR" title="Operation 9: GETATTR - Get Attributes">
+    <section toc='exclude' anchor="ss:op_GETATTR:A" title="ARGUMENT">
+      <?rfc include='autogen/getattr_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_GETATTR:R" title="RESULT">
+      <?rfc include='autogen/getattr_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_GETATTR:D" title="DESCRIPTION">
+      <t>
+        The GETATTR operation will obtain attributes for the file system
+        object specified by the current filehandle.  The client sets a bit in
+        the bitmap argument for each attribute value that it would like the
+        server to return.  The server returns an attribute bitmap that
+        indicates the attribute values that it was able to return, which will
+        include all attributes requested by the client that are attributes
+        supported by the server for the target file system.  This bitmap is
+        followed by the attribute values ordered lowest attribute number
+        first.
+      </t>
+
+      <t>
+        The server MUST return a value for each attribute that the client
+        requests if the attribute is supported by the server for the target
+        file system.  If the server does not support a particular attribute
+        on the target file system, then it MUST NOT return the attribute
+        value and MUST NOT set the attribute bit in the result bitmap.  The
+        server MUST return an error if it supports an attribute on the target
+        but cannot obtain its value.  In that case, no attribute values will
+        be returned.
+      </t>
+
+      <t>
+        File systems that are absent should be treated as having support for
+        a very small set of attributes as described in <xref target="ss:multi-server_namespace:GwaAFS" />, even
+        if previously, when the file system was present, more attributes were
+        supported.
+      </t>
+
+      <t>
+        All servers MUST support the REQUIRED attributes as specified in
+        <xref target="ss:file_attributes:RALaDR" />, for all file systems, with the exception of absent file
+        systems.
+      </t>
+
+      <t>
+        On success, the current filehandle retains its value.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_GETATTR:I" title="IMPLEMENTATION">
+      <t>
+        Suppose there is an OPEN_DELEGATE_WRITE delegation held by another
+        client for the file in question and size and/or change are among the
+        set of attributes being interrogated.  The server has two choices.
+        First, the server can obtain the actual current value of these
+        attributes from the client holding the delegation by using the
+        CB_GETATTR callback.  Second, the server, particularly when the
+        delegated client is unresponsive, can recall the delegation in
+        question.  The GETATTR MUST NOT proceed until one of the following
+        occurs:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            The requested attribute values are returned in the response to
+            CB_GETATTR.
+          </t>
+
+          <t>
+            The OPEN_DELEGATE_WRITE delegation is returned.
+          </t>
+
+          <t>
+            The OPEN_DELEGATE_WRITE delegation is revoked.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        Unless one of the above happens very quickly, one or more
+        NFS4ERR_DELAY errors will be returned while a delegation is
+        outstanding.
+      </t>
+    </section>
+  </section>
+

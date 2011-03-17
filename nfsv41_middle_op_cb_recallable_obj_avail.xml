@@ -1,0 +1,46 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_CB_RECALLABLE_OBJ_AVAIL" title="Operation 9: CB_RECALLABLE_OBJ_AVAIL - Signal Resources for Recallable Objects">
+    <section toc='exclude' anchor="ss:op_CB_RECALLABLE_OBJ_AVAIL:A" title="ARGUMENT">
+      <?rfc include='autogen/cb_recallable_obj_avail_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_RECALLABLE_OBJ_AVAIL:R" title="RESULT">
+      <?rfc include='autogen/cb_recallable_obj_avail_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_RECALLABLE_OBJ_AVAIL:D" title="DESCRIPTION">
+      <t>
+        CB_RECALLABLE_OBJ_AVAIL is used by the server to signal the client
+        that the server has resources to grant recallable objects that might
+        previously have been denied by OPEN, WANT_DELEGATION, GET_DIR_DELEG,
+        or LAYOUTGET.
+      </t>
+
+      <t>
+        The argument craa_objects_to_keep means the total number of
+        recallable objects of the types indicated in the argument type_mask
+        that the server believes it can allow the client to have, including
+        the number of such objects the client already has.  A client that
+        tries to acquire more recallable objects than the server informs it
+        can have runs the risk of having objects recalled.
+      </t>
+
+      <t>
+        The server is not obligated to reserve the difference between the
+        number of the objects the client currently has and the value of
+        craa_objects_to_keep, nor does delaying the reply to
+        CB_RECALLABLE_OBJ_AVAIL prevent the server from using the resources
+        of the recallable objects for another purpose.  Indeed, if a client
+        responds slowly to CB_RECALLABLE_OBJ_AVAIL, the server might
+        interpret the client as having reduced capability to manage
+        recallable objects, and so cancel or reduce any reservation it is
+        maintaining on behalf of the client.  Thus, if the client desires to
+        acquire more recallable objects, it needs to reply quickly to
+        CB_RECALLABLE_OBJ_AVAIL, and then send the appropriate operations to
+        acquire recallable objects.
+      </t>
+    </section>
+  </section>
+

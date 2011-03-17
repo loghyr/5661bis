@@ -1,0 +1,45 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_BACKCHANNEL_CTL" title="Operation 40: BACKCHANNEL_CTL - Backchannel Control">
+    <section toc='exclude' anchor="ss:op_BACKCHANNEL_CTL:A" title="ARGUMENT">
+      <?rfc include='autogen/backchannel_ctl_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_BACKCHANNEL_CTL:R" title="RESULT">
+      <?rfc include='autogen/backchannel_ctl_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_BACKCHANNEL_CTL:D" title="DESCRIPTION">
+      <t>
+        The BACKCHANNEL_CTL operation replaces the backchannel's callback
+        program number and adds (not replaces) RPCSEC_GSS handles for use by
+        the backchannel.
+      </t>
+
+      <t>
+        The arguments of the BACKCHANNEL_CTL call are a subset of the
+        CREATE_SESSION parameters.  In the arguments of BACKCHANNEL_CTL, the
+        bca_cb_program field and bca_sec_parms fields correspond respectively
+        to the csa_cb_program and csa_sec_parms fields of the arguments of
+        CREATE_SESSION (<xref target="op_CREATE_SESSION" />).
+      </t>
+
+      <t>
+        BACKCHANNEL_CTL MUST appear in a COMPOUND that starts with SEQUENCE.
+      </t>
+
+      <t>
+        If the RPCSEC_GSS handle identified by gcbp_handle_from_server does
+        not exist on the server, the server MUST return NFS4ERR_NOENT.
+      </t>
+
+      <t>
+        If an RPCSEC_GSS handle is using the SSV context (see
+        <xref target="ss:core_infrastructure:TSSVGM" />), then because each SSV RPCSEC_GSS handle shares a
+        common SSV GSS context, there are security considerations specific to
+        this situation discussed in <xref target="ss:core_infrastructure:SCfRWUtSM" />.
+      </t>
+    </section>
+  </section>
+

@@ -1,0 +1,36 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_DELEGRETURN" title="Operation 8: DELEGRETURN - Return Delegation">
+    <section toc='exclude' anchor="ss:op_DELEGRETURN:A" title="ARGUMENT">
+      <?rfc include='autogen/delegreturn_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_DELEGRETURN:R" title="RESULT">
+      <?rfc include='autogen/delegreturn_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_DELEGRETURN:D" title="DESCRIPTION">
+      <t>
+        The DELEGRETURN operation returns the delegation represented by the
+        current filehandle and stateid.
+      </t>
+
+      <t>
+        Delegations may be returned voluntarily (i.e., before the server has
+        recalled them) or when recalled.  In either case, the client must
+        properly propagate state changed under the context of the delegation
+        to the server before returning the delegation.
+      </t>
+
+      <t>
+        The server MAY require that the principal, security flavor, and if
+        applicable, the GSS mechanism, combination that acquired the
+        delegation also be the one to send DELEGRETURN on the file.  This
+        might not be possible if credentials for the principal are no longer
+        available.  The server MAY allow the machine credential or SSV
+        credential (see <xref target="op_EXCHANGE_ID" />) to send DELEGRETURN.
+      </t>
+    </section>
+  </section>
+

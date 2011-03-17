@@ -1,0 +1,202 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_LAYOUTRETURN" title="Operation 51: LAYOUTRETURN - Release Layout Information">
+    <section toc='exclude' anchor="ss:op_LAYOUTRETURN:A" title="ARGUMENT">
+      <?rfc include='autogen/type_layoutreturn4.xml'?>
+      <?rfc include='autogen/layoutreturn_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LAYOUTRETURN:R" title="RESULT">
+      <?rfc include='autogen/layoutreturn_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LAYOUTRETURN:D" title="DESCRIPTION">
+      <t>
+        This operation returns from the client to the server one or more
+        layouts represented by the client ID (derived from the session ID in
+        the preceding SEQUENCE operation), lora_layout_type, and lora_iomode.
+        When lr_returntype is LAYOUTRETURN4_FILE, the returned layout is
+        further identified by the current filehandle, lrf_offset, lrf_length,
+        and lrf_stateid.  If the lrf_length field is NFS4_UINT64_MAX, all
+        bytes of the layout, starting at lrf_offset, are returned.  When
+        lr_returntype is LAYOUTRETURN4_FSID, the current filehandle is used
+        to identify the file system and all layouts matching the client ID,
+        the fsid of the file system, lora_layout_type, and lora_iomode are
+        returned.  When lr_returntype is LAYOUTRETURN4_ALL, all layouts
+        matching the client ID, lora_layout_type, and lora_iomode are
+        returned and the current filehandle is not used.  After this call,
+        the client MUST NOT use the returned layout(s) and the associated
+        storage protocol to access the file data.
+      </t>
+
+      <t>
+        If the set of layouts designated in the case of LAYOUTRETURN4_FSID or
+        LAYOUTRETURN4_ALL is empty, then no error results.  In the case of
+        LAYOUTRETURN4_FILE, the byte-range specified is returned even if it
+        is a subdivision of a layout previously obtained with LAYOUTGET, a
+        combination of multiple layouts previously obtained with LAYOUTGET,
+        or a combination including some layouts previously obtained with
+        LAYOUTGET, and one or more subdivisions of such layouts.  When the
+        byte-range does not designate any bytes for which a layout is held
+        for the specified file, client ID, layout type and mode, no error
+        results.  See <xref target="ss:parallel_nfs:BRaR" /> for considerations with "bulk"
+        return of layouts.
+      </t>
+
+      <t>
+        The layout being returned may be a subset or superset of a layout
+        specified by CB_LAYOUTRECALL.  However, if it is a subset, the recall
+        is not complete until the full recalled scope has been returned.
+        Recalled scope refers to the byte-range in the case of
+        LAYOUTRETURN4_FILE, the use of LAYOUTRETURN4_FSID, or the use of
+        LAYOUTRETURN4_ALL.  There must be a LAYOUTRETURN with a matching
+        scope to complete the return even if all current layout ranges have
+        been previously individually returned.
+      </t>
+
+      <t>
+        For all lr_returntype values, an iomode of LAYOUTIOMODE4_ANY
+        specifies that all layouts that match the other arguments to
+        LAYOUTRETURN (i.e., client ID, lora_layout_type, and one of current
+        filehandle and range; fsid derived from current filehandle; or
+        LAYOUTRETURN4_ALL) are being returned.
+      </t>
+
+      <t>
+        In the case that lr_returntype is LAYOUTRETURN4_FILE, the lrf_stateid
+        provided by the client is a layout stateid as returned from previous
+        layout operations.  Note that the "seqid" field of lrf_stateid MUST
+        NOT be zero.  See Sections <xref target="ss:state_management:SD" format='counter' />,
+        <xref target="ss:parallel_nfs:LS1" format='counter' />,
+        and <xref target="ss:parallel_nfs:SoLO" format='counter' /> for a further
+        discussion and requirements.
+      </t>
+
+      <t>
+        Return of a layout or all layouts does not invalidate the mapping of
+        storage device ID to a storage device address.  The mapping remains
+        in effect until specifically changed or deleted via device ID
+        notification callbacks.  Of course if there are no remaining layouts
+        that refer to a previously used device ID, the server is free to
+        delete a device ID without a notification callback, which will be the
+        case when notifications are not in effect.
+      </t>
+
+      <t>
+        If the lora_reclaim field is set to TRUE, the client is attempting to
+        return a layout that was acquired before the restart of the metadata
+        server during the metadata server's grace period.  When returning
+        layouts that were acquired during the metadata server's grace period,
+        the client MUST set the lora_reclaim field to FALSE.  The
+        lora_reclaim field MUST be set to FALSE also when lr_layoutreturn is
+        LAYOUTRETURN4_FSID or LAYOUTRETURN4_ALL.  See LAYOUTCOMMIT
+        (<xref target="op_LAYOUTCOMMIT" />) for more details.
+      </t>
+
+      <t>
+        Layouts may be returned when recalled or voluntarily (i.e., before
+        the server has recalled them).  In either case, the client must
+        properly propagate state changed under the context of the layout to
+        the storage device(s) or to the metadata server before returning the
+        layout.
+      </t>
+
+      <t>
+        If the client returns the layout in response to a CB_LAYOUTRECALL
+        where the lor_recalltype field of the clora_recall field was
+        LAYOUTRECALL4_FILE, the client should use the lor_stateid value from
+        CB_LAYOUTRECALL as the value for lrf_stateid.  Otherwise, it should
+        use logr_stateid (from a previous LAYOUTGET result) or lorr_stateid
+        (from a previous LAYRETURN result).  This is done to indicate the
+        point in time (in terms of layout stateid transitions) when the
+        recall was sent.  The client uses the precise lora_recallstateid
+        value and MUST NOT set the stateid's seqid to zero; otherwise,
+        NFS4ERR_BAD_STATEID MUST be returned.  NFS4ERR_OLD_STATEID can be
+        returned if the client is using an old seqid, and the server knows
+        the client should not be using the old seqid.  For example, the
+        client uses the seqid on slot 1 of the session, receives the response
+        with the new seqid, and uses the slot to send another request with
+        the old seqid.
+      </t>
+
+      <t>
+        If a client fails to return a layout in a timely manner, then the
+        metadata server SHOULD use its control protocol with the storage
+        devices to fence the client from accessing the data referenced by the
+        layout.  See <xref target="ss:parallel_nfs:RL" /> for more details.
+      </t>
+
+      <t>
+        If the LAYOUTRETURN request sets the lora_reclaim field to TRUE after
+        the metadata server's grace period, NFS4ERR_NO_GRACE is returned.
+      </t>
+
+      <t>
+        If the LAYOUTRETURN request sets the lora_reclaim field to TRUE and
+        lr_returntype is set to LAYOUTRETURN4_FSID or LAYOUTRETURN4_ALL,
+        NFS4ERR_INVAL is returned.
+      </t>
+
+      <t>
+        If the client sets the lr_returntype field to LAYOUTRETURN4_FILE,
+        then the lrs_stateid field will represent the layout stateid as
+        updated for this operation's processing; the current stateid will
+        also be updated to match the returned value.  If the last byte of any
+        layout for the current file, client ID, and layout type is being
+        returned and there are no remaining pending CB_LAYOUTRECALL
+        operations for which a LAYOUTRETURN operation must be done,
+        lrs_present MUST be FALSE, and no stateid will be returned.  In
+        addition, the COMPOUND request's current stateid will be set to the
+        all-zeroes special stateid (see <xref target="ss:proc_COMPOUND:CS" />).  The server MUST
+        reject with NFS4ERR_BAD_STATEID any further use of the current
+        stateid in that COMPOUND until the current stateid is re-established
+        by a later stateid-returning operation.
+      </t>
+
+      <t>
+        On success, the current filehandle retains its value.
+      </t>
+
+      <t>
+        If the EXCHGID4_FLAG_BIND_PRINC_STATEID capability is set on the
+        client ID (see <xref target="op_EXCHANGE_ID" />), the server will require that the
+        principal, security flavor, and if applicable, the GSS mechanism,
+        combination that acquired the layout also be the one to send
+        LAYOUTRETURN.  This might not be possible if credentials for the
+        principal are no longer available.  The server will allow the machine
+        credential or SSV credential (see <xref target="op_EXCHANGE_ID" />) to send LAYOUTRETURN
+        if LAYOUTRETURN's operation code was set in the spo_must_allow result
+        of EXCHANGE_ID.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LAYOUTRETURN:I" title="IMPLEMENTATION">
+      <t>
+        The final LAYOUTRETURN operation in response to a CB_LAYOUTRECALL
+        callback MUST be serialized with any outstanding, intersecting
+        LAYOUTRETURN operations.  Note that it is possible that while a
+        client is returning the layout for some recalled range, the server
+        may recall a superset of that range (e.g., LAYOUTRECALL4_ALL); the
+        final return operation for the latter must block until the former
+        layout recall is done.
+      </t>
+
+      <t>
+        Returning all layouts in a file system using LAYOUTRETURN4_FSID is
+        typically done in response to a CB_LAYOUTRECALL for that file system
+        as the final return operation.  Similarly, LAYOUTRETURN4_ALL is used
+        in response to a recall callback for all layouts.  It is possible
+        that the client already returned some outstanding layouts via
+        individual LAYOUTRETURN calls and the call for LAYOUTRETURN4_FSID or
+        LAYOUTRETURN4_ALL marks the end of the LAYOUTRETURN sequence.  See
+        <xref target="ss:parallel_nfs:LRCR" /> for more details.
+      </t>
+
+      <t>
+        Once the client has returned all layouts referring to a particular
+        device ID, the server MAY delete the device ID.
+      </t>
+    </section>
+  </section>
+

@@ -1,0 +1,45 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_DESTROY_CLIENTID" title="Operation 57: DESTROY_CLIENTID - Destroy a Client ID">
+    <section toc='exclude' anchor="ss:op_DESTROY_CLIENTID:A" title="ARGUMENT">
+      <?rfc include='autogen/destroy_clientid_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_DESTROY_CLIENTID:R" title="RESULT">
+      <?rfc include='autogen/destroy_clientid_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_DESTROY_CLIENTID:D" title="DESCRIPTION">
+      <t>
+        The DESTROY_CLIENTID operation destroys the client ID.  If there are
+        sessions (both idle and non-idle), opens, locks, delegations,
+        layouts, and/or wants (<xref target="op_WANT_DELEGATION" />) associated with the unexpired
+        lease of the client ID, the server MUST return NFS4ERR_CLIENTID_BUSY.
+        DESTROY_CLIENTID MAY be preceded with a SEQUENCE operation as long as
+        the client ID derived from the session ID of SEQUENCE is not the same
+        as the client ID to be destroyed.  If the client IDs are the same,
+        then the server MUST return NFS4ERR_CLIENTID_BUSY.
+      </t>
+
+      <t>
+        If DESTROY_CLIENTID is not prefixed by SEQUENCE, it MUST be the only
+        operation in the COMPOUND request (otherwise, the server MUST return
+        NFS4ERR_NOT_ONLY_OP).  If the operation is sent without a SEQUENCE
+        preceding it, a client that retransmits the request may receive an
+        error in response, because the original request might have been
+        successfully executed.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_DESTROY_CLIENTID:I" title="IMPLEMENTATION">
+      <t>
+        DESTROY_CLIENTID allows a server to immediately reclaim the resources
+        consumed by an unused client ID, and also to forget that it ever
+        generated the client ID.  By forgetting that it ever generated the
+        client ID, the server can safely reuse the client ID on a future
+        EXCHANGE_ID operation.
+      </t>
+    </section>
+  </section>
+

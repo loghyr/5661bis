@@ -1,0 +1,847 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_OPEN" title="Operation 18: OPEN - Open a Regular File">
+    <section toc='exclude' anchor="ss:op_OPEN:A" title="ARGUMENT">
+      <?rfc include='autogen/open_args_gen.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_OPEN:R" title="RESULT">
+      <?rfc include='autogen/open_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_OPEN:D" title="DESCRIPTION">
+      <t>
+        The OPEN operation opens a regular file in a directory with the
+        provided name or filehandle.  OPEN can also create a file if a name
+        is provided, and the client specifies it wants to create a file.
+        Specification of whether or not a file is to be created, and the
+        method of creation is via the openhow parameter.  The openhow
+        parameter consists of a switched union (data type opengflag4), which
+        switches on the value of opentype (OPEN4_NOCREATE or OPEN4_CREATE).
+        If OPEN4_CREATE is specified, this leads to another switched union
+        (data type createhow4) that supports four cases of creation methods:
+        UNCHECKED4, GUARDED4, EXCLUSIVE4, or EXCLUSIVE4_1.  If opentype is
+        OPEN4_CREATE, then the claim field of the claim field MUST be one of
+        CLAIM_NULL, CLAIM_DELEGATE_CUR, or CLAIM_DELEGATE_PREV, because these
+        claim methods include a component of a file name.
+      </t>
+
+      <t>
+        Upon success (which might entail creation of a new file), the current
+        filehandle is replaced by that of the created or existing object.
+      </t>
+
+      <t>
+        If the current filehandle is a named attribute directory, OPEN will
+        then create or open a named attribute file.  Note that exclusive
+        create of a named attribute is not supported.  If the createmode is
+        EXCLUSIVE4 or EXCLUSIVE4_1 and the current filehandle is a named
+        attribute directory, the server will return EINVAL.
+      </t>
+
+      <t>
+        UNCHECKED4 means that the file should be created if a file of that
+        name does not exist and encountering an existing regular file of that
+        name is not an error.  For this type of create, createattrs specifies
+        the initial set of attributes for the file.  The set of attributes
+        may include any writable attribute valid for regular files.  When an
+        UNCHECKED4 create encounters an existing file, the attributes
+        specified by createattrs are not used, except that when createattrs
+        specifies the size attribute with a size of zero, the existing file
+        is truncated.
+      </t>
+
+      <t>
+        If GUARDED4 is specified, the server checks for the presence of a
+        duplicate object by name before performing the create.  If a
+        duplicate exists, NFS4ERR_EXIST is returned.  If the object does not
+        exist, the request is performed as described for UNCHECKED4.
+      </t>
+
+      <t>
+        For the UNCHECKED4 and GUARDED4 cases, where the operation is
+        successful, the server will return to the client an attribute mask
+        signifying which attributes were successfully set for the object.
+      </t>
+
+      <t>
+        EXCLUSIVE4_1 and EXCLUSIVE4 specify that the server is to follow
+        exclusive creation semantics, using the verifier to ensure exclusive
+        creation of the target.  The server should check for the presence of
+        a duplicate object by name.  If the object does not exist, the server
+        creates the object and stores the verifier with the object.  If the
+        object does exist and the stored verifier matches the client provided
+        verifier, the server uses the existing object as the newly created
+        object.  If the stored verifier does not match, then an error of
+        NFS4ERR_EXIST is returned.
+      </t>
+
+      <t>
+        If using EXCLUSIVE4, and if the server uses attributes to store the
+        exclusive create verifier, the server will signify which attributes
+        it used by setting the appropriate bits in the attribute mask that is
+        returned in the results.  Unlike UNCHECKED4, GUARDED4, and
+        EXCLUSIVE4_1, EXCLUSIVE4 does not support the setting of attributes
+        at file creation, and after a successful OPEN via EXCLUSIVE4, the
+        client MUST send a SETATTR to set attributes to a known state.
+      </t>
+
+      <t>
+        In NFSv4.1, EXCLUSIVE4 has been deprecated in favor of EXCLUSIVE4_1.
+        Unlike EXCLUSIVE4, attributes may be provided in the EXCLUSIVE4_1
+        case, but because the server may use attributes of the target object
+        to store the verifier, the set of allowable attributes may be fewer
+        than the set of attributes SETATTR allows.  The allowable attributes
+        for EXCLUSIVE4_1 are indicated in the suppattr_exclcreat
+        (<xref target="ss:file_attributes:A7s" />) attribute.  If the client attempts to set in
+        cva_attrs an attribute that is not in suppattr_exclcreat, the server
+        MUST return NFS4ERR_INVAL.  The response field, attrset, indicates
+        both which attributes the server set from cva_attrs and which
+        attributes the server used to store the verifier.  As described in
+        <xref target="ss:op_OPEN:I" />, the client can compare cva_attrs.attrmask with
+        attrset to determine which attributes were used to store the
+        verifier.
+      </t>
+
+      <t>
+        With the addition of persistent sessions and pNFS, under some
+        conditions EXCLUSIVE4 MUST NOT be used by the client or supported by
+        the server.  The following table summarizes the appropriate and
+        mandated exclusive create methods for implementations of NFSv4.1:
+      </t>
+
+      <texttable anchor='tbl:exclusive_create'>
+        <preamble>Required methods for exclusive create</preamble>
+        <ttcol>Persistent Reply Cache Enabled</ttcol>
+        <ttcol>Server Supports pNFS</ttcol>
+        <ttcol>Server REQUIRED</ttcol>
+        <ttcol>Client Allowed</ttcol>
+        <c>no </c> <c>no </c> <c>EXCLUSIVE4_1 and EXCLUSIVE4</c> <c>EXCLUSIVE4_1 (SHOULD) or EXCLUSIVE4 (SHOULD NOT)</c>
+        <c>no </c> <c>yes</c> <c>EXCLUSIVE4_1</c> <c>EXCLUSIVE4_1</c>
+        <c>yes</c> <c>no </c> <c>GUARDED4    </c> <c>GUARDED4    </c>
+        <c>yes</c> <c>yes</c> <c>GUARDED4    </c> <c>GUARDED4    </c>
+      </texttable>
+
+      <t>
+        If CREATE_SESSION4_FLAG_PERSIST is set in the results of
+        CREATE_SESSION, the reply cache is persistent (see <xref target="op_CREATE_SESSION" />).
+        If the EXCHGID4_FLAG_USE_PNFS_MDS flag is set in the results from
+        EXCHANGE_ID, the server is a pNFS server (see <xref target="op_EXCHANGE_ID" />).  If the
+        client attempts to use EXCLUSIVE4 on a persistent session, or a
+        session derived from an EXCHGID4_FLAG_USE_PNFS_MDS client ID, the
+        server MUST return NFS4ERR_INVAL.
+      </t>
+
+      <t>
+        With persistent sessions, exclusive create semantics are fully
+        achievable via GUARDED4, and so EXCLUSIVE4 or EXCLUSIVE4_1 MUST NOT
+        be used.  When pNFS is being used, the layout_hint attribute might
+        not be supported after the file is created.  Only the EXCLUSIVE4_1
+        and GUARDED methods of exclusive file creation allow the atomic
+        setting of attributes.
+      </t>
+
+      <t>
+        For the target directory, the server returns change_info4 information
+        in cinfo.  With the atomic field of the change_info4 data type, the
+        server will indicate if the before and after change attributes were
+        obtained atomically with respect to the link creation.
+      </t>
+
+      <t>
+        The OPEN operation provides for Windows share reservation capability
+        with the use of the share_access and share_deny fields of the OPEN
+        arguments.  The client specifies at OPEN the required share_access
+        and share_deny modes.  For clients that do not directly support
+        SHAREs (i.e., UNIX), the expected deny value is
+        OPEN4_SHARE_DENY_NONE.  In the case that there is an existing SHARE
+        reservation that conflicts with the OPEN request, the server returns
+        the error NFS4ERR_SHARE_DENIED.  For additional discussion of SHARE
+        semantics, see <xref target="ss:file_locking:SR" />.
+      </t>
+
+      <t>
+        For each OPEN, the client provides a value for the owner field of the
+        OPEN argument.  The owner field is of data type open_owner4, and
+        contains a field called clientid and a field called owner.  The
+        client can set the clientid field to any value and the server MUST
+        ignore it.  Instead, the server MUST derive the client ID from the
+        session ID of the SEQUENCE operation of the COMPOUND request.
+      </t>
+
+      <t>
+        The "seqid" field of the request is not used in NFSv4.1, but it MAY
+        be any value and the server MUST ignore it.
+      </t>
+
+      <t>
+        In the case that the client is recovering state from a server
+        failure, the claim field of the OPEN argument is used to signify that
+        the request is meant to reclaim state previously held.
+      </t>
+
+      <t>
+        The "claim" field of the OPEN argument is used to specify the file to
+        be opened and the state information that the client claims to
+        possess.  There are seven claim types as follows:
+      </t>
+
+      <texttable>
+        <ttcol>open type</ttcol>
+        <ttcol>description</ttcol>
+        <c>CLAIM_NULL, CLAIM_FH</c>
+        <c>
+	        For the client, this is a new OPEN request and there is
+	        no previous state associated with the file for the client.
+	        With CLAIM_NULL, the file is identified by the current
+	        filehandle and the specified component name.  With CLAIM_FH
+	        (new to NFSv4.1), the file is identified by just the
+	        current filehandle.
+        </c>
+
+        <c>CLAIM_PREVIOUS</c>
+        <c>
+	        The client is claiming basic OPEN state for a file that
+	        was held previous to a server restart.  Generally used
+	        when a server is returning persistent filehandles; the
+	        client may not have the file name to reclaim the OPEN.
+        </c>
+
+        <c>CLAIM_DELEGATE_CUR, CLAIM_DELEG_CUR_FH</c>
+        <c>
+	        The client is claiming a delegation for OPEN as granted
+	        by the server.  Generally, this is done as part of recalling
+	        a delegation.  With CLAIM_DELEGATE_CUR, the file is
+	        identified by the current filehandle and the specified
+	        component name.  With CLAIM_DELEG_CUR_FH (new to NFSv4.1),
+	        the file is identified by just the current filehandle.
+        </c>
+
+        <c>CLAIM_DELEGATE_PREV, CLAIM_DELEG_PREV_FH</c>
+        <c>
+	        The client is claiming a delegation granted to a previous
+	        client instance; used after the client restarts.  The
+	        server MAY support CLAIM_DELEGATE_PREV and/or CLAIM_DELEG_PREV_FH
+	        (new to NFSv4.1).  If it does support either claim type,
+	        CREATE_SESSION MUST NOT remove the client's delegation
+	        state, and the server MUST support the DELEGPURGE
+	        operation.
+        </c>
+      </texttable>
+
+      <t>
+        For OPEN requests that reach the server during the grace period, the
+        server returns an error of NFS4ERR_GRACE.  The following claim types
+        are exceptions:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            OPEN requests specifying the claim type CLAIM_PREVIOUS are devoted
+            to reclaiming opens after a server restart and are typically only
+            valid during the grace period.
+          </t>
+
+          <t>
+            OPEN requests specifying the claim types CLAIM_DELEGATE_CUR and
+            CLAIM_DELEG_CUR_FH are valid both during and after the grace
+            period.  Since the granting of the delegation that they are
+            subordinate to assures that there is no conflict with locks to be
+            reclaimed by other clients, the server need not return
+            NFS4ERR_GRACE when these are received during the grace period.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        For any OPEN request, the server may return an OPEN delegation, which
+        allows further opens and closes to be handled locally on the client
+        as described in <xref target="ss:client-side_caching:OD" />.  Note that delegation is up to the
+        server to decide.  The client should never assume that delegation
+        will or will not be granted in a particular instance.  It should
+        always be prepared for either case.  A partial exception is the
+        reclaim (CLAIM_PREVIOUS) case, in which a delegation type is claimed.
+        In this case, delegation will always be granted, although the server
+        may specify an immediate recall in the delegation structure.
+      </t>
+
+      <t>
+        The rflags returned by a successful OPEN allow the server to return
+        information governing how the open file is to be handled.
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+             OPEN4_RESULT_CONFIRM is deprecated and MUST NOT be returned by an
+             NFSv4.1 server.
+          </t>
+
+          <t>
+             OPEN4_RESULT_LOCKTYPE_POSIX indicates that the server's byte-range
+             locking behavior supports the complete set of POSIX locking
+             techniques <xref target="openg_fcntl" />.  From this, the
+             client can choose to manage byte-range locking state in a way
+             to handle a mismatch of byte-range locking management.
+          </t>
+
+          <t>
+             OPEN4_RESULT_PRESERVE_UNLINKED indicates that the server will
+             preserve the open file if the client (or any other client) removes
+             the file as long as it is open.  Furthermore, the server promises
+             to preserve the file through the grace period after server
+             restart, thereby giving the client the opportunity to reclaim its
+             open.
+          </t>
+
+          <t>
+             OPEN4_RESULT_MAY_NOTIFY_LOCK indicates that the server may attempt
+             CB_NOTIFY_LOCK callbacks for locks on this file.  This flag is a
+             hint only, and may be safely ignored by the client.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        If the component is of zero length, NFS4ERR_INVAL will be returned.
+        The component is also subject to the normal UTF-8, character support,
+        and name checks.  See <xref target="ss:internationalization:URE" /> for further discussion.
+      </t>
+
+      <t>
+        When an OPEN is done and the specified open-owner already has the
+        resulting filehandle open, the result is to "OR" together the new
+        share and deny status together with the existing status.  In this
+        case, only a single CLOSE need be done, even though multiple OPENs
+        were completed.  When such an OPEN is done, checking of share
+        reservations for the new OPEN proceeds normally, with no exception
+        for the existing OPEN held by the same open-owner.  In this case, the
+        stateid returned as an "other" field that matches that of the
+        previous open while the "seqid" field is incremented to reflect the
+        change status due to the new open.
+      </t>
+
+      <t>
+        If the underlying file system at the server is only accessible
+        in a read-only mode and the OPEN request has specified ACCESS_WRITE
+        or ACCESS_BOTH, the server will return NFS4ERR_ROFS to indicate
+        a read-only file system.
+      </t>
+
+      <t>
+        As with the CREATE operation, the server MUST derive the owner, owner
+        ACE, group, or group ACE if any of the four attributes are required
+        and supported by the server's file system.  For an OPEN with the
+        EXCLUSIVE4 createmode, the server has no choice, since such OPEN
+        calls do not include the createattrs field.  Conversely, if
+        createattrs (UNCHECKED4 or GUARDED4) or cva_attrs (EXCLUSIVE4_1) is
+        specified, and includes an owner, owner_group, or ACE that the
+        principal in the RPC call's credentials does not have authorization
+        to create files for, then the server may return NFS4ERR_PERM.
+      </t>
+
+      <t>
+        In the case of an OPEN that specifies a size of zero (e.g.,
+        truncation) and the file has named attributes, the named attributes
+        are left as is and are not removed.
+      </t>
+
+      <t>
+        NFSv4.1 gives more precise control to clients over acquisition of
+        delegations via the following new flags for the share_access field of
+        OPEN4args:
+      </t>
+
+      <t>
+        <list style='hanging'>
+          <t hangText='OPEN4_SHARE_ACCESS_WANT_READ_DELEG' />
+
+          <t hangText='OPEN4_SHARE_ACCESS_WANT_WRITE_DELEG' />
+
+          <t hangText='OPEN4_SHARE_ACCESS_WANT_ANY_DELEG' />
+
+          <t hangText='OPEN4_SHARE_ACCESS_WANT_NO_DELEG' />
+
+          <t hangText='OPEN4_SHARE_ACCESS_WANT_CANCEL' />
+
+          <t hangText='OPEN4_SHARE_ACCESS_WANT_SIGNAL_DELEG_WHEN_RESRC_AVAIL' />
+
+          <t hangText='OPEN4_SHARE_ACCESS_WANT_PUSH_DELEG_WHEN_UNCONTENDED' />
+        </list>
+      </t>
+
+      <t>
+        If (share_access &amp; OPEN4_SHARE_ACCESS_WANT_DELEG_MASK) is not zero,
+        then the client will have specified one and only one of:
+      </t>
+
+      <t>
+        <list style='hanging'>
+          <t hangText='OPEN4_SHARE_ACCESS_WANT_READ_DELEG' />
+
+          <t hangText='OPEN4_SHARE_ACCESS_WANT_WRITE_DELEG' />
+
+          <t hangText='OPEN4_SHARE_ACCESS_WANT_ANY_DELEG' />
+
+          <t hangText='OPEN4_SHARE_ACCESS_WANT_NO_DELEG' />
+
+          <t hangText='OPEN4_SHARE_ACCESS_WANT_CANCEL' />
+        </list>
+      </t>
+
+      <t>
+        Otherwise, the client is neither indicating a desire nor a non-desire
+        for a delegation, and the server MAY or MAY not return a delegation
+        in the OPEN response.
+      </t>
+
+      <t>
+        If the server supports the new _WANT_ flags and the client sends one
+        or more of the new flags, then in the event the server does not
+        return a delegation, it MUST return a delegation type of
+        OPEN_DELEGATE_NONE_EXT.  The field ond_why in the reply indicates why
+        no delegation was returned and will be one of:
+      </t>
+
+      <t>
+        <list style='hanging'>
+          <t hangText='WND4_NOT_WANTED'>
+            The client specified OPEN4_SHARE_ACCESS_WANT_NO_DELEG.
+          </t>
+
+          <t hangText='WND4_CONTENTION'>
+            There is a conflicting delegation or open on the file.
+          </t>
+
+          <t hangText='WND4_RESOURCE'>
+            Resource limitations prevent the server from granting
+            a delegation.
+          </t>
+
+          <t hangText='WND4_NOT_SUPP_FTYPE'>
+            The server does not support delegations on this file type.
+          </t>
+
+          <t hangText='WND4_WRITE_DELEG_NOT_SUPP_FTYPE'>
+            The server does not support
+            OPEN_DELEGATE_WRITE delegations on this file type.
+          </t>
+
+          <t hangText='WND4_NOT_SUPP_UPGRADE'>
+            The server does not support atomic upgrade of
+            an OPEN_DELEGATE_READ delegation to an OPEN_DELEGATE_WRITE
+            delegation.
+          </t>
+
+          <t hangText='WND4_NOT_SUPP_DOWNGRADE'>
+            The server does not support atomic downgrade
+            of an OPEN_DELEGATE_WRITE delegation to an OPEN_DELEGATE_READ
+            delegation.
+          </t>
+
+          <t hangText='WND4_CANCELED'>
+            The client specified OPEN4_SHARE_ACCESS_WANT_CANCEL
+            and now any "want" for this file object is cancelled.
+          </t>
+
+          <t hangText='WND4_IS_DIR'>
+            The specified file object is a directory, and the
+            operation is OPEN or WANT_DELEGATION, which do not support
+            delegations on directories.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        OPEN4_SHARE_ACCESS_WANT_READ_DELEG,
+        OPEN_SHARE_ACCESS_WANT_WRITE_DELEG, or
+        OPEN_SHARE_ACCESS_WANT_ANY_DELEG mean, respectively, the client wants
+        an OPEN_DELEGATE_READ, OPEN_DELEGATE_WRITE, or any delegation
+        regardless which of OPEN4_SHARE_ACCESS_READ,
+        OPEN4_SHARE_ACCESS_WRITE, or OPEN4_SHARE_ACCESS_BOTH is set.  If the
+        client has an OPEN_DELEGATE_READ delegation on a file and requests an
+        OPEN_DELEGATE_WRITE delegation, then the client is requesting atomic
+        upgrade of its OPEN_DELEGATE_READ delegation to an
+        OPEN_DELEGATE_WRITE delegation.  If the client has an
+        OPEN_DELEGATE_WRITE delegation on a file and requests an
+        OPEN_DELEGATE_READ delegation, then the client is requesting atomic
+        downgrade to an OPEN_DELEGATE_READ delegation.  A server MAY support
+        atomic upgrade or downgrade.  If it does, then the returned
+        delegation_type of OPEN_DELEGATE_READ or OPEN_DELEGATE_WRITE that is
+        different from the delegation type the client currently has,
+        indicates successful upgrade or downgrade.  If the server does not
+        support atomic delegation upgrade or downgrade, then ond_why will be
+        set to WND4_NOT_SUPP_UPGRADE or WND4_NOT_SUPP_DOWNGRADE.
+      </t>
+
+      <t>
+        OPEN4_SHARE_ACCESS_WANT_NO_DELEG means that the client wants no
+        delegation.
+      </t>
+
+      <t>
+        OPEN4_SHARE_ACCESS_WANT_CANCEL means that the client wants no
+        delegation and wants to cancel any previously registered "want" for a
+        delegation.
+      </t>
+
+      <t>
+        The client may set one or both of
+        OPEN4_SHARE_ACCESS_WANT_SIGNAL_DELEG_WHEN_RESRC_AVAIL and
+        OPEN4_SHARE_ACCESS_WANT_PUSH_DELEG_WHEN_UNCONTENDED.  However, they
+        will have no effect unless one of following is set:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            OPEN4_SHARE_ACCESS_WANT_READ_DELEG
+          </t>
+
+          <t>
+            OPEN4_SHARE_ACCESS_WANT_WRITE_DELEG
+          </t>
+
+          <t>
+            OPEN4_SHARE_ACCESS_WANT_ANY_DELEG
+          </t>
+        </list>
+      </t>
+
+      <t>
+        If the client specifies
+        OPEN4_SHARE_ACCESS_WANT_SIGNAL_DELEG_WHEN_RESRC_AVAIL, then it wishes
+        to register a "want" for a delegation, in the event the OPEN results
+        do not include a delegation.  If so and the server denies the
+        delegation due to insufficient resources, the server MAY later inform
+        the client, via the CB_RECALLABLE_OBJ_AVAIL operation, that the
+        resource limitation condition has eased.  The server will tell the
+        client that it intends to send a future CB_RECALLABLE_OBJ_AVAIL
+        operation by setting delegation_type in the results to
+        OPEN_DELEGATE_NONE_EXT, ond_why to WND4_RESOURCE, and
+        ond_server_will_signal_avail set to TRUE.  If
+        ond_server_will_signal_avail is set to TRUE, the server MUST later
+        send a CB_RECALLABLE_OBJ_AVAIL operation.
+      </t>
+
+      <t>
+        If the client specifies
+        OPEN4_SHARE_ACCESS_WANT_SIGNAL_DELEG_WHEN_UNCONTENDED, then it wishes
+        to register a "want" for a delegation, in the event the OPEN results
+        do not include a delegation.  If so and the server denies the
+        delegation due to contention, the server MAY later inform the client,
+        via the CB_PUSH_DELEG operation, that the contention condition has
+        eased.  The server will tell the client that it intends to send a
+        future CB_PUSH_DELEG operation by setting delegation_type in the
+        results to OPEN_DELEGATE_NONE_EXT, ond_why to WND4_CONTENTION, and
+        ond_server_will_push_deleg to TRUE.  If ond_server_will_push_deleg is
+        TRUE, the server MUST later send a CB_PUSH_DELEG operation.
+      </t>
+
+      <t>
+        If the client has previously registered a want for a delegation on a
+        file, and then sends a request to register a want for a delegation on
+        the same file, the server MUST return a new error:
+        NFS4ERR_DELEG_ALREADY_WANTED.  If the client wishes to register a
+        different type of delegation want for the same file, it MUST cancel
+        the existing delegation WANT.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_OPEN:I" title="IMPLEMENTATION">
+      <t>
+        In absence of a persistent session, the client invokes exclusive
+        create by setting the how parameter to EXCLUSIVE4 or EXCLUSIVE4_1.
+        In these cases, the client provides a verifier that can reasonably be
+        expected to be unique.  A combination of a client identifier, perhaps
+        the client network address, and a unique number generated by the
+        client, perhaps the RPC transaction identifier, may be appropriate.
+      </t>
+
+      <t>
+        If the object does not exist, the server creates the object and
+        stores the verifier in stable storage.  For file systems that do not
+        provide a mechanism for the storage of arbitrary file attributes, the
+        server may use one or more elements of the object's metadata to store
+        the verifier.  The verifier MUST be stored in stable storage to
+        prevent erroneous failure on retransmission of the request.  It is
+        assumed that an exclusive create is being performed because exclusive
+        semantics are critical to the application.  Because of the expected
+        usage, exclusive CREATE does not rely solely on the server's reply
+        cache for storage of the verifier.  A nonpersistent reply cache does
+        not survive a crash and the session and reply cache may be deleted
+        after a network partition that exceeds the lease time, thus opening
+        failure windows.
+      </t>
+
+      <t>
+        An NFSv4.1 server SHOULD NOT store the verifier in any of the file's
+        RECOMMENDED or REQUIRED attributes.  If it does, the server SHOULD
+        use time_modify_set or time_access_set to store the verifier.  The
+        server SHOULD NOT store the verifier in the following attributes:
+      </t>
+
+      <t>
+        <list style='hanging'>
+          <t hangText='acl'>
+            (it is desirable for access control to be established at creation),
+          </t>
+
+          <t hangText='dacl'>
+            (ditto),
+          </t>
+
+          <t hangText='mode'>
+            (ditto),
+          </t>
+
+          <t hangText='owner'>
+            (ditto),
+          </t>
+
+          <t hangText='owner_group'>
+            (ditto),
+          </t>
+
+          <t hangText='retentevt_set'>
+            (it may be desired to establish retention at creation)
+          </t>
+
+          <t hangText='retention_hold'>
+            (ditto),
+          </t>
+
+          <t hangText='retention_set'>
+            (ditto),
+          </t>
+
+          <t hangText='sacl'>
+            (it is desirable for auditing control to be established at creation),
+          </t>
+
+          <t hangText='size'>
+            (on some servers, size may have a limited range of values),
+          </t>
+
+          <t hangText='mode_set_masked'>
+            (as with mode),
+          </t>
+
+          <t hangText='time_creation'>
+            (a meaningful file creation should be set when the file is created).
+          </t>
+        </list>
+      </t>
+
+      <t>
+        Another alternative for the server is to use a named attribute to
+        store the verifier.
+      </t>
+
+      <t>
+        Because the EXCLUSIVE4 create method does not specify initial
+        attributes when processing an EXCLUSIVE4 create, the server
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            SHOULD set the owner of the file to that corresponding to the
+            credential of request's RPC header.
+          </t>
+
+          <t>
+            SHOULD NOT leave the file's access control to anyone but the owner
+            of the file.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        If the server cannot support exclusive create semantics, possibly
+        because of the requirement to commit the verifier to stable storage,
+        it should fail the OPEN request with the error NFS4ERR_NOTSUPP.
+      </t>
+
+      <t>
+        During an exclusive CREATE request, if the object already exists, the
+        server reconstructs the object's verifier and compares it with the
+        verifier in the request.  If they match, the server treats the
+        request as a success.  The request is presumed to be a duplicate of
+        an earlier, successful request for which the reply was lost and that
+        the server duplicate request cache mechanism did not detect.  If the
+        verifiers do not match, the request is rejected with the status
+        NFS4ERR_EXIST.
+      </t>
+
+      <t>
+        After the client has performed a successful exclusive create, the
+        attrset response indicates which attributes were used to store the
+        verifier.  If EXCLUSIVE4 was used, the attributes set in attrset were
+        used for the verifier.  If EXCLUSIVE4_1 was used, the client
+        determines the attributes used for the verifier by comparing attrset
+        with cva_attrs.attrmask; any bits set in the former but not the
+        latter identify the attributes used to store the verifier.  The
+        client MUST immediately send a SETATTR to set attributes used to
+        store the verifier.  Until it does so, the attributes used to store
+        the verifier cannot be relied upon.  The subsequent SETATTR MUST NOT
+        occur in the same COMPOUND request as the OPEN.
+      </t>
+
+      <t>
+        Unless a persistent session is used, use of the GUARDED4 attribute
+        does not provide exactly once semantics.  In particular, if a reply
+        is lost and the server does not detect the retransmission of the
+        request, the operation can fail with NFS4ERR_EXIST, even though the
+        create was performed successfully.  The client would use this
+        behavior in the case that the application has not requested an
+        exclusive create but has asked to have the file truncated when the
+        file is opened.  In the case of the client timing out and
+        retransmitting the create request, the client can use GUARDED4 to
+        prevent against a sequence like create, write, create (retransmitted)
+        from occurring.
+      </t>
+
+      <t>
+        For SHARE reservations, the value of the expression (share_access &amp;
+        ~OPEN4_SHARE_ACCESS_WANT_DELEG_MASK) MUST be one of
+        OPEN4_SHARE_ACCESS_READ, OPEN4_SHARE_ACCESS_WRITE, or
+        OPEN4_SHARE_ACCESS_BOTH.  If not, the server MUST return
+        NFS4ERR_INVAL.  The value of share_deny MUST be one of
+        OPEN4_SHARE_DENY_NONE, OPEN4_SHARE_DENY_READ, OPEN4_SHARE_DENY_WRITE,
+        or OPEN4_SHARE_DENY_BOTH.  If not, the server MUST return
+        NFS4ERR_INVAL.
+      </t>
+
+      <t>
+        Based on the share_access value (OPEN4_SHARE_ACCESS_READ,
+        OPEN4_SHARE_ACCESS_WRITE, or OPEN4_SHARE_ACCESS_BOTH), the client
+        should check that the requester has the proper access rights to
+        perform the specified operation.  This would generally be the results
+        of applying the ACL access rules to the file for the current
+        requester.  However, just as with the ACCESS operation, the client
+        should not attempt to second-guess the server's decisions, as access
+        rights may change and may be subject to server administrative
+        controls outside the ACL framework.  If the requester's READ or WRITE
+        operation is not authorized (depending on the share_access value),
+        the server MUST return NFS4ERR_ACCESS.
+      </t>
+
+      <t>
+        Note that if the client ID was not created with the
+        EXCHGID4_FLAG_BIND_PRINC_STATEID capability set in the reply to
+        EXCHANGE_ID, then the server MUST NOT impose any requirement that
+        READs and WRITEs sent for an open file have the same credentials as
+        the OPEN itself, and the server is REQUIRED to perform access
+        checking on the READs and WRITEs themselves.  Otherwise, if the reply
+        to EXCHANGE_ID did have EXCHGID4_FLAG_BIND_PRINC_STATEID set, then
+        with one exception, the credentials used in the OPEN request MUST
+        match those used in the READs and WRITEs, and the stateids in the
+        READs and WRITEs MUST match, or be derived from the stateid from the
+        reply to OPEN.  The exception is if SP4_SSV or SP4_MACH_CRED state
+        protection is used, and the spo_must_allow result of EXCHANGE_ID
+        includes the READ and/or WRITE operations.  In that case, the machine
+        or SSV credential will be allowed to send READ and/or WRITE.  See
+        <xref target="op_EXCHANGE_ID" />.
+      </t>
+
+      <t>
+        If the component provided to OPEN is a symbolic link, the error
+        NFS4ERR_SYMLINK will be returned to the client, while if it is a
+        directory the error NFS4ERR_ISDIR will be returned.  If the component
+        is neither of those but not an ordinary file, the error
+        NFS4ERR_WRONG_TYPE is returned.  If the current filehandle is not a
+        directory, the error NFS4ERR_NOTDIR will be returned.
+      </t>
+
+      <t>
+        The use of the OPEN4_RESULT_PRESERVE_UNLINKED result flag allows a
+        client to avoid the common implementation practice of renaming an
+        open file to ".nfs&lt;unique value&gt;" after it removes the file.  After
+        the server returns OPEN4_RESULT_PRESERVE_UNLINKED, if a client sends
+        a REMOVE operation that would reduce the file's link count to zero,
+        the server SHOULD report a value of zero for the numlinks attribute
+        on the file.
+      </t>
+
+      <t>
+        If another client has a delegation of the file being opened that
+        conflicts with open being done (sometimes depending on the
+        share_access or share_deny value specified), the delegation(s) MUST
+        be recalled, and the operation cannot proceed until each such
+        delegation is returned or revoked.  Except where this happens very
+        quickly, one or more NFS4ERR_DELAY errors will be returned to
+        requests made while delegation remains outstanding.  In the case of
+        an OPEN_DELEGATE_WRITE delegation, any open by a different client
+        will conflict, while for an OPEN_DELEGATE_READ delegation, only opens
+        with one of the following characteristics will be considered
+        conflicting:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            The value of share_access includes the bit
+            OPEN4_SHARE_ACCESS_WRITE.
+          </t>
+
+          <t>
+            The value of share_deny specifies OPEN4_SHARE_DENY_READ or
+            OPEN4_SHARE_DENY_BOTH.
+          </t>
+
+          <t>
+            OPEN4_CREATE is specified together with UNCHECKED4, the size
+            attribute is specified as zero (for truncation), and an existing
+            file is truncated.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        If OPEN4_CREATE is specified and the file does not exist and the
+        current filehandle designates a directory for which another client
+        holds a directory delegation, then, unless the delegation is such
+        that the situation can be resolved by sending a notification, the
+        delegation MUST be recalled, and the operation cannot proceed until
+        the delegation is returned or revoked.  Except where this happens
+        very quickly, one or more NFS4ERR_DELAY errors will be returned to
+        requests made while delegation remains outstanding.
+      </t>
+
+      <t>
+        If OPEN4_CREATE is specified and the file does not exist and the
+        current filehandle designates a directory for which one or more
+        directory delegations exist, then, when those delegations request
+        such notifications, NOTIFY4_ADD_ENTRY will be generated as a result
+        of this operation.
+      </t>
+
+      <section toc='exclude' anchor="ss:op_OPEN:WtCI" title="Warning to Client Implementors">
+        <t>
+          OPEN resembles LOOKUP in that it generates a filehandle for the
+          client to use.  Unlike LOOKUP though, OPEN creates server state on
+          the filehandle.  In normal circumstances, the client can only release
+          this state with a CLOSE operation.  CLOSE uses the current filehandle
+          to determine which file to close.  Therefore, the client MUST follow
+          every OPEN operation with a GETFH operation in the same COMPOUND
+          procedure.  This will supply the client with the filehandle such that
+          CLOSE can be used appropriately.
+        </t>
+
+        <t>
+          Simply waiting for the lease on the file to expire is insufficient
+          because the server may maintain the state indefinitely as long as
+          another client does not attempt to make a conflicting access to the
+          same file.
+        </t>
+
+        <t>
+          See also <xref target="ss:core_infrastructure:CaCCI" />.
+        </t>
+      </section>
+    </section>
+  </section>
+

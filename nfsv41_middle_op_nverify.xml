@@ -1,0 +1,65 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_NVERIFY" title="Operation 17: NVERIFY - Verify Difference in Attributes">
+    <section toc='exclude' anchor="ss:op_NVERIFY:A" title="ARGUMENT">
+      <?rfc include='autogen/nverify_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_NVERIFY:R" title="RESULT">
+      <?rfc include='autogen/nverify_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_NVERIFY:D" title="DESCRIPTION">
+      <t>
+        This operation is used to prefix a sequence of operations to be
+        performed if one or more attributes have changed on some file system
+        object.  If all the attributes match, then the error NFS4ERR_SAME
+        MUST be returned.
+      </t>
+
+      <t>
+        On success, the current filehandle retains its value.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_NVERIFY:I" title="IMPLEMENTATION">
+      <t>
+        This operation is useful as a cache validation operator.  If the
+        object to which the attributes belong has changed, then the following
+        operations may obtain new data associated with that object, for
+        instance, to check if a file has been changed and obtain new data if
+        it has:
+      </t>
+
+      <figure>
+        <artwork>
+    SEQUENCE
+    PUTFH fh
+    NVERIFY attrbits attrs
+    READ 0 32767
+        </artwork>
+      </figure>
+
+      <t>
+        Contrast this with NFSv3, which would first send a GETATTR in one
+        request/reply round trip, and then if attributes indicated that the
+        client's cache was stale, then send a READ in another request/reply
+        round trip.
+      </t>
+
+      <t>
+        In the case that a RECOMMENDED attribute is specified in the NVERIFY
+        operation and the server does not support that attribute for the file
+        system object, the error NFS4ERR_ATTRNOTSUPP is returned to the
+        client.
+      </t>
+
+      <t>
+        When the attribute rdattr_error or any set-only attribute (e.g.,
+        time_modify_set) is specified, the error NFS4ERR_INVAL is returned to
+        the client.
+      </t>
+    </section>
+  </section>
+

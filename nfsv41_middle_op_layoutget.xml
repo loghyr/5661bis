@@ -1,0 +1,504 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_LAYOUTGET" title="Operation 50: LAYOUTGET - Get Layout Information">
+    <section toc='exclude' anchor="ss:op_LAYOUTGET:A" title="ARGUMENT">
+      <?rfc include='autogen/layoutget_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LAYOUTGET:R" title="RESULT">
+      <?rfc include='autogen/layoutget_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LAYOUTGET:D" title="DESCRIPTION">
+      <t>
+        The LAYOUTGET operation requests a layout from the metadata
+        server for reading or writing the file given by the filehandle
+        at the byte-range specified by offset and length.  Layouts are
+        identified by the client ID (derived from the session ID in the
+        preceding SEQUENCE operation), current filehandle, layout type
+        (loga_layout_type), and
+        the layout stateid (loga_stateid).  The use of the loga_iomode field
+        depends upon the layout type, but should reflect the client's data
+        access intent.
+      </t>
+
+      <t>
+        If the metadata server is in a grace period, and does not persist
+        layouts and device ID to device address mappings, then it MUST return
+        NFS4ERR_GRACE (see <xref target="ss:state_management:SR" />).
+      </t>
+
+      <t>
+        The LAYOUTGET operation returns layout information for the specified
+        byte-range: a layout.  The client actually specifies two ranges, both
+        starting at the offset in the loga_offset field.  The first range is
+        between loga_offset and loga_offset + loga_length - 1 inclusive.
+        This range indicates the desired range the client wants the layout to
+        cover.  The second range is between loga_offset and loga_offset +
+        loga_minlength - 1 inclusive.  This range indicates the required
+        range the client needs the layout to cover.  Thus, loga_minlength
+        MUST be less than or equal to loga_length.
+      </t>
+
+      <t>
+        When a length field is set to NFS4_UINT64_MAX, this indicates a
+        desire (when loga_length is NFS4_UINT64_MAX) or requirement (when
+        loga_minlength is NFS4_UINT64_MAX) to get a layout from loga_offset
+        through the end-of-file, regardless of the file's length.
+      </t>
+
+      <t>
+        The following rules govern the relationships among, and the minima
+        of, loga_length, loga_minlength, and loga_offset.
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            If loga_length is less than loga_minlength, the metadata server
+            MUST return NFS4ERR_INVAL.
+          </t>
+
+          <t>
+            If loga_minlength is zero, this is an indication to the metadata
+            server that the client desires any layout at offset loga_offset or
+            less that the metadata server has "readily available".  Readily is
+            subjective, and depends on the layout type and the pNFS server
+            implementation.  For example, some metadata servers might have to
+            pre-allocate stable storage when they receive a request for a
+            range of a file that goes beyond the file's current length.  If
+            loga_minlength is zero and loga_length is greater than zero, this
+            tells the metadata server what range of the layout the client
+            would prefer to have.  If loga_length and loga_minlength are both
+            zero, then the client is indicating that it desires a layout of
+            any length with the ending offset of the range no less than the
+            value specified loga_offset, and the starting offset at or below
+            loga_offset.  If the metadata server does not have a layout that
+            is readily available, then it MUST return NFS4ERR_LAYOUTTRYLATER.
+          </t>
+
+          <t>
+            If the sum of loga_offset and loga_minlength exceeds
+            NFS4_UINT64_MAX, and loga_minlength is not NFS4_UINT64_MAX, the
+            error NFS4ERR_INVAL MUST result.
+          </t>
+
+          <t>
+            If the sum of loga_offset and loga_length exceeds NFS4_UINT64_MAX,
+            and loga_length is not NFS4_UINT64_MAX, the error NFS4ERR_INVAL
+            MUST result.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        After the metadata server has performed the above checks on
+        loga_offset, loga_minlength, and loga_offset, the metadata server
+        MUST return a layout according to the rules in <xref target='tbl:layout_hell' />.
+      </t>
+
+      <texttable anchor='tbl:layout_hell'>
+        <preamble>
+          Acceptable layouts based on loga_minlength.  Note: u64m =
+          NFS4_UINT64_MAX; a_off = loga_offset; a_minlen = loga_minlength.
+        </preamble>
+        <ttcol>Layout iomode of request</ttcol>
+        <ttcol>Layout a_minlen of request</ttcol>
+        <ttcol>Layout iomode of reply</ttcol>
+        <ttcol>Layout offset of reply</ttcol>
+        <ttcol>Layout length of reply</ttcol>
+        <c>_READ</c> <c>u64m          </c>       <c>MAY be _READ</c> <c>MUST be &lt;= a_off</c> <c>MUST be &gt;= file length - layout offset</c>
+        <c>_READ</c> <c>u64m          </c>       <c>MAY be _RW  </c> <c>MUST be &lt;= a_off</c> <c>MUST be u64m</c>
+        <c>_READ</c> <c>&gt; 0 and &lt; u64m</c> <c>MAY be _READ</c> <c>MUST be &lt;= a_off</c> <c>MUST be &gt;= MIN(file length, a_minlen + a_off) - layout offset</c>
+        <c>_READ</c> <c>&gt; 0 and &lt; u64m</c> <c>MAY be _RW  </c> <c>MUST be &lt;= a_off</c> <c>MUST be &gt;= a_off - layout offset + a_minlen</c>
+        <c>_READ</c> <c>0             </c>       <c>MAY be _READ</c> <c>MUST be &lt;= a_off</c> <c>MUST be &gt; 0</c>
+        <c>_READ</c> <c>0             </c>       <c>MAY be _RW  </c> <c>MUST be &lt;= a_off</c> <c>MUST be &gt; 0</c>
+        <c>_RW  </c> <c>u64m          </c>       <c>MUST be _RW </c> <c>MUST be &lt;= a_off</c> <c>MUST be u64m</c>
+        <c>_RW  </c> <c>&gt; 0 and &lt; u64m</c> <c>MUST be _RW </c> <c>MUST be &lt;= a_off</c> <c>MUST be &gt;= a_off - layout offset + a_minlen</c>
+        <c>_RW  </c> <c>0             </c>       <c>MUST be _RW </c> <c>MUST be &lt;= a_off</c> <c>MUST be &gt; 0</c>
+      </texttable>
+
+      <t>
+        If loga_minlength is not zero and the metadata server cannot return a
+        layout according to the rules in <xref target='tbl:layout_hell' />, then the metadata server
+        MUST return the error NFS4ERR_BADLAYOUT.  If loga_minlength is zero
+        and the metadata server cannot or will not return a layout according
+        to the rules in <xref target='tbl:layout_hell' />, then the metadata server MUST return the
+        error NFS4ERR_LAYOUTTRYLATER.  Assuming that loga_length is greater
+        than loga_minlength or equal to zero, the metadata server SHOULD
+        return a layout according to the rules in <xref target='tbl:layout_hell2' />.
+      </t>
+
+      <texttable anchor='tbl:layout_hell2'>
+        <preamble>
+          Desired layouts based on loga_length.  The rules of <xref target='tbl:layout_hell' /> MUST be
+          applied first.  Note: u64m = NFS4_UINT64_MAX; a_off = loga_offset; a_len = loga_length.
+        </preamble>
+        <ttcol>Layout iomode of request</ttcol>
+        <ttcol>Layout a_len of request</ttcol>
+        <ttcol>Layout iomode of reply</ttcol>
+        <ttcol>Layout offset of reply</ttcol>
+        <ttcol>Layout length of reply</ttcol>
+        <c>_READ</c> <c>u64m          </c>       <c>MAY be _READ</c> <c>MUST be &lt;= a_off</c> <c>SHOULD be u64m</c>
+        <c>_READ</c> <c>u64m          </c>       <c>MAY be _RW  </c> <c>MUST be &lt;= a_off</c> <c>SHOULD be u64m</c>
+        <c>_READ</c> <c>&gt; 0 and &lt; u64m</c> <c>MAY be _READ</c> <c>MUST be &lt;= a_off</c> <c>SHOULD be &gt;= a_off - layout offset + a_len</c>
+        <c>_READ</c> <c>&gt; 0 and &lt; u64m</c> <c>MAY be _RW  </c> <c>MUST be &lt;= a_off</c> <c>SHOULD be &gt;= a_off - layout offset + a_len</c>
+        <c>_READ</c> <c>0             </c>       <c>MAY be _READ</c> <c>MUST be &lt;= a_off</c> <c>SHOULD be &gt; a_off - layout offset</c>
+        <c>_READ</c> <c>0             </c>       <c>MAY be _READ</c> <c>MUST be &lt;= a_off</c> <c>SHOULD be &gt; a_off - layout offset</c>
+        <c>_RW  </c> <c>u64m          </c>       <c>MUST be _RW </c> <c>MUST be &lt;= a_off</c> <c>SHOULD be u64m</c>
+        <c>_RW  </c> <c>&gt; 0 and &lt; u64m</c> <c>MUST be _RW </c> <c>MUST be &lt;= a_off</c> <c>SHOULD be &gt;= a_off - layout offset + a_len</c>
+        <c>_RW  </c> <c>0             </c>       <c>MUST be _RW </c> <c>MUST be &lt;= a_off</c> <c>SHOULD be &gt; a_off - layout offset</c>
+      </texttable>
+
+      <t>
+        The loga_stateid field specifies a valid stateid.  If a layout is not
+        currently held by the client, the loga_stateid field represents a
+        stateid reflecting the correspondingly valid open, byte-range lock,
+        or delegation stateid.  Once a layout is held on the file by the
+        client, the loga_stateid field MUST be a stateid as returned from a
+        previous LAYOUTGET or LAYOUTRETURN operation or provided by a
+        CB_LAYOUTRECALL operation (see <xref target="ss:parallel_nfs:LS1" />).
+      </t>
+
+      <t>
+        The loga_maxcount field specifies the maximum layout size (in bytes)
+        that the client can handle.  If the size of the layout structure
+        exceeds the size specified by maxcount, the metadata server will
+        return the NFS4ERR_TOOSMALL error.
+      </t>
+
+      <t>
+        The returned layout is expressed as an array, logr_layout, with each
+        element of type layout4.  If a file has a single striping pattern,
+        then logr_layout SHOULD contain just one entry.  Otherwise, if the
+        requested range overlaps more than one striping pattern, logr_layout
+        will contain the required number of entries.  The elements of
+        logr_layout MUST be sorted in ascending order of the value of the
+        lo_offset field of each element.  There MUST be no gaps or overlaps
+        in the range between two successive elements of logr_layout.  The
+        lo_iomode field in each element of logr_layout MUST be the same.
+      </t>
+
+      <t>
+        Tables <xref target='tbl:layout_hell' format='counter' /> and
+        <xref target='tbl:layout_hell2' format='counter' /> both refer to a returned layout iomode, offset,
+        and length.  Because the returned layout is encoded in the
+        logr_layout array, more description is required.
+      </t>
+
+      <t>
+        <list style='hanging'>
+          <t hangText='iomode'><vspace />
+            The value of the returned layout iomode listed in <xref target='tbl:layout_hell' /> and
+            <xref target='tbl:layout_hell2' /> is equal to the value of the lo_iomode field in each
+            element of logr_layout.  As shown in
+            Tables <xref target='tbl:layout_hell' format='counter' />
+            and <xref target='tbl:layout_hell2' format='counter' />, the
+            metadata server MAY return a layout with an lo_iomode different
+            from the requested iomode (field loga_iomode of the request).  If
+            it does so, it MUST ensure that the lo_iomode is more permissive
+            than the loga_iomode requested.  For example, this behavior allows
+            an implementation to upgrade LAYOUTIOMODE4_READ requests to
+            LAYOUTIOMODE4_RW requests at its discretion, within the limits of
+            the layout type specific protocol.  A lo_iomode of either
+            LAYOUTIOMODE4_READ or LAYOUTIOMODE4_RW MUST be returned.
+          </t>
+
+          <t hangText='offset'><vspace />
+            The value of the returned layout offset listed in <xref target='tbl:layout_hell' /> and
+            <xref target='tbl:layout_hell2' /> is always equal to the lo_offset field of the first
+            element logr_layout.
+          </t>
+
+          <t hangText='length'><vspace />
+            When setting the value of the returned layout length, the
+            situation is complicated by the possibility that the special
+            layout length value NFS4_UINT64_MAX is involved.  For a
+            logr_layout array of N elements, the lo_length field in the first
+            N-1 elements MUST NOT be NFS4_UINT64_MAX.  The lo_length field of
+            the last element of logr_layout can be NFS4_UINT64_MAX under some
+            conditions as described in the following list.
+
+            <list style='symbols'>
+              <t>
+                If an applicable rule of <xref target='tbl:layout_hell' /> states that the metadata
+                server MUST return a layout of length NFS4_UINT64_MAX, then the
+                lo_length field of the last element of logr_layout MUST be
+                NFS4_UINT64_MAX.
+              </t>
+
+              <t>
+                If an applicable rule of <xref target='tbl:layout_hell' /> states that the metadata
+                server MUST NOT return a layout of length NFS4_UINT64_MAX, then
+                the lo_length field of the last element of logr_layout MUST NOT
+                be NFS4_UINT64_MAX.
+              </t>
+
+              <t>
+                If an applicable rule of <xref target='tbl:layout_hell2' /> states that the metadata
+                server SHOULD return a layout of length NFS4_UINT64_MAX, then
+                the lo_length field of the last element of logr_layout SHOULD
+                be NFS4_UINT64_MAX.
+              </t>
+
+              <t>
+                When the value of the returned layout length of <xref target='tbl:layout_hell' /> and
+                <xref target='tbl:layout_hell2' /> is not NFS4_UINT64_MAX, then the returned layout
+                length is equal to the sum of the lo_length fields of each
+                element of logr_layout.
+              </t>
+            </list>
+          </t>
+        </list>
+      </t>
+
+      <t>
+        The logr_return_on_close result field is a directive to return the
+        layout before closing the file.  When the metadata server sets this
+        return value to TRUE, it MUST be prepared to recall the layout in the
+        case in which the client fails to return the layout before close.
+        For the metadata server that knows a layout must be returned before a
+        close of the file, this return value can be used to communicate the
+        desired behavior to the client and thus remove one extra step from
+        the client's and metadata server's interaction.
+      </t>
+
+      <t>
+        The logr_stateid stateid is returned to the client for use in
+        subsequent layout related operations.  See Sections
+        <xref target="ss:state_management:SD" format='counter' />,
+        <xref target="ss:parallel_nfs:LS1" format='counter' />, and
+        <xref target="ss:parallel_nfs:SoLO" format='counter' /> for a further discussion and requirements.
+      </t>
+
+      <t>
+        The format of the returned layout (lo_content) is specific to the
+        layout type.  The value of the layout type (lo_content.loc_type) for
+        each of the elements of the array of layouts returned by the metadata
+        server (logr_layout) MUST be equal to the loga_layout_type specified
+        by the client.  If it is not equal, the client SHOULD ignore the
+        response as invalid and behave as if the metadata server returned an
+        error, even if the client does have support for the layout type
+        returned.
+      </t>
+
+      <t>
+        If neither the requested file nor its containing file system support
+        layouts, the metadata server MUST return NFS4ERR_LAYOUTUNAVAILABLE.
+        If the layout type is not supported, the metadata server MUST return
+        NFS4ERR_UNKNOWN_LAYOUTTYPE.  If layouts are supported but no layout
+        matches the client provided layout identification, the metadata
+        server MUST return NFS4ERR_BADLAYOUT.  If an invalid loga_iomode is
+        specified, or a loga_iomode of LAYOUTIOMODE4_ANY is specified, the
+        metadata server MUST return NFS4ERR_BADIOMODE.
+      </t>
+
+      <t>
+        If the layout for the file is unavailable due to transient
+        conditions, e.g., file sharing prohibits layouts, the metadata server
+        MUST return NFS4ERR_LAYOUTTRYLATER.
+      </t>
+
+      <t>
+        If the layout request is rejected due to an overlapping layout
+        recall, the metadata server MUST return NFS4ERR_RECALLCONFLICT.  See
+        <xref target="ss:parallel_nfs:SoLO" /> for details.
+      </t>
+
+      <t>
+        If the layout conflicts with a mandatory byte-range lock held on the
+        file, and if the storage devices have no method of enforcing
+        mandatory locks, other than through the restriction of layouts, the
+        metadata server SHOULD return NFS4ERR_LOCKED.
+      </t>
+
+      <t>
+        If client sets loga_signal_layout_avail to TRUE, then it is
+        registering with the client a "want" for a layout in the event the
+        layout cannot be obtained due to resource exhaustion.  If the
+        metadata server supports and will honor the "want", the results will
+        have logr_will_signal_layout_avail set to TRUE.  If so, the client
+        should expect a CB_RECALLABLE_OBJ_AVAIL operation to indicate that a
+        layout is available.
+      </t>
+
+      <t>
+        On success, the current filehandle retains its value and the current
+        stateid is updated to match the value as returned in the results.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LAYOUTGET:I" title="IMPLEMENTATION">
+      <t>
+        Typically, LAYOUTGET will be called as part of a COMPOUND request
+        after an OPEN operation and results in the client having location
+        information for the file.  This requires that loga_stateid be set to
+        the special stateid that tells the metadata server to use the current
+        stateid, which is set by OPEN (see <xref target="ss:proc_COMPOUND:CS" />).  A client may
+        also hold a layout across multiple OPENs.  The client specifies a
+        layout type that limits what kind of layout the metadata server will
+        return.  This prevents metadata servers from granting layouts that
+        are unusable by the client.
+      </t>
+
+      <t>
+        As indicated by Tables <xref target='tbl:layout_hell' format='counter' />
+        and <xref target='tbl:layout_hell2' format='counter' />, the specification of LAYOUTGET
+        allows a pNFS client and server considerable flexibility.  A pNFS
+        client can take several strategies for sending LAYOUTGET.  Some
+        examples are as follows.
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            If LAYOUTGET is preceded by OPEN in the same COMPOUND request and
+            the OPEN requests OPEN4_SHARE_ACCESS_READ access, the client might
+            opt to request a _READ layout with loga_offset set to zero,
+            loga_minlength set to zero, and loga_length set to
+            NFS4_UINT64_MAX.  If the file has space allocated to it, that
+            space is striped over one or more storage devices, and there is
+            either no conflicting layout or the concept of a conflicting
+            layout does not apply to the pNFS server's layout type or
+            implementation, then the metadata server might return a layout
+            with a starting offset of zero, and a length equal to the length
+            of the file, if not NFS4_UINT64_MAX.  If the length of the file is
+            not a multiple of the pNFS server's stripe width (see <xref target="ss:nfsv4.1_as:FLD" />
+            for a formal definition), the metadata server might round up the
+            returned layout's length.
+          </t>
+
+          <t>
+            If LAYOUTGET is preceded by OPEN in the same COMPOUND request, and
+            the OPEN requests OPEN4_SHARE_ACCESS_WRITE access and does not
+            truncate the file, the client might opt to request a _RW layout
+            with loga_offset set to zero, loga_minlength set to zero, and
+            loga_length set to the file's current length (if known), or
+            NFS4_UINT64_MAX.  As with the previous case, under some conditions
+            the metadata server might return a layout that covers the entire
+            length of the file or beyond.
+          </t>
+
+          <t>
+            This strategy is as above, but the OPEN truncates the file.  In
+            this case, the client might anticipate it will be writing to the
+            file from offset zero, and so loga_offset and loga_minlength are
+            set to zero, and loga_length is set to the value of
+            threshold4_write_iosize.  The metadata server might return a
+            layout from offset zero with a length at least as long as
+            threshold4_write_iosize.
+          </t>
+
+          <t>
+            A process on the client invokes a request to read from offset
+            10000 for length 50000.  The client is using buffered I/O, and has
+            buffer sizes of 4096 bytes.  The client intends to map the request
+            of the process into a series of READ requests starting at offset
+            8192.  The end offset needs to be higher than 10000 + 50000 =
+            60000, and the next offset that is a multiple of 4096 is 61440.
+            The difference between 61440 and that starting offset of the
+            layout is 53248 (which is the product of 4096 and 15).  The value
+            of threshold4_read_iosize is less than 53248, so the client sends
+            a LAYOUTGET request with loga_offset set to 8192, loga_minlength
+            set to 53248, and loga_length set to the file's length (if known)
+            minus 8192 or NFS4_UINT64_MAX (if the file's length is not known).
+            Since this LAYOUTGET request exceeds the metadata server's
+            threshold, it grants the layout, possibly with an initial offset
+            of zero, with an end offset of at least 8192 + 53248 - 1 = 61439,
+            but preferably a layout with an offset aligned on the stripe width
+            and a length that is a multiple of the stripe width.
+          </t>
+
+          <t>
+            This strategy is as above, but the client is not using buffered
+            I/O, and instead all internal I/O requests are sent directly to
+            the server.  The LAYOUTGET request has loga_offset equal to 10000
+            and loga_minlength set to 50000.  The value of loga_length is set
+            to the length of the file.  The metadata server is free to return
+            a layout that fully overlaps the requested range, with a starting
+            offset and length aligned on the stripe width.
+          </t>
+
+          <t>
+            Again, a process on the client invokes a request to read from
+            offset 10000 for length 50000 (i.e. a range with a starting offset
+            of 10000 and an ending offset of 69999), and buffered I/O is in
+            use.  The client is expecting that the server might not be able to
+            return the layout for the full I/O range.  The client intends to
+            map the request of the process into a series of thirteen READ
+            requests starting at offset 8192, each with length 4096, with a
+            total length of 53248 (which equals 13 * 4096), which fully
+            contains the range that client's process wants to read.  Because
+            the value of threshold4_read_iosize is equal to 4096, it is
+            practical and reasonable for the client to use several LAYOUTGET
+            operations to complete the series of READs.  The client sends a
+            LAYOUTGET request with loga_offset set to 8192, loga_minlength set
+            to 4096, and loga_length set to 53248 or higher.  The server will
+            grant a layout possibly with an initial offset of zero, with an
+            end offset of at least 8192 + 4096 - 1 = 12287, but preferably a
+            layout with an offset aligned on the stripe width and a length
+            that is a multiple of the stripe width.  This will allow the
+            client to make forward progress, possibly sending more LAYOUTGET
+            operations for the remainder of the range.
+          </t>
+
+          <t>
+            An NFS client detects a sequential read pattern, and so sends a
+            LAYOUTGET operation that goes well beyond any current or pending
+            read requests to the server.  The server might likewise detect
+            this pattern, and grant the LAYOUTGET request.  Once the client
+            reads from an offset of the file that represents 50% of the way
+            through the range of the last layout it received, in order to
+            avoid stalling I/O that would wait for a layout, the client sends
+            more operations from an offset of the file that represents 50% of
+            the way through the last layout it received.  The client continues
+            to request layouts with byte-ranges that are well in advance of
+            the byte-ranges of recent and/or read requests of processes
+            running on the client.
+          </t>
+
+          <t>
+            This strategy is as above, but the client fails to detect the
+            pattern, but the server does.  The next time the metadata server
+            gets a LAYOUTGET, it returns a layout with a length that is well
+            beyond loga_minlength.
+          </t>
+
+          <t>
+            A client is using buffered I/O, and has a long queue of
+            write-behinds to process and also detects a sequential write pattern.
+            It sends a LAYOUTGET for a layout that spans the range of the
+            queued write-behinds and well beyond, including ranges beyond the
+            filer's current length.  The client continues to send LAYOUTGET
+            operations once the write-behind queue reaches 50% of the maximum
+            queue length.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        Once the client has obtained a layout referring to a particular
+        device ID, the metadata server MUST NOT delete the device ID until
+        the layout is returned or revoked.
+      </t>
+
+      <t>
+        CB_NOTIFY_DEVICEID can race with LAYOUTGET.  One race scenario is
+        that LAYOUTGET returns a device ID for which the client does not have
+        device address mappings, and the metadata server sends a
+        CB_NOTIFY_DEVICEID to add the device ID to the client's awareness and
+        meanwhile the client sends GETDEVICEINFO on the device ID.  This
+        scenario is discussed in <xref target="ss:op_GETDEVICEINFO:I" />.  Another scenario is that
+        the CB_NOTIFY_DEVICEID is processed by the client before it processes
+        the results from LAYOUTGET.  The client will send a GETDEVICEINFO on
+        the device ID.  If the results from GETDEVICEINFO are received before
+        the client gets results from LAYOUTGET, then there is no longer a
+        race.  If the results from LAYOUTGET are received before the results
+        from GETDEVICEINFO, the client can either wait for results of
+        GETDEVICEINFO or send another one to get possibly more up-to-date
+        device address mappings for the device ID.
+      </t>
+    </section>
+  </section>
+

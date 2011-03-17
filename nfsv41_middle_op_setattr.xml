@@ -1,0 +1,163 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_SETATTR" title="Operation 34: SETATTR - Set Attributes">
+    <section toc='exclude' anchor="ss:op_SETATTR:A" title="ARGUMENT">
+      <?rfc include='autogen/setattr_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_SETATTR:R" title="RESULT">
+      <?rfc include='autogen/setattr_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_SETATTR:D" title="DESCRIPTION">
+      <t>
+        The SETATTR operation changes one or more of the attributes of a file
+        system object.  The new attributes are specified with a bitmap and
+        the attributes that follow the bitmap in bit order.
+      </t>
+
+      <t>
+        The stateid argument for SETATTR is used to provide byte-range
+        locking context that is necessary for SETATTR requests that set the
+        size attribute.  Since setting the size attribute modifies the file's
+        data, it has the same locking requirements as a corresponding WRITE.
+        Any SETATTR that sets the size attribute is incompatible with a share
+        reservation that specifies OPEN4_SHARE_DENY_WRITE.  The area between
+        the old end-of-file and the new end-of-file is considered to be
+        modified just as would have been the case had the area in question
+        been specified as the target of WRITE, for the purpose of checking
+        conflicts with byte-range locks, for those cases in which a server is
+        implementing mandatory byte-range locking behavior.  A valid stateid
+        SHOULD always be specified.  When the file size attribute is not set,
+        the special stateid consisting of all bits equal to zero MAY be
+        passed.
+      </t>
+
+      <t>
+        On either success or failure of the operation, the server will return
+        the attrsset bitmask to represent what (if any) attributes were
+        successfully set.  The attrsset in the response is a subset of the
+        attrmask field of the obj_attributes field in the argument.
+      </t>
+
+      <t>
+        On success, the current filehandle retains its value.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_SETATTR:I" title="IMPLEMENTATION">
+      <t>
+        If the request specifies the owner attribute to be set, the server
+        SHOULD allow the operation to succeed if the current owner of the
+        object matches the value specified in the request.  Some servers may
+        be implemented in a way as to prohibit the setting of the owner
+        attribute unless the requester has privilege to do so.  If the server
+        is lenient in this one case of matching owner values, the client
+        implementation may be simplified in cases of creation of an object
+        (e.g., an exclusive create via OPEN) followed by a SETATTR.
+      </t>
+
+      <t>
+        The file size attribute is used to request changes to the size of a
+        file.  A value of zero causes the file to be truncated, a value less
+        than the current size of the file causes data from new size to the
+        end of the file to be discarded, and a size greater than the current
+        size of the file causes logically zeroed data bytes to be added to
+        the end of the file.  Servers are free to implement this using
+        unallocated bytes (holes) or allocated data bytes set to zero.
+        Clients should not make any assumptions regarding a server's
+        implementation of this feature, beyond that the bytes in the affected
+        byte-range returned by READ will be zeroed.  Servers MUST support
+        extending the file size via SETATTR.
+      </t>
+
+      <t>
+        SETATTR is not guaranteed to be atomic.  A failed SETATTR may
+        partially change a file's attributes, hence the reason why the reply
+        always includes the status and the list of attributes that were set.
+      </t>
+
+      <t>
+        If the object whose attributes are being changed has a file
+        delegation that is held by a client other than the one doing the
+        SETATTR, the delegation(s) must be recalled, and the operation cannot
+        proceed to actually change an attribute until each such delegation is
+        returned or revoked.  In all cases in which delegations are recalled,
+        the server is likely to return one or more NFS4ERR_DELAY errors while
+        the delegation(s) remains outstanding, although it might not do that
+        if the delegations are returned quickly.
+      </t>
+
+      <t>
+        If the object whose attributes are being set is a directory and
+        another client holds a directory delegation for that directory, then
+        if enabled, asynchronous notifications will be generated when the set
+        of attributes changed has a non-null intersection with the set of
+        attributes for which notification is requested.  Notifications of
+        type NOTIFY4_CHANGE_DIR_ATTRS will be sent to the appropriate
+        client(s), but the SETATTR is not delayed by waiting for these
+        notifications to be sent.
+      </t>
+
+      <t>
+        If the object whose attributes are being set is a member of the
+        directory for which another client holds a directory delegation, then
+        asynchronous notifications will be generated when the set of
+        attributes changed has a non-null intersection with the set of
+        attributes for which notification is requested.  Notifications of
+        type NOTIFY4_CHANGE_CHILD_ATTRS will be sent to the appropriate
+        clients, but the SETATTR is not delayed by waiting for these
+        notifications to be sent.
+      </t>
+
+      <t>
+        Changing the size of a file with SETATTR indirectly changes the
+        time_modify and change attributes.  A client must account for this as
+        size changes can result in data deletion.
+      </t>
+
+      <t>
+        The attributes time_access_set and time_modify_set are write-only
+        attributes constructed as a switched union so the client can direct
+        the server in setting the time values.  If the switched union
+        specifies SET_TO_CLIENT_TIME4, the client has provided an nfstime4 to
+        be used for the operation.  If the switch union does not specify
+        SET_TO_CLIENT_TIME4, the server is to use its current time for the
+        SETATTR operation.
+      </t>
+
+      <t>
+        If server and client times differ, programs that compare client time
+        to file times can break.  A time synchronization protocol should be
+        used to limit client/server time skew.
+      </t>
+
+      <t>
+        Use of a COMPOUND containing a VERIFY operation specifying only the
+        change attribute, immediately followed by a SETATTR, provides a means
+        whereby a client may specify a request that emulates the
+        functionality of the SETATTR guard mechanism of NFSv3.  Since the
+        function of the guard mechanism is to avoid changes to the file
+        attributes based on stale information, delays between checking of the
+        guard condition and the setting of the attributes have the potential
+        to compromise this function, as would the corresponding delay in the
+        NFSv4 emulation.  Therefore, NFSv4.1 servers SHOULD take care to
+        avoid such delays, to the degree possible, when executing such a
+        request.
+      </t>
+
+      <t>
+        If the server does not support an attribute as requested by the
+        client, the server SHOULD return NFS4ERR_ATTRNOTSUPP.
+      </t>
+
+      <t>
+        A mask of the attributes actually set is returned by SETATTR in all
+        cases.  That mask MUST NOT include attribute bits not requested to be
+        set by the client.  If the attribute masks in the request and reply
+        are equal, the status field in the reply MUST be NFS4_OK.
+      </t>
+    </section>
+  </section>
+

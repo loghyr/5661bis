@@ -1,0 +1,51 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_DELEGPURGE" title="Operation 7: DELEGPURGE - Purge Delegations Awaiting Recovery">
+    <section toc='exclude' anchor="ss:op_DELEGPURGE:A" title="ARGUMENT">
+      <?rfc include='autogen/delegpurge_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_DELEGPURGE:R" title="RESULT">
+      <?rfc include='autogen/delegpurge_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_DELEGPURGE:D" title="DESCRIPTION">
+      <t>
+        This operation purges all of the delegations awaiting recovery for a
+        given client.  This is useful for clients that do not commit
+        delegation information to stable storage to indicate that conflicting
+        requests need not be delayed by the server awaiting recovery of
+        delegation information.
+      </t>
+
+      <t>
+        The client is NOT specified by the clientid field of the request.
+        The client SHOULD set the client field to zero, and the server MUST
+        ignore the clientid field.  Instead, the server MUST derive the
+        client ID from the value of the session ID in the arguments of the
+        SEQUENCE operation that precedes DELEGPURGE in the COMPOUND request.
+      </t>
+
+      <t>
+        The DELEGPURGE operation should be used by clients that record
+        delegation information on stable storage on the client.  In this
+        case, after the client recovers all delegations it knows of, it
+        should immediately send a DELEGPURGE operation.  Doing so will notify
+        the server that no additional delegations for the client will be
+        recovered allowing it to free resources, and avoid delaying other
+        clients which make requests that conflict with the unrecovered
+        delegations.  The set of delegations known to the server and the
+        client might be different.  The reason for this is that after sending
+        a request that resulted in a delegation, the client might experience
+        a failure before it both received the delegation and committed the
+        delegation to the client's stable storage.
+      </t>
+
+      <t>
+        The server MAY support DELEGPURGE, but if it does not, it MUST NOT
+        support CLAIM_DELEGATE_PREV and MUST NOT support CLAIM_DELEG_PREV_FH.
+      </t>
+    </section>
+  </section>
+

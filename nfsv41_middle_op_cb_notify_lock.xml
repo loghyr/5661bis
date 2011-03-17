@@ -1,0 +1,68 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_CB_NOTIFY_LOCK" title="Operation 13: CB_NOTIFY_LOCK - Notify Client of Possible Lock Availability">
+    <section toc='exclude' anchor="ss:op_CB_NOTIFY_LOCK:A" title="ARGUMENT">
+      <?rfc include='autogen/cb_notify_lock_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_NOTIFY_LOCK:R" title="RESULT">
+      <?rfc include='autogen/cb_notify_lock_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_NOTIFY_LOCK:D" title="DESCRIPTION">
+      <t>
+        The server can use this operation to indicate that a byte-range lock
+        for the given file and lock-owner, previously requested by the client
+        via an unsuccessful LOCK operation, might be available.
+      </t>
+
+      <t>
+        This callback is meant to be used by servers to help reduce the
+        latency of blocking locks in the case where they recognize that a
+        client that has been polling for a blocking byte-range lock may now
+        be able to acquire the lock.  If the server supports this callback
+        for a given file, it MUST set the OPEN4_RESULT_MAY_NOTIFY_LOCK flag
+        when responding to successful opens for that file.  This does not
+        commit the server to the use of CB_NOTIFY_LOCK, but the client may
+        use this as a hint to decide how frequently to poll for locks derived
+        from that open.
+      </t>
+
+      <t>
+        If an OPEN operation results in an upgrade, in which the stateid
+        returned has an "other" value matching that of a stateid already
+        allocated, with a new "seqid" indicating a change in the lock being
+        represented, then the value of the OPEN4_RESULT_MAY_NOTIFY_LOCK flag
+        when responding to that new OPEN controls handling from that point
+        going forward.  When parallel OPENs are done on the same file and
+        open-owner, the ordering of the "seqid" fields of the returned
+        stateids (subject to wraparound) are to be used to select the
+        controlling value of the OPEN4_RESULT_MAY_NOTIFY_LOCK flag.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_NOTIFY_LOCK:I" title="IMPLEMENTATION">
+      <t>
+        The server MUST NOT grant the byte-range lock to the client unless
+        and until it receives a LOCK operation from the client.  Similarly,
+        the client receiving this callback cannot assume that it now has the
+        lock or that a subsequent LOCK operation for the lock will be
+        successful.
+      </t>
+
+      <t>
+        The server is not required to implement this callback, and even if it
+        does, it is not required to use it in any particular case.
+        Therefore, the client must still rely on polling for blocking locks,
+        as described in <xref target="ss:file_locking:BL" />.
+      </t>
+
+      <t>
+        Similarly, the client is not required to implement this callback, and
+        even it does, is still free to ignore it.  Therefore, the server MUST
+        NOT assume that the client will act based on the callback.
+      </t>
+    </section>
+  </section>
+

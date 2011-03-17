@@ -1,0 +1,93 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_LOOKUP" title="Operation 15: LOOKUP - Lookup Filename">
+    <section toc='exclude' anchor="ss:op_LOOKUP:A" title="ARGUMENT">
+      <?rfc include='autogen/lookup_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LOOKUP:R" title="RESULT">
+      <?rfc include='autogen/lookup_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LOOKUP:D" title="DESCRIPTION">
+      <t>
+        The LOOKUP operation looks up or finds a file system object using the
+        directory specified by the current filehandle.  LOOKUP evaluates the
+        component and if the object exists, the current filehandle is
+        replaced with the component's filehandle.
+      </t>
+
+      <t>
+        If the component cannot be evaluated either because it does not exist
+        or because the client does not have permission to evaluate the
+        component, then an error will be returned and the current filehandle
+        will be unchanged.
+      </t>
+
+      <t>
+        If the component is a zero-length string or if any component does not
+        obey the UTF-8 definition, the error NFS4ERR_INVAL will be returned.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LOOKUP:I" title="IMPLEMENTATION">
+      <t>
+        If the client wants to achieve the effect of a multi-component look
+        up, it may construct a COMPOUND request such as (and obtain each
+        filehandle):
+      </t>
+
+      <figure>
+        <artwork>
+    PUTFH  (directory filehandle)
+    LOOKUP "pub"
+    GETFH
+    LOOKUP "foo"
+    GETFH
+    LOOKUP "bar"
+    GETFH
+        </artwork>
+      </figure>
+
+      <t>
+        Unlike NFSv3, NFSv4.1 allows LOOKUP requests to cross mountpoints on
+        the server.  The client can detect a mountpoint crossing by comparing
+        the fsid attribute of the directory with the fsid attribute of the
+        directory looked up.  If the fsids are different, then the new
+        directory is a server mountpoint.  UNIX clients that detect a
+        mountpoint crossing will need to mount the server's file system.
+        This needs to be done to maintain the file object identity checking
+        mechanisms common to UNIX clients.
+      </t>
+
+      <t>
+        Servers that limit NFS access to "shared" or "exported" file systems
+        should provide a pseudo file system into which the exported file
+        systems can be integrated, so that clients can browse the server's
+        namespace.  The clients view of a pseudo file system will be limited
+        to paths that lead to exported file systems.
+      </t>
+
+      <t>
+        Note: previous versions of the protocol assigned special semantics to
+        the names "." and "..".  NFSv4.1 assigns no special semantics to
+        these names.  The LOOKUPP operator must be used to look up a parent
+        directory.
+      </t>
+
+      <t>
+        Note that this operation does not follow symbolic links.  The client
+        is responsible for all parsing of filenames including filenames that
+        are modified by symbolic links encountered during the look up
+        process.
+      </t>
+
+      <t>
+        If the current filehandle supplied is not a directory but a symbolic
+        link, the error NFS4ERR_SYMLINK is returned as the error.  For all
+        other non-directory file types, the error NFS4ERR_NOTDIR is returned.
+      </t>
+    </section>
+  </section>
+

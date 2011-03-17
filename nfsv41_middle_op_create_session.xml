@@ -1,0 +1,586 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_CREATE_SESSION" title="Operation 43: CREATE_SESSION - Create New Session and Confirm Client ID">
+    <section toc='exclude' anchor="ss:op_CREATE_SESSION:A" title="ARGUMENT">
+      <?rfc include='autogen/create_session_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CREATE_SESSION:R" title="RESULT">
+      <?rfc include='autogen/create_session_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CREATE_SESSION:D" title="DESCRIPTION">
+      <t>
+        This operation is used by the client to create new session objects on
+        the server.
+      </t>
+
+      <t>
+        CREATE_SESSION can be sent with or without a preceding SEQUENCE
+        operation in the same COMPOUND procedure.  If CREATE_SESSION is sent
+        with a preceding SEQUENCE operation, any session created by
+        CREATE_SESSION has no direct relation to the session specified in the
+        SEQUENCE operation, although the two sessions might be associated
+        with the same client ID.  If CREATE_SESSION is sent without a
+        preceding SEQUENCE, then it MUST be the only operation in the
+        COMPOUND procedure's request.  If it is not, the server MUST return
+        NFS4ERR_NOT_ONLY_OP.
+      </t>
+
+      <t>
+        In addition to creating a session, CREATE_SESSION has the following
+        effects:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            The first session created with a new client ID serves to confirm
+            the creation of that client's state on the server.  The server
+            returns the parameter values for the new session.
+          </t>
+
+          <t>
+            The connection CREATE_SESSION that is sent over is associated with
+            the session's fore channel.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        The arguments and results of CREATE_SESSION are described as follows:
+      </t>
+
+      <t>
+        <list style='hanging'>
+          <t hangText='csa_clientid:'><vspace />
+            This is the client ID with which the new session will be
+            associated.  The corresponding result is csr_sessionid, the
+            session ID of the new session.
+          </t>
+
+          <t hangText='csa_sequence:'><vspace />
+            Each client ID serializes CREATE_SESSION via a per-client ID
+            sequence number (see <xref target="ss:op_CREATE_SESSION:I" />).  The corresponding result
+            is csr_sequence, which MUST be equal to csa_sequence.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        In the next three arguments, the client offers a value that is to be
+        a property of the session.  Except where stated otherwise, it is
+        RECOMMENDED that the server accept the value.  If it is not
+        acceptable, the server MAY use a different value.  Regardless, the
+        server MUST return the value the session will use (which will be
+        either what the client offered, or what the server is insisting on)
+        to the client.
+      </t>
+
+      <t>
+        <list style='hanging'>
+          <t hangText='csa_flags:'><vspace />
+            The csa_flags field contains a list of the following flag bits:
+
+            <list style='hanging'>
+              <t hangText='CREATE_SESSION4_FLAG_PERSIST:'><vspace />
+                If CREATE_SESSION4_FLAG_PERSIST is set, the client wants the
+                server to provide a persistent reply cache.  For sessions in
+                which only idempotent operations will be used (e.g., a
+                read-only session), clients SHOULD NOT set
+                CREATE_SESSION4_FLAG_PERSIST.  If the server does not or cannot
+                provide a persistent reply cache, the server MUST NOT set
+                CREATE_SESSION4_FLAG_PERSIST in the field csr_flags.
+                <vspace blankLines='1' />
+                If the server is a pNFS metadata server, for reasons described
+                in <xref target="ss:parallel_nfs:GL" /> it SHOULD support
+                CREATE_SESSION4_FLAG_PERSIST if it supports the layout_hint
+                (<xref target="ss:file_attributes:A6l2" />) attribute.
+              </t>
+
+              <t hangText='CREATE_SESSION4_FLAG_CONN_BACK_CHAN:'><vspace />
+                If CREATE_SESSION4_FLAG_CONN_BACK_CHAN is set in csa_flags, the
+                client is requesting that the connection over which the
+                CREATE_SESSION operation arrived be associated with the
+                session's backchannel in addition to its fore channel.  If the
+                server agrees, it sets CREATE_SESSION4_FLAG_CONN_BACK_CHAN in
+                the result field csr_flags.  If
+                CREATE_SESSION4_FLAG_CONN_BACK_CHAN is not set in csa_flags,
+                then CREATE_SESSION4_FLAG_CONN_BACK_CHAN MUST NOT be set in
+                csr_flags.
+              </t>
+
+              <t hangText='CREATE_SESSION4_FLAG_CONN_RDMA:'><vspace />
+                If CREATE_SESSION4_FLAG_CONN_RDMA is set in csa_flags, and if
+                the connection over which the CREATE_SESSION operation arrived
+                is currently in non-RDMA mode but has the capability to operate
+                in RDMA mode, then the client is requesting that the server
+                "step up" to RDMA mode on the connection.  If the server
+                agrees, it sets CREATE_SESSION4_FLAG_CONN_RDMA in the result
+                field csr_flags.  If CREATE_SESSION4_FLAG_CONN_RDMA is not set
+                in csa_flags, then CREATE_SESSION4_FLAG_CONN_RDMA MUST NOT be
+                set in csr_flags.  Note that once the server agrees to step up,
+                it and the client MUST exchange all future traffic on the
+                connection with RPC RDMA framing and not Record Marking (<xref target="RFC5666" />).
+              </t>
+            </list>
+          </t>
+
+          <t hangText='csa_fore_chan_attrs, csa_fore_chan_attrs:'><vspace />
+            The csa_fore_chan_attrs and csa_back_chan_attrs fields apply to
+            attributes of the fore channel (which conveys requests originating
+            from the client to the server), and the backchannel (the channel
+            that conveys callback requests originating from the server to the
+            client), respectively.  The results are in corresponding
+            structures called csr_fore_chan_attrs and csr_back_chan_attrs.
+            The results establish attributes for each channel, and on all
+            subsequent use of each channel of the session.  Each structure has
+            the following fields:
+
+            <list style='hanging'>
+              <t hangText='ca_headerpadsize:'><vspace />
+                The maximum amount of padding the requester is willing to apply
+                to ensure that write payloads are aligned on some boundary at
+                the replier.  For each channel, the server
+
+                <list style='symbols'>
+                  <t>
+                    will reply in ca_headerpadsize with its preferred value, or
+                    zero if padding is not in use, and
+                  </t>
+
+                  <t>
+                    MAY decrease this value but MUST NOT increase it.
+                  </t>
+                </list>
+              </t>
+
+              <t hangText='ca_maxrequestsize:'><vspace />
+                The maximum size of a COMPOUND or CB_COMPOUND request that will
+                be sent.  This size represents the XDR encoded size of the
+                request, including the RPC headers (including security flavor
+                credentials and verifiers) but excludes any RPC transport
+                framing headers.  Imagine a request coming over a non-RDMA
+                TCP/IP connection, and that it has a single Record Marking
+                header preceding it.  The maximum allowable count encoded in
+                the header will be ca_maxrequestsize.  If a requester sends a
+                request that exceeds ca_maxrequestsize, the error
+                NFS4ERR_REQ_TOO_BIG will be returned per the description in
+                <xref target="ss:core_infrastructure:CaCCI" />.  For each channel, the server MAY decrease
+                this value but MUST NOT increase it.
+              </t>
+
+              <t hangText='ca_maxresponsesize:'><vspace />
+                The maximum size of a COMPOUND or CB_COMPOUND reply that the
+                requester will accept from the replier including RPC headers
+                (see the ca_maxrequestsize definition).  For each channel, the
+                server MAY decrease this value, but MUST NOT increase it.
+                However, if the client selects a value for ca_maxresponsesize
+                such that a replier on a channel could never send a response,
+                the server SHOULD return NFS4ERR_TOOSMALL in the CREATE_SESSION
+                reply.  After the session is created, if a requester sends a
+                request for which the size of the reply would exceed this
+                value, the replier will return NFS4ERR_REP_TOO_BIG, per the
+                description in <xref target="ss:core_infrastructure:CaCCI" />.
+              </t>
+
+              <t hangText='ca_maxresponsesize_cached:'><vspace />
+                Like ca_maxresponsesize, but the maximum size of a reply that
+                will be stored in the reply cache (<xref target="ss:core_infrastructure:SIaRC" />).  For each
+                channel, the server MAY decrease this value, but MUST NOT
+                increase it.  If, in the reply to CREATE_SESSION, the value of
+                ca_maxresponsesize_cached of a channel is less than the value
+                of ca_maxresponsesize of the same channel, then this is an
+                indication to the requester that it needs to be selective about
+                which replies it directs the replier to cache; for example,
+                large replies from nonidempotent operations (e.g., COMPOUND
+                requests with a READ operation) should not be cached.  The
+                requester decides which replies to cache via an argument to the
+                SEQUENCE (the sa_cachethis field, see <xref target="op_SEQUENCE" />) or
+                CB_SEQUENCE (the csa_cachethis field, see <xref target="op_CB_SEQUENCE" />)
+                operations.  After the session is created, if a requester sends
+                a request for which the size of the reply would exceed
+                ca_maxresponsesize_cached, the replier will return
+                NFS4ERR_REP_TOO_BIG_TO_CACHE, per the description in
+                <xref target="ss:core_infrastructure:CaCCI" />.
+              </t>
+
+              <t hangText='ca_maxoperations:'><vspace />
+                The maximum number of operations the replier will accept in a
+                COMPOUND or CB_COMPOUND.  For the backchannel, the server MUST
+                NOT change the value the client offers.  For the fore channel,
+                the server MAY change the requested value.  After the session
+                is created, if a requester sends a COMPOUND or CB_COMPOUND with
+                more operations than ca_maxoperations, the replier MUST return
+                NFS4ERR_TOO_MANY_OPS.
+              </t>
+
+              <t hangText='ca_maxrequests:'><vspace />
+                The maximum number of concurrent COMPOUND or CB_COMPOUND
+                requests the requester will send on the session.  Subsequent
+                requests will each be assigned a slot identifier by the
+                requester within the range zero to ca_maxrequests - 1
+                inclusive.  For the backchannel, the server MUST NOT change the
+                value the client offers.  For the fore channel, the server MAY
+                change the requested value.
+              </t>
+
+              <t hangText='ca_rdma_ird:'><vspace />
+                This array has a maximum of one element.  If this array has one
+                element, then the element contains the inbound RDMA read queue
+                depth (IRD).  For each channel, the server MAY decrease this
+                value, but MUST NOT increase it.
+              </t>
+            </list>
+          </t>
+
+          <t hangText='csa_cb_program'><vspace />
+            This is the ONC RPC program number the server MUST use in any
+            callbacks sent through the backchannel to the client.  The server
+            MUST specify an ONC RPC program number equal to csa_cb_program and
+            an ONC RPC version number equal to 4 in callbacks sent to the
+            client.  If a CB_COMPOUND is sent to the client, the server MUST
+            use a minor version number of 1.  There is no corresponding
+            result.
+          </t>
+
+          <t hangText='csa_sec_parms'><vspace />
+            The field csa_sec_parms is an array of acceptable security
+            credentials the server can use on the session's backchannel.
+            Three security flavors are supported: AUTH_NONE, AUTH_SYS, and
+            RPCSEC_GSS.  If AUTH_NONE is specified for a credential, then this
+            says the client is authorizing the server to use AUTH_NONE on all
+            callbacks for the session.  If AUTH_SYS is specified, then the
+            client is authorizing the server to use AUTH_SYS on all callbacks,
+            using the credential specified cbsp_sys_cred.  If RPCSEC_GSS is
+            specified, then the server is allowed to use the RPCSEC_GSS
+            context specified in cbsp_gss_parms as the RPCSEC_GSS context in
+            the credential of the RPC header of callbacks to the client.
+            There is no corresponding result.
+            <vspace blankLines='1' />
+            The RPCSEC_GSS context for the backchannel is specified via a pair
+            of values of data type gsshandle4_t.  The data type gsshandle4_t
+            represents an RPCSEC_GSS handle, and is precisely the same as the
+            data type of the "handle" field of the rpc_gss_init_res data type
+            defined in Section 5.2.3.1, "Context Creation Response -
+            Successful Acceptance", of <xref target="RFC2203" />.
+            <vspace blankLines='1' />
+            The first RPCSEC_GSS handle, gcbp_handle_from_server, is the fore
+            handle the server returned to the client (either in the handle
+            field of data type rpc_gss_init_res or as one of the elements of
+            the spi_handles field returned in the reply to EXCHANGE_ID) when
+            the RPCSEC_GSS context was created on the server.  The second
+            handle, gcbp_handle_from_client, is the back handle to which the
+            client will map the RPCSEC_GSS context.  The server can
+            immediately use the value of gcbp_handle_from_client in the
+            RPCSEC_GSS credential in callback RPCs.  That is, the value in
+            gcbp_handle_from_client can be used as the value of the field
+            "handle" in data type rpc_gss_cred_t (see Section 5, "Elements of
+            the RPCSEC_GSS Security Protocol", of <xref target="RFC2203" />) in callback RPCs.  The
+            server MUST use the RPCSEC_GSS security service specified in
+            gcbp_service, i.e., it MUST set the "service" field of the
+            rpc_gss_cred_t data type in RPCSEC_GSS credential to the value of
+            gcbp_service (see Section 5.3.1, "RPC Request Header", of <xref target="RFC2203" />).
+            <vspace blankLines='1' />
+            If the RPCSEC_GSS handle identified by gcbp_handle_from_server
+            does not exist on the server, the server will return
+            NFS4ERR_NOENT.
+            <vspace blankLines='1' />
+            Within each element of csa_sec_parms, the fore and back RPCSEC_GSS
+            contexts MUST share the same GSS context and MUST have the same
+            seq_window (see <xref target="ss:file_attributes:RA1" />.3.1 of RFC2203 <xref target="RFC2203" />).  The fore and
+            back RPCSEC_GSS context state are independent of each other as far
+            as the RPCSEC_GSS sequence number (see the seq_num field in the
+            rpc_gss_cred_t data type of Sections 5 and 5.3.1 of <xref target="RFC2203" />).
+            <vspace blankLines='1' />
+            If an RPCSEC_GSS handle is using the SSV context (see
+            <xref target="ss:core_infrastructure:TSSVGM" />), then because each SSV RPCSEC_GSS handle shares a
+            common SSV GSS context, there are security considerations specific
+            to this situation discussed in <xref target="ss:core_infrastructure:SCfRWUtSM" />.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        Once the session is created, the first SEQUENCE or CB_SEQUENCE
+        received on a slot MUST have a sequence ID equal to 1; if not, the
+        replier MUST return NFS4ERR_SEQ_MISORDERED.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CREATE_SESSION:I" title="IMPLEMENTATION">
+      <t>
+        To describe a possible implementation, the same notation for client
+        records introduced in the description of EXCHANGE_ID is used with the
+        following addition:
+      </t>
+
+      <t>
+        <list style='hanging'>
+          <t hangText='clientid_arg:'>
+            The value of the csa_clientid field of the
+            CREATE_SESSION4args structure of the current request.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        Since CREATE_SESSION is a non-idempotent operation, we need to
+        consider the possibility that retries may occur as a result of a
+        client restart, network partition, malfunctioning router, etc.  For
+        each client ID created by EXCHANGE_ID, the server maintains a
+        separate reply cache (called the CREATE_SESSION reply cache) similar
+        to the session reply cache used for SEQUENCE operations, with two
+        distinctions.
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            First, this is a reply cache just for detecting and processing
+            CREATE_SESSION requests for a given client ID.
+          </t>
+
+          <t>
+            Second, the size of the client ID reply cache is of one slot (and
+            as a result, the CREATE_SESSION request does not carry a slot
+            number).  This means that at most one CREATE_SESSION request for a
+            given client ID can be outstanding.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        As previously stated, CREATE_SESSION can be sent with or without a
+        preceding SEQUENCE operation.  Even if a SEQUENCE precedes
+        CREATE_SESSION, the server MUST maintain the CREATE_SESSION reply
+        cache, which is separate from the reply cache for the session
+        associated with a SEQUENCE.  If CREATE_SESSION was originally sent by
+        itself, the client MAY send a retry of the CREATE_SESSION operation
+        within a COMPOUND preceded by a SEQUENCE.  If CREATE_SESSION was
+        originally sent in a COMPOUND that started with a SEQUENCE, then the
+        client SHOULD send a retry in a COMPOUND that starts with a SEQUENCE
+        that has the same session ID as the SEQUENCE of the original request.
+        However, the client MAY send a retry in a COMPOUND that either has no
+        preceding SEQUENCE, or has a preceding SEQUENCE that refers to a
+        different session than the original CREATE_SESSION.  This might be
+        necessary if the client sends a CREATE_SESSION in a COMPOUND preceded
+        by a SEQUENCE with session ID X, and session X no longer exists.
+        Regardless, any retry of CREATE_SESSION, with or without a preceding
+        SEQUENCE, MUST use the same value of csa_sequence as the original.
+      </t>
+
+      <t>
+        After the client received a reply to an EXCHANGE_ID operation that
+        contains a new, unconfirmed client ID, the server expects the client
+        to follow with a CREATE_SESSION operation to confirm the client ID.
+        The server expects value of csa_sequenceid in the arguments to that
+        CREATE_SESSION to be to equal the value of the field eir_sequenceid
+        that was returned in results of the EXCHANGE_ID that returned the
+        unconfirmed client ID.  Before the server replies to that EXCHANGE_ID
+        operation, it initializes the client ID slot to be equal to
+        eir_sequenceid - 1 (accounting for underflow), and records a
+        contrived CREATE_SESSION result with a "cached" result of
+        NFS4ERR_SEQ_MISORDERED.  With the client ID slot thus initialized,
+        the processing of the CREATE_SESSION operation is divided into four
+        phases:
+      </t>
+
+      <t>
+        <list style='numbers'>
+          <t>
+            Client record look up.  The server looks up the client ID in its
+            client record table.  If the server contains no records with
+            client ID equal to clientid_arg, then most likely the client's
+            state has been purged during a period of inactivity, possibly due
+            to a loss of connectivity.  NFS4ERR_STALE_CLIENTID is returned,
+            and no changes are made to any client records on the server.
+            Otherwise, the server goes to phase 2.
+          </t>
+
+          <t>
+            Sequence ID processing.  If csa_sequenceid is equal to the
+            sequence ID in the client ID's slot, then this is a replay of the
+            previous CREATE_SESSION request, and the server returns the
+            cached result.  If csa_sequenceid is not equal to the sequence ID
+            in the slot, and is more than one greater (accounting for
+            wraparound), then the server returns the error
+            NFS4ERR_SEQ_MISORDERED, and does not change the slot.  If
+            csa_sequenceid is equal to the slot's sequence ID + 1 (accounting
+            for wraparound), then the slot's sequence ID is set to
+            csa_sequenceid, and the CREATE_SESSION processing goes to the
+            next phase.  A subsequent new CREATE_SESSION call over the same
+            client ID MUST use a csa_sequenceid that is one greater than the
+            sequence ID in the slot.
+          </t>
+
+          <t>
+            Client ID confirmation.  If this would be the first session for
+            the client ID, the CREATE_SESSION operation serves to confirm the
+            client ID.  Otherwise, the client ID confirmation phase is
+            skipped and only the session creation phase occurs.  Any case in
+            which there is more than one record with identical values for
+            client ID represents a server implementation error.  Operation in
+            the potential valid cases is summarized as follows.
+
+            <list style='symbols'>
+              <t>
+                Successful Confirmation
+
+                <list style='empty'>
+                  <t>
+                    If the server has the following unconfirmed record, then
+                    this is the expected confirmation of an unconfirmed record.
+                  </t>
+
+                  <t>
+                    { ownerid, verifier, principal_arg, clientid_arg,
+                    unconfirmed }
+                  </t>
+
+                  <t>
+                    As noted in <xref target="ss:op_EXCHANGE_ID:I" />, the server might also have the
+                    following confirmed record.
+                  </t>
+
+                  <t>
+                    { ownerid, old_verifier, principal_arg, old_clientid,
+                    confirmed }
+                  </t>
+
+                  <t>
+                    The server schedules the replacement of both records with:
+                  </t>
+
+                  <t>
+                    { ownerid, verifier, principal_arg, clientid_arg, confirmed
+                    }
+                  </t>
+
+                  <t>
+                    The processing of CREATE_SESSION continues on to session
+                    creation.  Once the session is successfully created, the
+                    scheduled client record replacement is committed.  If the
+                    session is not successfully created, then no changes are
+                    made to any client records on the server.
+                  </t>
+                </list>
+              </t>
+
+              <t>
+                Unsuccessful Confirmation
+
+                <list style='empty'>
+                  <t>
+                    If the server has the following record, then the client has
+                    changed principals after the previous EXCHANGE_ID request,
+                    or there has been a chance collision between shorthand
+                    client identifiers.
+                  </t>
+
+                  <t>
+                    { *, *, old_principal_arg, clientid_arg, * }
+                  </t>
+
+                  <t>
+                    Neither of these cases is permissible.  Processing stops
+                    and NFS4ERR_CLID_INUSE is returned to the client.  No
+                    changes are made to any client records on the server.
+                  </t>
+                </list>
+              </t>
+            </list>
+          </t>
+
+          <t>
+            Session creation.  The server confirmed the client ID, either in
+            this CREATE_SESSION operation, or a previous CREATE_SESSION
+            operation.  The server examines the remaining fields of the
+            arguments.
+            <vspace blankLines='1' />
+            The server creates the session by recording the parameter values
+            used (including whether the CREATE_SESSION4_FLAG_PERSIST flag is
+            set and has been accepted by the server) and allocating space for
+            the session reply cache (if there is not enough space, the server
+            returns NFS4ERR_NOSPC).  For each slot in the reply cache, the
+            server sets the sequence ID to zero, and records an entry
+            containing a COMPOUND reply with zero operations and the error
+            NFS4ERR_SEQ_MISORDERED.  This way, if the first SEQUENCE request
+            sent has a sequence ID equal to zero, the server can simply
+            return what is in the reply cache: NFS4ERR_SEQ_MISORDERED.  The
+            client initializes its reply cache for receiving callbacks in the
+            same way, and similarly, the first CB_SEQUENCE operation on a
+            slot after session creation MUST have a sequence ID of one.
+            <vspace blankLines='1' />
+            If the session state is created successfully, the server
+            associates the session with the client ID provided by the client.
+            <vspace blankLines='1' />
+            When a request that had CREATE_SESSION4_FLAG_CONN_RDMA set needs
+            to be retried, the retry MUST be done on a new connection that is
+            in non-RDMA mode.  If properties of the new connection are
+            different enough that the arguments to CREATE_SESSION need to
+            change, then a non-retry MUST be sent.  The server will
+            eventually dispose of any session that was created on the
+            original connection.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        On the backchannel, the client and server might wish to have many
+        slots, in some cases perhaps more that the fore channel, in order to
+        deal with the situations where the network link has high latency and
+        is the primary bottleneck for response to recalls.  If so, and if the
+        client provides too few slots to the backchannel, the server might
+        limit the number of recallable objects it gives to the client.
+      </t>
+
+      <t>
+        Implementing RPCSEC_GSS callback support requires changes to both the
+        client and server implementations of RPCSEC_GSS.  One possible set of
+        changes includes:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            Adding a data structure that wraps the GSS-API context with a
+            reference count.
+          </t>
+
+          <t>
+            New functions to increment and decrement the reference count.  If
+            the reference count is decremented to zero, the wrapper data
+            structure and the GSS-API context it refers to would be freed.
+          </t>
+
+          <t>
+            Change RPCSEC_GSS to create the wrapper data structure upon
+            receiving GSS-API context from gss_accept_sec_context() and
+            gss_init_sec_context().  The reference count would be initialized
+            to 1.
+          </t>
+
+          <t>
+            Adding a function to map an existing RPCSEC_GSS handle to a
+            pointer to the wrapper data structure.  The reference count would
+            be incremented.
+          </t>
+
+          <t>
+            Adding a function to create a new RPCSEC_GSS handle from a pointer
+            to the wrapper data structure.  The reference count would be
+            incremented.
+          </t>
+
+          <t>
+            Replacing calls from RPCSEC_GSS that free GSS-API contexts, with
+            calls to decrement the reference count on the wrapper data
+            structure.
+          </t>
+        </list>
+      </t>
+    </section>
+  </section>
+

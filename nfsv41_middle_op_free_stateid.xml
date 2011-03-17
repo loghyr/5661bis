@@ -1,0 +1,39 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_FREE_STATEID" title="Operation 45: FREE_STATEID - Free Stateid with No Locks">
+    <section toc='exclude' anchor="ss:op_FREE_STATEID:A" title="ARGUMENT">
+      <?rfc include='autogen/free_stateid_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_FREE_STATEID:R" title="RESULT">
+      <?rfc include='autogen/free_stateid_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_FREE_STATEID:D" title="DESCRIPTION">
+      <t>
+        The FREE_STATEID operation is used to free a stateid that no longer
+        has any associated locks (including opens, byte-range locks,
+        delegations, and layouts).  This may be because of client LOCKU
+        operations or because of server revocation.  If there are valid locks
+        (of any kind) associated with the stateid in question, the error
+        NFS4ERR_LOCKS_HELD will be returned, and the associated stateid will
+        not be freed.
+      </t>
+
+      <t>
+        When a stateid is freed that had been associated with revoked locks,
+        by sending the FREE_STATEID operation, the client acknowledges the
+        loss of those locks.  This allows the server, once all such revoked
+        state is acknowledged, to allow that client again to reclaim locks,
+        without encountering the edge conditions discussed in <xref target="ss:state_management:SFaR" />.
+      </t>
+
+      <t>
+        Once a successful FREE_STATEID is done for a given stateid, any
+        subsequent use of that stateid will result in an NFS4ERR_BAD_STATEID
+        error.
+      </t>
+    </section>
+  </section>
+

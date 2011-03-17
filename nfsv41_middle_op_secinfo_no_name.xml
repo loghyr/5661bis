@@ -1,0 +1,68 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_SECINFO_NO_NAME" title="Operation 52: SECINFO_NO_NAME - Get Security on Unnamed Object">
+    <section toc='exclude' anchor="ss:op_SECINFO_NO_NAME:A" title="ARGUMENT">
+      <?rfc include='autogen/secinfo_no_name_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_SECINFO_NO_NAME:R" title="RESULT">
+      <?rfc include='autogen/secinfo_no_name_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_SECINFO_NO_NAME:D" title="DESCRIPTION">
+      <t>
+        Like the SECINFO operation, SECINFO_NO_NAME is used by the client to
+        obtain a list of valid RPC authentication flavors for a specific file
+        object.  Unlike SECINFO, SECINFO_NO_NAME only works with objects that
+        are accessed by filehandle.
+      </t>
+
+      <t>
+        There are two styles of SECINFO_NO_NAME, as determined by the value
+        of the secinfo_style4 enumeration.  If SECINFO_STYLE4_CURRENT_FH is
+        passed, then SECINFO_NO_NAME is querying for the required security
+        for the current filehandle.  If SECINFO_STYLE4_PARENT is passed, then
+        SECINFO_NO_NAME is querying for the required security of the current
+        filehandle's parent.  If the style selected is SECINFO_STYLE4_PARENT,
+        then SECINFO should apply the same access methodology used for
+        LOOKUPP when evaluating the traversal to the parent directory.
+        Therefore, if the requester does not have the appropriate access to
+        LOOKUPP the parent, then SECINFO_NO_NAME must behave the same way and
+        return NFS4ERR_ACCESS.
+      </t>
+
+      <t>
+        If PUTFH, PUTPUBFH, PUTROOTFH, or RESTOREFH returns NFS4ERR_WRONGSEC,
+        then the client resolves the situation by sending a COMPOUND request
+        that consists of PUTFH, PUTPUBFH, or PUTROOTFH immediately followed
+        by SECINFO_NO_NAME, style SECINFO_STYLE4_CURRENT_FH.  See <xref target="ss:core_infrastructure:SSN" />
+        for instructions on dealing with NFS4ERR_WRONGSEC error returns from
+        PUTFH, PUTROOTFH, PUTPUBFH, or RESTOREFH.
+      </t>
+
+      <t>
+        If SECINFO_STYLE4_PARENT is specified and there is no parent
+        directory, SECINFO_NO_NAME MUST return NFS4ERR_NOENT.
+      </t>
+
+      <t>
+        On success, the current filehandle is consumed (see
+        <xref target="ss:core_infrastructure:OaSaS" />), and if the next operation after SECINFO_NO_NAME
+        tries to use the current filehandle, that operation will fail with
+        the status NFS4ERR_NOFILEHANDLE.
+      </t>
+
+      <t>
+        Everything else about SECINFO_NO_NAME is the same as SECINFO.  See
+        the discussion on SECINFO (<xref target="ss:op_SECINFO:D" />).
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_SECINFO_NO_NAME:I" title="IMPLEMENTATION">
+      <t>
+        See the discussion on SECINFO (<xref target="ss:op_SECINFO:I" />).
+      </t>
+    </section>
+  </section>
+

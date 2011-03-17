@@ -1,0 +1,1009 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_EXCHANGE_ID" title="Operation 42: EXCHANGE_ID - Instantiate Client ID">
+    <t>
+      The EXCHANGE_ID exchanges long-hand client and server identifiers
+      (owners), and creates a client ID.
+    </t>
+
+    <section toc='exclude' anchor="ss:op_EXCHANGE_ID:A" title="ARGUMENT">
+      <?rfc include='autogen/exchange_id_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_EXCHANGE_ID:R" title="RESULT">
+      <?rfc include='autogen/exchange_id_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_EXCHANGE_ID:D" title="DESCRIPTION">
+      <t>
+        The client uses the EXCHANGE_ID operation to register a particular
+        client owner with the server.  The client ID returned from this
+        operation will be necessary for requests that create state on the
+        server and will serve as a parent object to sessions created by the
+        client.  In order to confirm the client ID it must first be used,
+        along with the returned eir_sequenceid, as arguments to
+        CREATE_SESSION.  If the flag EXCHGID4_FLAG_CONFIRMED_R is set in the
+        result, eir_flags, then eir_sequenceid MUST be ignored, as it has no
+        relevancy.
+      </t>
+
+      <t>
+        EXCHANGE_ID MAY be sent in a COMPOUND procedure that starts with
+        SEQUENCE.  However, when a client communicates with a server for the
+        first time, it will not have a session, so using SEQUENCE will not be
+        possible.  If EXCHANGE_ID is sent without a preceding SEQUENCE, then
+        it MUST be the only operation in the COMPOUND procedure's request.
+        If it is not, the server MUST return NFS4ERR_NOT_ONLY_OP.
+      </t>
+
+      <t>
+        The eia_clientowner field is composed of a co_verifier field and a
+        co_ownerid string.  As noted in <xref target="ss:core_infrastructure:CIaCO" />, the co_ownerid describes
+        the client, and the co_verifier is the incarnation of the client.  An
+        EXCHANGE_ID sent with a new incarnation of the client will lead to
+        the server removing lock state of the old incarnation.  Whereas an
+        EXCHANGE_ID sent with the current incarnation and co_ownerid will
+        result in an error or an update of the client ID's properties,
+        depending on the arguments to EXCHANGE_ID.
+      </t>
+
+      <t>
+        A server MUST NOT use the same client ID for two different
+        incarnations of an eir_clientowner.
+      </t>
+
+      <t>
+        In addition to the client ID and sequence ID, the server returns a
+        server owner (eir_server_owner) and server scope (eir_server_scope).
+        The former field is used for network trunking as described in
+        <xref target="ss:core_infrastructure:T" />.  The latter field is used to allow clients to
+        determine when client IDs sent by one server may be recognized by
+        another in the event of file system migration (see <xref target="ss:multi-server_namespace:LSaFST" />).
+      </t>
+
+      <t>
+        The client ID returned by EXCHANGE_ID is only unique relative to the
+        combination of eir_server_owner.so_major_id and eir_server_scope.
+        Thus, if two servers return the same client ID, the onus is on the
+        client to distinguish the client IDs on the basis of
+        eir_server_owner.so_major_id and eir_server_scope.  In the event two
+        different servers claim matching server_owner.so_major_id and
+        eir_server_scope, the client can use the verification techniques
+        discussed in <xref target="ss:core_infrastructure:T" /> to determine if the servers are distinct.
+        If they are distinct, then the client will need to note the
+        destination network addresses of the connections used with each
+        server, and use the network address as the final discriminator.
+      </t>
+
+      <t>
+        The server, as defined by the unique identity expressed in the
+        so_major_id of the server owner and the server scope, needs to track
+        several properties of each client ID it hands out.  The properties
+        apply to the client ID and all sessions associated with the client
+        ID.  The properties are derived from the arguments and results of
+        EXCHANGE_ID.  The client ID properties include:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            The capabilities expressed by the following bits, which come from
+            the results of EXCHANGE_ID:
+
+            <list style='symbols'>
+              <t>
+                EXCHGID4_FLAG_SUPP_MOVED_REFER
+              </t>
+
+              <t>
+                EXCHGID4_FLAG_SUPP_MOVED_MIGR
+              </t>
+
+              <t>
+                EXCHGID4_FLAG_BIND_PRINC_STATEID
+              </t>
+
+              <t>
+                EXCHGID4_FLAG_USE_NON_PNFS
+              </t>
+
+              <t>
+                EXCHGID4_FLAG_USE_PNFS_MDS
+              </t>
+
+              <t>
+                EXCHGID4_FLAG_USE_PNFS_DS
+              </t>
+            </list>
+
+            These properties may be updated by subsequent EXCHANGE_ID requests
+            on confirmed client IDs though the server MAY refuse to change
+            them.
+          </t>
+
+          <t>
+            The state protection method used, one of SP4_NONE, SP4_MACH_CRED,
+            or SP4_SSV, as set by the spa_how field of the arguments to
+            EXCHANGE_ID.  Once the client ID is confirmed, this property
+            cannot be updated by subsequent EXCHANGE_ID requests.
+          </t>
+
+          <t>
+            For SP4_MACH_CRED or SP4_SSV state protection:
+
+            <list style='symbols'>
+              <t>
+                The list of operations (spo_must_enforce) that MUST use the
+                specified state protection.  This list comes from the results
+                of EXCHANGE_ID.
+              </t>
+
+              <t>
+                The list of operations (spo_must_allow) that MAY use the
+                specified state protection.  This list comes from the results
+                of EXCHANGE_ID.
+              </t>
+            </list>
+
+            Once the client ID is confirmed, these properties cannot be
+            updated by subsequent EXCHANGE_ID requests.
+          </t>
+
+          <t>
+            For SP4_SSV protection:
+
+            <list style='symbols'>
+              <t>
+                The OID of the hash algorithm.  This property is represented by
+                one of the algorithms in the ssp_hash_algs field of the
+                EXCHANGE_ID arguments.  Once the client ID is confirmed, this
+                property cannot be updated by subsequent EXCHANGE_ID requests.
+              </t>
+
+              <t>
+                The OID of the encryption algorithm.  This property is
+                represented by one of the algorithms in the ssp_encr_algs field
+                of the EXCHANGE_ID arguments.  Once the client ID is confirmed,
+                this property cannot be updated by subsequent EXCHANGE_ID
+                requests.
+              </t>
+
+              <t>
+                The length of the SSV.  This property is represented by the
+                spi_ssv_len field in the EXCHANGE_ID results.  Once the client
+                ID is confirmed, this property cannot be updated by subsequent
+                EXCHANGE_ID requests.
+                <vspace blankLines="1" />
+                There are REQUIRED and RECOMMENDED relationships among the
+                length of the key of the encryption algorithm ("key length"),
+                the length of the output of hash algorithm ("hash length"), and
+                the length of the SSV ("SSV length").
+
+                <list style='symbols'>
+                  <t>
+                    key length MUST be &lt;= hash length.  This is because the keys
+                    used for the encryption algorithm are actually subkeys
+                    derived from the SSV, and the derivation is via the hash
+                    algorithm.  The selection of an encryption algorithm with a
+                    key length that exceeded the length of the output of the
+                    hash algorithm would require padding, and thus weaken the
+                    use of the encryption algorithm.
+                  </t>
+
+                  <t>
+                    hash length SHOULD be &lt;= SSV length.  This is because the
+                    SSV is a key used to derive subkeys via an HMAC, and it is
+                    recommended that the key used as input to an HMAC be at
+                    least as long as the length of the HMAC's hash algorithm's
+                    output (see <xref target="sec:protocol_constants" /> of RFC2104 <xref target="RFC2104" />).
+                  </t>
+
+                  <t>
+                    key length SHOULD be &lt;= SSV length.  This is a transitive
+                    result of the above two invariants.
+                  </t>
+
+                  <t>
+                    key length SHOULD be &gt;= hash length / 2.  This is because
+                    the subkey derivation is via an HMAC and it is recommended
+                    that if the HMAC has to be truncated, it should not be
+                    truncated to less than half the hash length (see <xref target="sec:filehandles" />
+                    of RFC2104 <xref target="RFC2104" />).
+                  </t>
+                </list>
+              </t>
+
+              <t>
+                Number of concurrent versions of the SSV the client and server
+                will support (<xref target="ss:core_infrastructure:TSSVGM" />).  This property is represented by
+                spi_window in the EXCHANGE_ID results.  The property may be
+                updated by subsequent EXCHANGE_ID requests.
+              </t>
+            </list>
+          </t>
+
+          <t>
+            The client's implementation ID as represented by the
+            eia_client_impl_id field of the arguments.  The property may be
+            updated by subsequent EXCHANGE_ID requests.
+          </t>
+
+          <t>
+            The server's implementation ID as represented by the
+            eir_server_impl_id field of the reply.  The property may be
+            updated by replies to subsequent EXCHANGE_ID requests.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        The eia_flags passed as part of the arguments and the eir_flags
+        results allow the client and server to inform each other of their
+        capabilities as well as indicate how the client ID will be used.
+        Whether a bit is set or cleared on the arguments' flags does not
+        force the server to set or clear the same bit on the results' side.
+        Bits not defined above cannot be set in the eia_flags field.  If they
+        are, the server MUST reject the operation with NFS4ERR_INVAL.
+      </t>
+
+      <t>
+        The EXCHGID4_FLAG_UPD_CONFIRMED_REC_A bit can only be set in
+        eia_flags; it is always off in eir_flags.  The
+        EXCHGID4_FLAG_CONFIRMED_R bit can only be set in eir_flags; it is
+        always off in eia_flags.  If the server recognizes the co_ownerid and
+        co_verifier as mapping to a confirmed client ID, it sets
+        EXCHGID4_FLAG_CONFIRMED_R in eir_flags.  The
+        EXCHGID4_FLAG_CONFIRMED_R flag allows a client to tell if the client
+        ID it is trying to create already exists and is confirmed.
+      </t>
+
+      <t>
+        If EXCHGID4_FLAG_UPD_CONFIRMED_REC_A is set in eia_flags, this means
+        that the client is attempting to update properties of an existing
+        confirmed client ID (if the client wants to update properties of an
+        unconfirmed client ID, it MUST NOT set
+        EXCHGID4_FLAG_UPD_CONFIRMED_REC_A).  If so, it is RECOMMENDED that
+        the client send the update EXCHANGE_ID operation in the same COMPOUND
+        as a SEQUENCE so that the EXCHANGE_ID is executed exactly once.
+        Whether the client can update the properties of client ID depends on
+        the state protection it selected when the client ID was created, and
+        the principal and security flavor it uses when sending the
+        EXCHANGE_ID request.  The situations described in items 6, 7, 8, or 9
+        of the second numbered list of <xref target="ss:op_EXCHANGE_ID:I" /> will apply.  Note that
+        if the operation succeeds and returns a client ID that is already
+        confirmed, the server MUST set the EXCHGID4_FLAG_CONFIRMED_R bit in
+        eir_flags.
+      </t>
+
+      <t>
+        If EXCHGID4_FLAG_UPD_CONFIRMED_REC_A is not set in eia_flags, this
+        means that the client is trying to establish a new client ID; it is
+        attempting to trunk data communication to the server
+        (<xref target="ss:core_infrastructure:T" />); or it is attempting to update properties of an
+        unconfirmed client ID.  The situations described in items 1, 2, 3, 4,
+        or 5 of the second numbered list of <xref target="ss:op_EXCHANGE_ID:I" /> will apply.  Note
+        that if the operation succeeds and returns a client ID that was
+        previously confirmed, the server MUST set the
+        EXCHGID4_FLAG_CONFIRMED_R bit in eir_flags.
+      </t>
+
+      <t>
+        When the EXCHGID4_FLAG_SUPP_MOVED_REFER flag bit is set, the client
+        indicates that it is capable of dealing with an NFS4ERR_MOVED error
+        as part of a referral sequence.  When this bit is not set, it is
+        still legal for the server to perform a referral sequence.  However,
+        a server may use the fact that the client is incapable of correctly
+        responding to a referral, by avoiding it for that particular client.
+        It may, for instance, act as a proxy for that particular file system,
+        at some cost in performance, although it is not obligated to do so.
+        If the server will potentially perform a referral, it MUST set
+        EXCHGID4_FLAG_SUPP_MOVED_REFER in eir_flags.
+      </t>
+
+      <t>
+        When the EXCHGID4_FLAG_SUPP_MOVED_MIGR is set, the client indicates
+        that it is capable of dealing with an NFS4ERR_MOVED error as part of
+        a file system migration sequence.  When this bit is not set, it is
+        still legal for the server to indicate that a file system has moved,
+        when this in fact happens.  However, a server may use the fact that
+        the client is incapable of correctly responding to a migration in its
+        scheduling of file systems to migrate so as to avoid migration of
+        file systems being actively used.  It may also hide actual migrations
+        from clients unable to deal with them by acting as a proxy for a
+        migrated file system for particular clients, at some cost in
+        performance, although it is not obligated to do so.  If the server
+        will potentially perform a migration, it MUST set
+        EXCHGID4_FLAG_SUPP_MOVED_MIGR in eir_flags.
+      </t>
+
+      <t>
+        When EXCHGID4_FLAG_BIND_PRINC_STATEID is set, the client indicates
+        that it wants the server to bind the stateid to the principal.  This
+        means that when a principal creates a stateid, it has to be the one
+        to use the stateid.  If the server will perform binding, it will
+        return EXCHGID4_FLAG_BIND_PRINC_STATEID.  The server MAY return
+        EXCHGID4_FLAG_BIND_PRINC_STATEID even if the client does not request
+        it.  If an update to the client ID changes the value of
+        EXCHGID4_FLAG_BIND_PRINC_STATEID's client ID property, the effect
+        applies only to new stateids.  Existing stateids (and all stateids
+        with the same "other" field) that were created with stateid to
+        principal binding in force will continue to have binding in force.
+        Existing stateids (and all stateids with the same "other" field) that
+        were created with stateid to principal not in force will continue to
+        have binding not in force.
+      </t>
+
+      <t>
+        The EXCHGID4_FLAG_USE_NON_PNFS, EXCHGID4_FLAG_USE_PNFS_MDS, and
+        EXCHGID4_FLAG_USE_PNFS_DS bits are described in <xref target="ss:nfsv4.1_as:CIaSC" /> and
+        convey roles the client ID is to be used for in a pNFS environment.
+        The server MUST set one of the acceptable combinations of these bits
+        (roles) in eir_flags, as specified in <xref target="ss:nfsv4.1_as:CIaSC" />.  Note that the
+        same client owner/server owner pair can have multiple roles.
+        Multiple roles can be associated with the same client ID or with
+        different client IDs.  Thus, if a client sends EXCHANGE_ID from the
+        same client owner to the same server owner multiple times, but
+        specifies different pNFS roles each time, the server might return
+        different client IDs.  Given that different pNFS roles might have
+        different client IDs, the client may ask for different properties for
+        each role/client ID.
+      </t>
+
+      <t>
+        The spa_how field of the eia_state_protect field specifies how the
+        client wants to protect its client, locking, and session states from
+        unauthorized changes (<xref target="ss:core_infrastructure:PfUSC" />):
+      </t>
+
+      <t>
+        <list style='hanging'>
+          <t hangText='SP4_NONE.'>
+            The client does not request the NFSv4.1 server to
+            enforce state protection.  The NFSv4.1 server MUST NOT enforce
+            state protection for the returned client ID.
+          </t>
+
+          <t hangText='SP4_MACH_CRED.'>
+            If spa_how is SP4_MACH_CRED, then the client MUST
+            send the EXCHANGE_ID request with RPCSEC_GSS as the security
+            flavor, and with a service of RPC_GSS_SVC_INTEGRITY or
+            RPC_GSS_SVC_PRIVACY.  If SP4_MACH_CRED is specified, then the
+            client wants to use an RPCSEC_GSS-based machine credential to
+            protect its state.  The server MUST note the principal the
+            EXCHANGE_ID operation was sent with, and the GSS mechanism used.
+            These notes collectively comprise the machine credential.
+            <vspace blankLines="1" />
+            After the client ID is confirmed, as long as the lease associated
+            with the client ID is unexpired, a subsequent EXCHANGE_ID
+            operation that uses the same eia_clientowner.co_owner as the first
+            EXCHANGE_ID MUST also use the same machine credential as the first
+            EXCHANGE_ID.  The server returns the same client ID for the
+            subsequent EXCHANGE_ID as that returned from the first
+            EXCHANGE_ID.
+          </t>
+
+         <t hangText=' SP4_SSV.'>
+            If spa_how is SP4_SSV, then the client MUST send the
+            EXCHANGE_ID request with RPCSEC_GSS as the security flavor, and
+            with a service of RPC_GSS_SVC_INTEGRITY or RPC_GSS_SVC_PRIVACY.
+            If SP4_SSV is specified, then the client wants to use the SSV to
+            protect its state.  The server records the credential used in the
+            request as the machine credential (as defined above) for the
+            eia_clientowner.co_owner.  The CREATE_SESSION operation that
+            confirms the client ID MUST use the same machine credential.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        When a client specifies SP4_MACH_CRED or SP4_SSV, it also provides
+        two lists of operations (each expressed as a bitmap).  The first list
+        is spo_must_enforce and consists of those operations the client MUST
+        send (subject to the server confirming the list of operations in the
+        result of EXCHANGE_ID) with the machine credential (if SP4_MACH_CRED
+        protection is specified) or the SSV-based credential (if SP4_SSV
+        protection is used).  The client MUST send the operations with
+        RPCSEC_GSS credentials that specify the RPC_GSS_SVC_INTEGRITY or
+        RPC_GSS_SVC_PRIVACY security service.  Typically, the first list of
+        operations includes EXCHANGE_ID, CREATE_SESSION, DELEGPURGE,
+        DESTROY_SESSION, BIND_CONN_TO_SESSION, and DESTROY_CLIENTID.  The
+        client SHOULD NOT specify in this list any operations that require a
+        filehandle because the server's access policies MAY conflict with the
+        client's choice, and thus the client would then be unable to access a
+        subset of the server's namespace.
+      </t>
+
+      <t>
+        Note that if SP4_SSV protection is specified, and the client
+        indicates that CREATE_SESSION must be protected with SP4_SSV, because
+        the SSV cannot exist without a confirmed client ID, the first
+        CREATE_SESSION MUST instead be sent using the machine credential, and
+        the server MUST accept the machine credential.
+      </t>
+
+      <t>
+        There is a corresponding result, also called spo_must_enforce, of the
+        operations for which the server will require SP4_MACH_CRED or SP4_SSV
+        protection.  Normally, the server's result equals the client's
+        argument, but the result MAY be different.  If the client requests
+        one or more operations in the set { EXCHANGE_ID, CREATE_SESSION,
+        DELEGPURGE, DESTROY_SESSION, BIND_CONN_TO_SESSION, DESTROY_CLIENTID
+        }, then the result spo_must_enforce MUST include the operations the
+        client requested from that set.
+      </t>
+
+      <t>
+        If spo_must_enforce in the results has BIND_CONN_TO_SESSION set, then
+        connection binding enforcement is enabled, and the client MUST use
+        the machine (if SP4_MACH_CRED protection is used) or SSV (if SP4_SSV
+        protection is used) credential on calls to BIND_CONN_TO_SESSION.
+      </t>
+
+      <t>
+        The second list is spo_must_allow and consists of those operations
+        the client wants to have the option of sending with the machine
+        credential or the SSV-based credential, even if the object the
+        operations are performed on is not owned by the machine or SSV
+        credential.
+      </t>
+
+      <t>
+        The corresponding result, also called spo_must_allow, consists of the
+        operations the server will allow the client to use SP4_SSV or
+        SP4_MACH_CRED credentials with.  Normally, the server's result equals
+        the client's argument, but the result MAY be different.
+      </t>
+
+      <t>
+        The purpose of spo_must_allow is to allow clients to solve the
+        following conundrum.  Suppose the client ID is confirmed with
+        EXCHGID4_FLAG_BIND_PRINC_STATEID, and it calls OPEN with the
+        RPCSEC_GSS credentials of a normal user.  Now suppose the user's
+        credentials expire, and cannot be renewed (e.g., a Kerberos ticket
+        granting ticket expires, and the user has logged off and will not be
+        acquiring a new ticket granting ticket).  The client will be unable
+        to send CLOSE without the user's credentials, which is to say the
+        client has to either leave the state on the server or re-send
+        EXCHANGE_ID with a new verifier to clear all state, that is, unless
+        the client includes CLOSE on the list of operations in spo_must_allow
+        and the server agrees.
+      </t>
+
+      <t>
+        The SP4_SSV protection parameters also have:
+      </t>
+
+      <t>
+        <list style='hanging'>
+          <t hangText='ssp_hash_algs:'><vspace />
+            This is the set of algorithms the client supports for the purpose
+            of computing the digests needed for the internal SSV GSS mechanism
+            and for the SET_SSV operation.  Each algorithm is specified as an
+            object identifier (OID).  The REQUIRED algorithms for a server are
+            id-sha1, id-sha224, id-sha256, id-sha384, and id-sha512 <xref target="RFC4055" />.  The
+            algorithm the server selects among the set is indicated in
+            spi_hash_alg, a field of spr_ssv_prot_info.  The field
+            spi_hash_alg is an index into the array ssp_hash_algs.  If the
+            server does not support any of the offered algorithms, it returns
+            NFS4ERR_HASH_ALG_UNSUPP.  If ssp_hash_algs is empty, the server
+            MUST return NFS4ERR_INVAL.
+          </t>
+
+          <t hangText='ssp_encr_algs:'><vspace />
+            This is the set of algorithms the client supports for the purpose
+            of providing privacy protection for the internal SSV GSS
+            mechanism.  Each algorithm is specified as an OID.  The REQUIRED
+            algorithm for a server is id-aes256-CBC.  The RECOMMENDED
+            algorithms are id-aes192-CBC and id-aes128-CBC <xref target="CSOR_AES" />.  The selected
+            algorithm is returned in spi_encr_alg, an index into
+            ssp_encr_algs.  If the server does not support any of the offered
+            algorithms, it returns NFS4ERR_ENCR_ALG_UNSUPP.  If ssp_encr_algs
+            is empty, the server MUST return NFS4ERR_INVAL.  Note that due to
+            previously stated requirements and recommendations on the
+            relationships between key length and hash length, some
+            combinations of RECOMMENDED and REQUIRED encryption algorithm and
+            hash algorithm either SHOULD NOT or MUST NOT be used.  <xref target='tbl:encrpt_disc' />
+            summarizes the illegal and discouraged combinations.
+          </t>
+
+          <t hangText='ssp_window:'><vspace />
+            This is the number of SSV versions the client wants the server to
+            maintain (i.e., each successful call to SET_SSV produces a new
+            version of the SSV).  If ssp_window is zero, the server MUST
+            return NFS4ERR_INVAL.  The server responds with spi_window, which
+            MUST NOT exceed ssp_window, and MUST be at least one.  Any
+            requests on the backchannel or fore channel that are using a
+            version of the SSV that is outside the window will fail with an
+            ONC RPC authentication error, and the requester will have to retry
+            them with the same slot ID and sequence ID.
+          </t>
+
+          <t hangText='ssp_num_gss_handles:'><vspace />
+            This is the number of RPCSEC_GSS handles the server should create
+            that are based on the GSS SSV mechanism (<xref target="ss:core_infrastructure:TSSVGM" />).  It is
+            not the total number of RPCSEC_GSS handles for the client ID.
+            Indeed, subsequent calls to EXCHANGE_ID will add RPCSEC_GSS
+            handles.  The server responds with a list of handles in
+            spi_handles.  If the client asks for at least one handle and the
+            server cannot create it, the server MUST return an error.  The
+            handles in spi_handles are not available for use until the client
+            ID is confirmed, which could be immediately if EXCHANGE_ID returns
+            EXCHGID4_FLAG_CONFIRMED_R, or upon successful confirmation from
+            CREATE_SESSION.
+            <vspace blankLines="1" />
+            While a client ID can span all the connections that are connected
+            to a server sharing the same eir_server_owner.so_major_id, the
+            RPCSEC_GSS handles returned in spi_handles can only be used on
+            connections connected to a server that returns the same the
+            eir_server_owner.so_major_id and eir_server_owner.so_minor_id on
+            each connection.  It is permissible for the client to set
+            ssp_num_gss_handles to zero; the client can create more handles
+            with another EXCHANGE_ID call.
+            <vspace blankLines="1" />
+            Because each SSV RPCSEC_GSS handle shares a common SSV GSS
+            context, there are security considerations specific to this
+            situation discussed in <xref target="ss:core_infrastructure:SCfRWUtSM" />.
+            <vspace blankLines="1" />
+            The seq_window (see <xref target="ss:file_attributes:RA1" />.3.1 of RFC2203 <xref target="RFC2203" />) of each
+            RPCSEC_GSS handle in spi_handle MUST be the same as the seq_window
+            of the RPCSEC_GSS handle used for the credential of the RPC
+            request that the EXCHANGE_ID request was sent with.
+          </t>
+        </list>
+      </t>
+
+      <texttable anchor='tbl:encrpt_disc'>
+        <ttcol>Encryption Algorithm</ttcol>
+        <ttcol>MUST NOT be combined with</ttcol>
+        <ttcol>SHOULD NOT be combined with</ttcol>
+        <c>id-aes128-CBC</c> <c>                  </c> <c>id-sha384, id-sha512</c>
+        <c>id-aes192-CBC</c> <c>id-sha1           </c> <c>id-sha512           </c>
+        <c>id-aes256-CBC</c> <c>id-sha1, id-sha224</c> <c>                    </c>
+      </texttable>
+
+      <t>
+        The arguments include an array of up to one element in length called
+        eia_client_impl_id.  If eia_client_impl_id is present, it contains
+        the information identifying the implementation of the client.
+        Similarly, the results include an array of up to one element in
+        length called eir_server_impl_id that identifies the implementation
+        of the server.  Servers MUST accept a zero-length eia_client_impl_id
+        array, and clients MUST accept a zero-length eir_server_impl_id
+        array.
+      </t>
+
+      <t>
+        An example use for implementation identifiers would be diagnostic
+        software that extracts this information in an attempt to identify
+        interoperability problems, performance workload behaviors, or general
+        usage statistics.  Since the intent of having access to this
+        information is for planning or general diagnosis only, the client and
+        server MUST NOT interpret this implementation identity information in
+        a way that affects interoperational behavior of the implementation.
+        The reason is that if clients and servers did such a thing, they
+        might use fewer capabilities of the protocol than the peer can
+        support, or the client and server might refuse to interoperate.
+      </t>
+
+      <t>
+        Because it is possible that some implementations will violate the
+        protocol specification and interpret the identity information,
+        implementations MUST allow the users of the NFSv4 client and server
+        to set the contents of the sent nfs_impl_id structure to any value.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_EXCHANGE_ID:I" title="IMPLEMENTATION">
+      <t>
+        A server's client record is a 5-tuple:
+      </t>
+
+      <t>
+        <list style='numbers'>
+          <t>
+            co_ownerid:<vspace />
+
+               The client identifier string, from the eia_clientowner
+               structure of the EXCHANGE_ID4args structure.
+          </t>
+
+          <t>
+            co_verifier:<vspace />
+
+               A client-specific value used to indicate incarnations (where a
+               client restart represents a new incarnation), from the
+               eia_clientowner structure of the EXCHANGE_ID4args structure.
+          </t>
+
+          <t>
+            principal:<vspace />
+
+               The principal that was defined in the RPC header's credential
+               and/or verifier at the time the client record was established.
+          </t>
+
+          <t>
+            client ID:<vspace />
+
+               The shorthand client identifier, generated by the server and
+               returned via the eir_clientid field in the EXCHANGE_ID4resok
+               structure.
+          </t>
+
+          <t>
+            confirmed:<vspace />
+
+               A private field on the server indicating whether or not a
+               client record has been confirmed.  A client record is
+               confirmed if there has been a successful CREATE_SESSION
+               operation to confirm it.  Otherwise, it is unconfirmed.  An
+               unconfirmed record is established by an EXCHANGE_ID call.  Any
+               unconfirmed record that is not confirmed within a lease period
+               SHOULD be removed.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        The following identifiers represent special values for the fields in
+        the records.
+      </t>
+
+      <t>
+        <list style='hanging'>
+          <t hangText='ownerid_arg:'><vspace />
+            The value of the eia_clientowner.co_ownerid subfield of the
+            EXCHANGE_ID4args structure of the current request.
+          </t>
+
+          <t hangText='verifier_arg:'><vspace />
+            The value of the eia_clientowner.co_verifier subfield of the
+            EXCHANGE_ID4args structure of the current request.
+          </t>
+
+          <t hangText='old_verifier_arg:'><vspace />
+            A value of the eia_clientowner.co_verifier field of a client
+            record received in a previous request; this is distinct from
+            verifier_arg.
+          </t>
+
+          <t hangText='principal_arg:'><vspace />
+            The value of the RPCSEC_GSS principal for the current request.
+          </t>
+
+          <t hangText='old_principal_arg:'><vspace />
+            A value of the principal of a client record as defined by the RPC
+            header's credential or verifier of a previous request.  This is
+            distinct from principal_arg.
+          </t>
+
+          <t hangText='clientid_ret:'><vspace />
+            The value of the eir_clientid field the server will return in the
+            EXCHANGE_ID4resok structure for the current request.
+          </t>
+
+          <t hangText='old_clientid_ret:'><vspace />
+            The value of the eir_clientid field the server returned in the
+            EXCHANGE_ID4resok structure for a previous request.  This is
+            distinct from clientid_ret.
+          </t>
+
+          <t hangText='confirmed:'><vspace />
+            The client ID has been confirmed.
+          </t>
+
+          <t hangText='unconfirmed:'><vspace />
+            The client ID has not been confirmed.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        Since EXCHANGE_ID is a non-idempotent operation, we must consider the
+        possibility that retries occur as a result of a client restart,
+        network partition, malfunctioning router, etc.  Retries are
+        identified by the value of the eia_clientowner field of
+        EXCHANGE_ID4args, and the method for dealing with them is outlined in
+        the scenarios below.
+      </t>
+
+      <t>
+        The scenarios are described in terms of the client record(s) a server
+        has for a given co_ownerid.  Note that if the client ID was created
+        specifying SP4_SSV state protection and EXCHANGE_ID as the one of the
+        operations in spo_must_allow, then the server MUST authorize
+        EXCHANGE_IDs with the SSV principal in addition to the principal that
+        created the client ID.
+      </t>
+
+      <t anchor='list:case'>
+        <list style='numbers'>
+          <t anchor='list:case:new_owner_id'>
+            New Owner ID
+
+            <list style='empty'>
+              <t>
+                If the server has no client records with
+                eia_clientowner.co_ownerid matching ownerid_arg, and
+                EXCHGID4_FLAG_UPD_CONFIRMED_REC_A is not set in the
+                EXCHANGE_ID, then a new shorthand client ID (let us call it
+                clientid_ret) is generated, and the following unconfirmed
+                record is added to the server's state.
+              </t>
+
+              <t>
+                { ownerid_arg, verifier_arg, principal_arg, clientid_ret,
+                unconfirmed }
+              </t>
+
+              <t>
+                Subsequently, the server returns clientid_ret.
+              </t>
+            </list>
+          </t>
+
+          <t anchor='list:case:non_update'>
+            Non-Update on Existing Client ID
+
+            <list style='empty'>
+              <t>
+                If the server has the following confirmed record, and the
+                request does not have EXCHGID4_FLAG_UPD_CONFIRMED_REC_A set,
+                then the request is the result of a retried request due to a
+                faulty router or lost connection, or the client is trying to
+                determine if it can perform trunking.
+              </t>
+
+              <t>
+                { ownerid_arg, verifier_arg, principal_arg, clientid_ret,
+                confirmed }
+              </t>
+
+              <t>
+                Since the record has been confirmed, the client must have
+                received the server's reply from the initial EXCHANGE_ID
+                request.  Since the server has a confirmed record, and since
+                EXCHGID4_FLAG_UPD_CONFIRMED_REC_A is not set, with the
+                possible exception of eir_server_owner.so_minor_id, the server
+                returns the same result it did when the client ID's properties
+                were last updated (or if never updated, the result when the
+                client ID was created).  The confirmed record is unchanged.
+              </t>
+            </list>
+          </t>
+
+          <t anchor='list:case:client_colli'>
+            Client Collision
+
+            <list style='empty'>
+              <t>
+                If EXCHGID4_FLAG_UPD_CONFIRMED_REC_A is not set, and if the
+                server has the following confirmed record, then this request
+                is likely the result of a chance collision between the values
+                of the eia_clientowner.co_ownerid subfield of EXCHANGE_ID4args
+                for two different clients.
+              </t>
+
+              <t>
+                { ownerid_arg, *, old_principal_arg, old_clientid_ret,
+                confirmed }
+              </t>
+
+              <t>
+                If there is currently no state associated with
+                old_clientid_ret, or if there is state but the lease has
+                expired, then this case is effectively equivalent to the New
+                Owner ID case of <xref target='list:case:new_owner_id' />.  The confirmed record is
+                deleted, the old_clientid_ret and its lock state are deleted,
+                a new shorthand client ID is generated, and the following
+                unconfirmed record is added to the server's state.
+              </t>
+
+              <t>
+                { ownerid_arg, verifier_arg, principal_arg, clientid_ret,
+                unconfirmed }
+              </t>
+
+              <t>
+                Subsequently, the server returns clientid_ret.
+              </t>
+
+              <t>
+                If old_clientid_ret has an unexpired lease with state, then no
+                state of old_clientid_ret is changed or deleted.  The server
+                returns NFS4ERR_CLID_INUSE to indicate that the client should
+                retry with a different value for the
+                eia_clientowner.co_ownerid subfield of EXCHANGE_ID4args.  The
+                client record is not changed.
+              </t>
+            </list>
+          </t>
+
+          <t anchor='list:case:replace_uncon'>
+            Replacement of Unconfirmed Record
+
+            <list style='empty'>
+              <t>
+                If the EXCHGID4_FLAG_UPD_CONFIRMED_REC_A flag is not set, and
+                the server has the following unconfirmed record, then the
+                client is attempting EXCHANGE_ID again on an unconfirmed
+                client ID, perhaps due to a retry, a client restart before
+                client ID confirmation (i.e., before CREATE_SESSION was
+                called), or some other reason.
+              </t>
+
+              <t>
+                { ownerid_arg, *, *, old_clientid_ret, unconfirmed }
+              </t>
+
+              <t>
+                It is possible that the properties of old_clientid_ret are
+                different than those specified in the current EXCHANGE_ID.
+                Whether or not the properties are being updated, to eliminate
+                ambiguity, the server deletes the unconfirmed record,
+                generates a new client ID (clientid_ret), and establishes the
+                following unconfirmed record:
+              </t>
+
+              <t>
+                { ownerid_arg, verifier_arg, principal_arg, clientid_ret,
+                unconfirmed }
+              </t>
+            </list>
+          </t>
+
+          <t anchor='list:case:client_restart'>
+            Client Restart
+
+            <list style='empty'>
+              <t>
+                If EXCHGID4_FLAG_UPD_CONFIRMED_REC_A is not set, and if the
+                server has the following confirmed client record, then this
+                request is likely from a previously confirmed client that has
+                restarted.
+              </t>
+
+              <t>
+                { ownerid_arg, old_verifier_arg, principal_arg,
+                old_clientid_ret, confirmed }
+              </t>
+
+              <t>
+                Since the previous incarnation of the same client will no
+                longer be making requests, once the new client ID is confirmed
+                by CREATE_SESSION, byte-range locks and share reservations
+                should be released immediately rather than forcing the new
+                incarnation to wait for the lease time on the previous
+                incarnation to expire.  Furthermore, session state should be
+                removed since if the client had maintained that information
+                across restart, this request would not have been sent.  If the
+                server supports neither the CLAIM_DELEGATE_PREV nor
+                CLAIM_DELEG_PREV_FH claim types, associated delegations should
+                be purged as well; otherwise, delegations are retained and
+                recovery proceeds according to <xref target="ss:client-side_caching:DR" />.
+              </t>
+
+              <t>
+                After processing, clientid_ret is returned to the client and
+                this client record is added:
+              </t>
+
+              <t>
+                { ownerid_arg, verifier_arg, principal_arg, clientid_ret,
+                unconfirmed }
+              </t>
+
+              <t>
+                The previously described confirmed record continues to exist,
+                and thus the same ownerid_arg exists in both a confirmed and
+                unconfirmed state at the same time.  The number of states can
+                collapse to one once the server receives an applicable
+                CREATE_SESSION or EXCHANGE_ID.
+
+                <list style='symbols'>
+                  <t>
+                    If the server subsequently receives a successful
+                    CREATE_SESSION that confirms clientid_ret, then the server
+                    atomically destroys the confirmed record and makes the
+                    unconfirmed record confirmed as described in
+                    <xref target="ss:op_CREATE_SESSION:I" />.
+                  </t>
+
+                  <t>
+                    If the server instead subsequently receives an EXCHANGE_ID
+                    with the client owner equal to ownerid_arg, one strategy is
+                    to simply delete the unconfirmed record, and process the
+                    EXCHANGE_ID as described in the entirety of
+                    <xref target="ss:op_EXCHANGE_ID:I" />.
+                  </t>
+                </list>
+              </t>
+            </list>
+          </t>
+
+          <t anchor='list:case:update'>
+            Update
+
+            <list style='empty'>
+              <t>
+                If EXCHGID4_FLAG_UPD_CONFIRMED_REC_A is set, and the server
+                has the following confirmed record, then this request is an
+                attempt at an update.
+              </t>
+
+              <t>
+                { ownerid_arg, verifier_arg, principal_arg, clientid_ret,
+                confirmed }
+              </t>
+
+              <t>
+                Since the record has been confirmed, the client must have
+                received the server's reply from the initial EXCHANGE_ID
+                request.  The server allows the update, and the client record
+                is left intact.
+              </t>
+            </list>
+          </t>
+
+          <t anchor='list:case:update_no_conf'>
+            Update but No Confirmed Record
+
+            <list style='empty'>
+              <t>
+                If EXCHGID4_FLAG_UPD_CONFIRMED_REC_A is set, and the server
+                has no confirmed record corresponding ownerid_arg, then the
+                server returns NFS4ERR_NOENT and leaves any unconfirmed record
+                intact.
+              </t>
+            </list>
+          </t>
+
+          <t anchor='list:case:update_wrong_veri'>
+            Update but Wrong Verifier
+
+            <list style='empty'>
+              <t>
+                If EXCHGID4_FLAG_UPD_CONFIRMED_REC_A is set, and the server
+                has the following confirmed record, then this request is an
+                illegal attempt at an update, perhaps because of a retry from
+                a previous client incarnation.
+              </t>
+
+              <t>
+                { ownerid_arg, old_verifier_arg, *, clientid_ret, confirmed }
+              </t>
+
+              <t>
+                The server returns NFS4ERR_NOT_SAME and leaves the client
+                record intact.
+              </t>
+            </list>
+          </t>
+
+          <t anchor='list:case:update_wrong_princ'>
+            Update but Wrong Principal
+
+            <list style='empty'>
+              <t>
+                If EXCHGID4_FLAG_UPD_CONFIRMED_REC_A is set, and the server
+                has the following confirmed record, then this request is an
+                illegal attempt at an update by an unauthorized principal.
+              </t>
+
+              <t>
+                { ownerid_arg, verifier_arg, old_principal_arg, clientid_ret,
+                confirmed }
+              </t>
+
+              <t>
+                The server returns NFS4ERR_PERM and leaves the client record
+                intact.
+              </t>
+            </list>
+          </t>
+        </list>
+      </t>
+    </section>
+  </section>
+

@@ -1,0 +1,173 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_SECINFO" title="Operation 33: SECINFO - Obtain Available Security">
+    <section toc='exclude' anchor="ss:op_SECINFO:A" title="ARGUMENT">
+      <?rfc include='autogen/secinfo_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_SECINFO:R" title="RESULT">
+      <?rfc include='autogen/secinfo_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_SECINFO:D" title="DESCRIPTION">
+      <t>
+        The SECINFO operation is used by the client to obtain a list of valid
+        RPC authentication flavors for a specific directory filehandle, file
+        name pair.  SECINFO should apply the same access methodology used for
+        LOOKUP when evaluating the name.  Therefore, if the requester does
+        not have the appropriate access to LOOKUP the name, then SECINFO MUST
+        behave the same way and return NFS4ERR_ACCESS.
+      </t>
+
+      <t>
+        The result will contain an array that represents the security
+        mechanisms available, with an order corresponding to the server's
+        preferences, the most preferred being first in the array.  The client
+        is free to pick whatever security mechanism it both desires and
+        supports, or to pick in the server's preference order the first one
+        it supports.  The array entries are represented by the secinfo4
+        structure.  The field 'flavor' will contain a value of AUTH_NONE,
+        AUTH_SYS (as defined in RFC 5531 <xref target="RFC5531" />), or RPCSEC_GSS (as defined in
+        RFC 2203 <xref target="RFC2203" />).  The field flavor can also be any other security
+        flavor registered with IANA.
+      </t>
+
+      <t>
+        For the flavors AUTH_NONE and AUTH_SYS, no additional security
+        information is returned.  The same is true of many (if not most)
+        other security flavors, including AUTH_DH.  For a return value of
+        RPCSEC_GSS, a security triple is returned that contains the mechanism
+        object identifier (OID, as defined in RFC 2743 <xref target="RFC2743" />), the quality of
+        protection (as defined in RFC 2743 <xref target="RFC2743" />), and the service type (as
+        defined in RFC 2203 <xref target="RFC2203" />).  It is possible for SECINFO to return
+        multiple entries with flavor equal to RPCSEC_GSS with different
+        security triple values.
+      </t>
+
+      <t>
+        On success, the current filehandle is consumed (see
+        <xref target="ss:core_infrastructure:OaSaS" />), and if the next operation after SECINFO tries
+        to use the current filehandle, that operation will fail with the
+        status NFS4ERR_NOFILEHANDLE.
+      </t>
+
+      <t>
+        If the name has a length of zero, or if the name does not obey the
+        UTF-8 definition (assuming UTF-8 capabilities are enabled; see
+        <xref target="ss:internationalization:UC" />), the error NFS4ERR_INVAL will be returned.
+      </t>
+
+      <t>
+        See <xref target="ss:core_infrastructure:SSN" /> for additional information on the use of SECINFO.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_SECINFO:I" title="IMPLEMENTATION">
+      <t>
+        The SECINFO operation is expected to be used by the NFS client when
+        the error value of NFS4ERR_WRONGSEC is returned from another NFS
+        operation.  This signifies to the client that the server's security
+        policy is different from what the client is currently using.  At this
+        point, the client is expected to obtain a list of possible security
+        flavors and choose what best suits its policies.
+      </t>
+
+      <t>
+        As mentioned, the server's security policies will determine when a
+        client request receives NFS4ERR_WRONGSEC.  See <xref target='tbl:error_op_returns' /> for a list of
+        operations that can return NFS4ERR_WRONGSEC.  In addition, when
+        READDIR returns attributes, the rdattr_error (<xref target="ss:file_attributes:A1r" />) can
+        contain NFS4ERR_WRONGSEC.  Note that CREATE and REMOVE MUST NOT
+        return NFS4ERR_WRONGSEC.  The rationale for CREATE is that unless the
+        target name exists, it cannot have a separate security policy from
+        the parent directory, and the security policy of the parent was
+        checked when its filehandle was injected into the COMPOUND request's
+        operations stream (for similar reasons, an OPEN operation that
+        creates the target MUST NOT return NFS4ERR_WRONGSEC).  If the target
+        name exists, while it might have a separate security policy, that is
+        irrelevant because CREATE MUST return NFS4ERR_EXIST.  The rationale
+        for REMOVE is that while that target might have a separate security
+        policy, the target is going to be removed, and so the security policy
+        of the parent trumps that of the object being removed.  RENAME and
+        LINK MAY return NFS4ERR_WRONGSEC, but the NFS4ERR_WRONGSEC error
+        applies only to the saved filehandle (see <xref target="ss:core_infrastructure:LaR" />).  Any
+        NFS4ERR_WRONGSEC error on the current filehandle used by LINK and
+        RENAME MUST be returned by the PUTFH, PUTPUBFH, PUTROOTFH, or
+        RESTOREFH operation that injected the current filehandle.
+      </t>
+
+      <t>
+        With the exception of LINK and RENAME, the set of operations that can
+        return NFS4ERR_WRONGSEC represents the point at which the client can
+        inject a filehandle into the "current filehandle" at the server.  The
+        filehandle is either provided by the client (PUTFH, PUTPUBFH,
+        PUTROOTFH), generated as a result of a name-to-filehandle translation
+        (LOOKUP and OPEN), or generated from the saved filehandle via
+        RESTOREFH.  As <xref target="ss:core_infrastructure:PFOS" /> states, a put filehandle operation
+        followed by SAVEFH MUST NOT return NFS4ERR_WRONGSEC.  Thus, the
+        RESTOREFH operation, under certain conditions (see
+        <xref target="ss:core_infrastructure:PFO" />), is permitted to return NFS4ERR_WRONGSEC so that
+        security policies can be honored.
+      </t>
+
+      <t>
+        The READDIR operation will not directly return the NFS4ERR_WRONGSEC
+        error.  However, if the READDIR request included a request for
+        attributes, it is possible that the READDIR request's security triple
+        did not match that of a directory entry.  If this is the case and the
+        client has requested the rdattr_error attribute, the server will
+        return the NFS4ERR_WRONGSEC error in rdattr_error for the entry.
+      </t>
+
+      <t>
+        To resolve an error return of NFS4ERR_WRONGSEC, the client does the
+        following:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            For LOOKUP and OPEN, the client will use SECINFO with the same
+            current filehandle and name as provided in the original LOOKUP or
+            OPEN to enumerate the available security triples.
+          </t>
+
+          <t>
+            For the rdattr_error, the client will use SECINFO with the same
+            current filehandle as provided in the original READDIR.  The name
+            passed to SECINFO will be that of the directory entry (as returned
+            from READDIR) that had the NFS4ERR_WRONGSEC error in the
+            rdattr_error attribute.
+          </t>
+
+          <t>
+            For PUTFH, PUTROOTFH, PUTPUBFH, RESTOREFH, LINK, and RENAME, the
+            client will use SECINFO_NO_NAME { style =
+            SECINFO_STYLE4_CURRENT_FH }.  The client will prefix the
+            SECINFO_NO_NAME operation with the appropriate PUTFH, PUTPUBFH, or
+            PUTROOTFH operation that provides the filehandle originally
+            provided by the PUTFH, PUTPUBFH, PUTROOTFH, or RESTOREFH
+            operation.
+            <vspace blankLines="1" />
+            NOTE: In NFSv4.0, the client was required to use SECINFO, and had
+            to reconstruct the parent of the original filehandle and the
+            component name of the original filehandle.  The introduction in
+            NFSv4.1 of SECINFO_NO_NAME obviates the need for reconstruction.
+          </t>
+
+          <t>
+            For LOOKUPP, the client will use SECINFO_NO_NAME { style =
+            SECINFO_STYLE4_PARENT } and provide the filehandle that equals the
+            filehandle originally provided to LOOKUPP.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        See <xref target="sec:security_considerations" /> for a discussion on the recommendations for the
+        security flavor used by SECINFO and SECINFO_NO_NAME.
+      </t>
+    </section>
+  </section>
+

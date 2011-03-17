@@ -1,0 +1,88 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_LOCKT" title="Operation 13: LOCKT - Test for Lock">
+    <section toc='exclude' anchor="ss:op_LOCKT:A" title="ARGUMENT">
+      <?rfc include='autogen/lockt_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LOCKT:R" title="RESULT">
+      <?rfc include='autogen/lockt_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LOCKT:D" title="DESCRIPTION">
+      <t>
+        The LOCKT operation tests the lock as specified in the arguments.  If
+        a conflicting lock exists, the owner, offset, length, and type of the
+        conflicting lock are returned.  The owner field in the results
+        includes the client ID of the owner of the conflicting lock, whether
+        this is the client ID associated with the current session or a
+        different client ID.  If no lock is held, nothing other than NFS4_OK
+        is returned.  Lock types READ_LT and READW_LT are processed in the
+        same way in that a conflicting lock test is done without regard to
+        blocking or non-blocking.  The same is true for WRITE_LT and
+        WRITEW_LT.
+      </t>
+
+      <t>
+        The ranges are specified as for LOCK.  The NFS4ERR_INVAL and
+        NFS4ERR_BAD_RANGE errors are returned under the same circumstances as
+        for LOCK.
+      </t>
+
+      <t>
+        The clientid field of the owner MAY be set to any value by the client
+        and MUST be ignored by the server.  The reason the server MUST ignore
+        the clientid field is that the server MUST derive the client ID from
+        the session ID from the SEQUENCE operation of the COMPOUND request.
+      </t>
+
+      <t>
+        If the current filehandle is not an ordinary file, an error will be
+        returned to the client.  In the case that the current filehandle
+        represents an object of type NF4DIR, NFS4ERR_ISDIR is returned.  If
+        the current filehandle designates a symbolic link, NFS4ERR_SYMLINK is
+        returned.  In all other cases, NFS4ERR_WRONG_TYPE is returned.
+      </t>
+
+      <t>
+        On success, the current filehandle retains its value.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LOCKT:I" title="IMPLEMENTATION">
+      <t>
+        If the server is unable to determine the exact offset and length of
+        the conflicting lock, the same offset and length that were provided
+        in the arguments should be returned in the denied results.
+      </t>
+
+      <t>
+        LOCKT uses a lock_owner4 rather a stateid4, as is used in LOCK to
+        identify the owner.  This is because the client does not have to open
+        the file to test for the existence of a lock, so a stateid might not
+        be available.
+      </t>
+
+      <t>
+        As noted in <xref target="ss:op_LOCK:I" />, some servers may return NFS4ERR_LOCK_RANGE
+        to certain (otherwise non-conflicting) LOCK operations that
+        overlap ranges already granted to the current lock-owner.
+      </t>
+
+      <t>
+        The LOCKT operation's test for conflicting locks SHOULD exclude locks
+        for the current lock-owner, and thus should return NFS4_OK in such
+        cases.  Note that this means that a server might return NFS4_OK to a
+        LOCKT request even though a LOCK operation for the same range and
+        lock-owner would fail with NFS4ERR_LOCK_RANGE.
+      </t>
+
+      <t>
+        When a client holds an OPEN_DELEGATE_WRITE delegation, it may choose
+        (see <xref target="ss:op_LOCK:I" />) to handle LOCK requests locally.  In such a
+        case, LOCKT requests will similarly be handled locally.
+      </t>
+    </section>
+  </section>
+

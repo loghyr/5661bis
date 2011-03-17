@@ -1,0 +1,135 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_BIND_CONN_TO_SESSION" title="Operation 41: BIND_CONN_TO_SESSION - Associate Connection with Session">
+    <section toc='exclude' anchor="ss:op_BIND_CONN_TO_SESSION:A" title="ARGUMENT">
+      <?rfc include='autogen/bind_conn_to_session_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_BIND_CONN_TO_SESSION:R" title="RESULT">
+      <?rfc include='autogen/bind_conn_to_session_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_BIND_CONN_TO_SESSION:D" title="DESCRIPTION">
+      <t>
+        BIND_CONN_TO_SESSION is used to associate additional connections with
+        a session.  It MUST be used on the connection being associated with
+        the session.  It MUST be the only operation in the COMPOUND
+        procedure.  If SP4_NONE (<xref target="op_EXCHANGE_ID" />) state protection is used, any
+        principal, security flavor, or RPCSEC_GSS context MAY be used to
+        invoke the operation.  If SP4_MACH_CRED is used, RPCSEC_GSS MUST be
+        used with the integrity or privacy services, using the principal that
+        created the client ID.  If SP4_SSV is used, RPCSEC_GSS with the SSV
+        GSS mechanism (<xref target="ss:core_infrastructure:TSSVGM" />) and integrity or privacy MUST be used.
+      </t>
+
+      <t>
+        If, when the client ID was created, the client opted for SP4_NONE
+        state protection, the client is not required to use
+        BIND_CONN_TO_SESSION to associate the connection with the session,
+        unless the client wishes to associate the connection with the
+        backchannel.  When SP4_NONE protection is used, simply sending a
+        COMPOUND request with a SEQUENCE operation is sufficient to associate
+        the connection with the session specified in SEQUENCE.
+      </t>
+
+      <t>
+        The field bctsa_dir indicates whether the client wants to associate
+        the connection with the fore channel or the backchannel or both
+        channels.  The value CDFC4_FORE_OR_BOTH indicates that the client
+        wants to associate the connection with both the fore channel and
+        backchannel, but will accept the connection being associated to just
+        the fore channel.  The value CDFC4_BACK_OR_BOTH indicates that the
+        client wants to associate with both the fore channel and backchannel,
+        but will accept the connection being associated with just the
+        backchannel.  The server replies in bctsr_dir which channel(s) the
+        connection is associated with.  If the client specified CDFC4_FORE,
+        the server MUST return CDFS4_FORE.  If the client specified
+        CDFC4_BACK, the server MUST return CDFS4_BACK.  If the client
+        specified CDFC4_FORE_OR_BOTH, the server MUST return CDFS4_FORE or
+        CDFS4_BOTH.  If the client specified CDFC4_BACK_OR_BOTH, the server
+        MUST return CDFS4_BACK or CDFS4_BOTH.
+      </t>
+
+      <t>
+        See the CREATE_SESSION operation (<xref target="op_CREATE_SESSION" />), and the description
+        of the argument csa_use_conn_in_rdma_mode to understand
+        bctsa_use_conn_in_rdma_mode, and the description of
+        csr_use_conn_in_rdma_mode to understand bctsr_use_conn_in_rdma_mode.
+      </t>
+
+      <t>
+        Invoking BIND_CONN_TO_SESSION on a connection already associated with
+        the specified session has no effect, and the server MUST respond with
+        NFS4_OK, unless the client is demanding changes to the set of
+        channels the connection is associated with.  If so, the server MUST
+        return NFS4ERR_INVAL.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_BIND_CONN_TO_SESSION:I" title="IMPLEMENTATION">
+      <t>
+        If a session's channel loses all connections, depending on the client
+        ID's state protection and type of channel, the client might need to
+        use BIND_CONN_TO_SESSION to associate a new connection.  If the
+        server restarted and does not keep the reply cache in stable storage,
+        the server will not recognize the session ID.  The client will
+        ultimately have to invoke EXCHANGE_ID to create a new client ID and
+        session.
+      </t>
+
+      <t>
+        Suppose SP4_SSV state protection is being used, and
+        BIND_CONN_TO_SESSION is among the operations included in the
+        spo_must_enforce set when the client ID was created (<xref target="op_EXCHANGE_ID" />).
+        If so, there is an issue if SET_SSV is sent, no response is returned,
+        and the last connection associated with the client ID drops.  The
+        client, per the sessions model, MUST retry the SET_SSV.  But it needs
+        a new connection to do so, and MUST associate that connection with
+        the session via a BIND_CONN_TO_SESSION authenticated with the SSV GSS
+        mechanism.  The problem is that the RPCSEC_GSS message integrity
+        codes use a subkey derived from the SSV as the key and the SSV may
+        have changed.  While there are multiple recovery strategies, a
+        single, general strategy is described here.
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            The client reconnects.
+          </t>
+
+          <t>
+            The client assumes that the SET_SSV was executed, and so sends
+            BIND_CONN_TO_SESSION with the subkey (derived from the new SSV,
+            i.e., what SET_SSV would have set the SSV to) used as the key for
+            the RPCSEC_GSS credential message integrity codes.
+          </t>
+
+          <t>
+            If the request succeeds, this means that the original attempted
+            SET_SSV did execute successfully.  The client re-sends the
+            original SET_SSV, which the server will reply to via the reply
+            cache.
+          </t>
+
+          <t>
+            If the server returns an RPC authentication error, this means that
+            the server's current SSV was not changed (and the SET_SSV was
+            likely not executed).  The client then tries BIND_CONN_TO_SESSION
+            with the subkey derived from the old SSV as the key for the
+            RPCSEC_GSS message integrity codes.
+          </t>
+
+          <t>
+            The attempted BIND_CONN_TO_SESSION with the old SSV should
+            succeed.  If so, the client re-sends the original SET_SSV.  If the
+            original SET_SSV was not executed, then the server executes it.
+            If the original SET_SSV was executed but failed, the server will
+            return the SET_SSV from the reply cache.
+          </t>
+        </list>
+      </t>
+    </section>
+  </section>
+

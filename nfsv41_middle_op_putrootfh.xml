@@ -1,0 +1,47 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_PUTROOTFH" title="Operation 24: PUTROOTFH - Set Root Filehandle">
+    <section toc='exclude' anchor="ss:op_PUTROOTFH:A" title="ARGUMENT">
+      <figure>
+        <artwork>
+void;
+        </artwork>
+      </figure>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_PUTROOTFH:R" title="RESULT">
+      <?rfc include='autogen/putrootfh_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_PUTROOTFH:D" title="DESCRIPTION">
+      <t>
+        This operation replaces the current filehandle with the filehandle
+        that represents the root of the server's namespace.  From this
+        filehandle, a LOOKUP operation can locate any other filehandle on the
+        server.  This filehandle may be different from the "public"
+        filehandle that may be associated with some other directory on the
+        server.
+      </t>
+
+      <t>
+        PUTROOTFH also clears the current stateid.
+      </t>
+
+      <t>
+        See <xref target="ss:proc_COMPOUND:CF" /> for more details on the current filehandle.
+      </t>
+
+      <t>
+        See <xref target="ss:proc_COMPOUND:CS" /> for more details on the current stateid.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_PUTROOTFH:I" title="IMPLEMENTATION">
+      <t>
+        This operation is used in an NFS request to set the context for file
+        accessing operations that follow in the same COMPOUND request.
+      </t>
+    </section>
+  </section>
+

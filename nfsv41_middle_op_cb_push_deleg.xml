@@ -1,0 +1,45 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_CB_PUSH_DELEG" title="Operation 7: CB_PUSH_DELEG - Offer Previously Requested Delegation to Client">
+    <section toc='exclude' anchor="ss:op_CB_PUSH_DELEG:A" title="ARGUMENT">
+      <?rfc include='autogen/cb_push_deleg_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_PUSH_DELEG:R" title="RESULT">
+      <?rfc include='autogen/cb_push_deleg_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_PUSH_DELEG:D" title="DESCRIPTION">
+      <t>
+        CB_PUSH_DELEG is used by the server both to signal to the client that
+        the delegation it wants (previously indicated via a want established
+        from an OPEN or WANT_DELEGATION operation) is available and to
+        simultaneously offer the delegation to the client.  The client has
+        the choice of accepting the delegation by returning NFS4_OK to the
+        server, delaying the decision to accept the offered delegation by
+        returning NFS4ERR_DELAY, or permanently rejecting the offer of the
+        delegation by returning NFS4ERR_REJECT_DELEG.  When a delegation is
+        rejected in this fashion, the want previously established is
+        permanently deleted and the delegation is subject to acquisition by
+        another client.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_PUSH_DELEG:I" title="IMPLEMENTATION">
+      <t>
+        If the client does return NFS4ERR_DELAY and there is a conflicting
+        delegation request, the server MAY process it at the expense of the
+        client that returned NFS4ERR_DELAY.  The client's want will not be
+        cancelled, but MAY be processed behind other delegation requests or
+        registered wants.
+      </t>
+
+      <t>
+        When a client returns a status other than NFS4_OK, NFS4ERR_DELAY, or
+        NFS4ERR_REJECT_DELAY, the want remains pending, although servers may
+        decide to cancel the want by sending a CB_WANTS_CANCELLED.
+      </t>
+    </section>
+  </section>
+

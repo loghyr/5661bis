@@ -1,0 +1,1709 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+<section anchor="sec:state_management" title="State Management">
+  <t>
+    Integrating locking into the NFS protocol necessarily causes it to be
+    stateful.  With the inclusion of such features as share reservations,
+    file and directory delegations, recallable layouts, and support for
+    mandatory byte-range locking, the protocol becomes substantially more
+    dependent on proper management of state than the traditional
+    combination of NFS and NLM <xref target="xnfs" />.  These
+    features include expanded locking facilities, which provide some
+    measure of inter-client exclusion, but the state also offers features
+    not readily providable using a stateless model.  There are three
+    components to making this state manageable:
+  </t>
+
+  <t>
+    <list style='symbols'>
+      <t>
+        clear division between client and server
+      </t>
+
+      <t>
+        ability to reliably detect inconsistency in state between client
+        and server
+      </t>
+
+      <t>
+        simple and robust recovery mechanisms
+      </t>
+    </list>
+  </t>
+
+  <t>
+    In this model, the server owns the state information.  The client
+    requests changes in locks and the server responds with the changes
+    made.  Non-client-initiated changes in locking state are infrequent.
+    The client receives prompt notification of such changes and can
+    adjust its view of the locking state to reflect the server's changes.
+  </t>
+
+  <t>
+    Individual pieces of state created by the server and passed to the
+    client at its request are represented by 128-bit stateids.  These
+    stateids may represent a particular open file, a set of byte-range
+    locks held by a particular owner, or a recallable delegation of
+    privileges to access a file in particular ways or at a particular
+    location.
+  </t>
+
+  <t>
+    In all cases, there is a transition from the most general information
+    that represents a client as a whole to the eventual lightweight
+    stateid used for most client and server locking interactions.  The
+    details of this transition will vary with the type of object but it
+    always starts with a client ID.
+  </t>
+
+  <section anchor="ss:state_management:CaSI" title="Client and Session ID">
+    <t>
+      A client must establish a client ID (see <xref target="ss:core_infrastructure:CIaCO" />) and then one or
+      more sessionids (see <xref target="ss:core_infrastructure:S" />) before performing any operations
+      to open, byte-range lock, delegate, or obtain a layout for a file
+      object.  Each session ID is associated with a specific client ID, and
+      thus serves as a shorthand reference to an NFSv4.1 client.
+    </t>
+
+    <t>
+      For some types of locking interactions, the client will represent
+      some number of internal locking entities called "owners", which
+      normally correspond to processes internal to the client.  For other
+      types of locking-related objects, such as delegations and layouts, no
+      such intermediate entities are provided for, and the locking-related
+      objects are considered to be transferred directly between the server
+      and a unitary client.
+    </t>
+  </section>
+
+  <section anchor="ss:state_management:SD" title="Stateid Definition">
+    <t>
+      When the server grants a lock of any type (including opens,
+      byte-range locks, delegations, and layouts), it responds with a unique
+      stateid that represents a set of locks (often a single lock) for the
+      same file, of the same type, and sharing the same ownership
+      characteristics.  Thus, opens of the same file by different
+      open-owners each have an identifying stateid.  Similarly, each set of
+      byte-range locks on a file owned by a specific lock-owner has its own
+      identifying stateid.  Delegations and layouts also have associated
+      stateids by which they may be referenced.  The stateid is used as a
+      shorthand reference to a lock or set of locks, and given a stateid,
+      the server can determine the associated state-owner or state-owners
+      (in the case of an open-owner/lock-owner pair) and the associated
+      filehandle.  When stateids are used, the current filehandle must be
+      the one associated with that stateid.
+    </t>
+
+    <t>
+      All stateids associated with a given client ID are associated with a
+      common lease that represents the claim of those stateids and the
+      objects they represent to be maintained by the server.  See
+      <xref target="ss:state_management:LR" /> for a discussion of the lease.
+    </t>
+
+    <t>
+      The server may assign stateids independently for different clients.
+      A stateid with the same bit pattern for one client may designate an
+      entirely different set of locks for a different client.  The stateid
+      is always interpreted with respect to the client ID associated with
+      the current session.  Stateids apply to all sessions associated with
+      the given client ID, and the client may use a stateid obtained from
+      one session on another session associated with the same client ID.
+    </t>
+
+    <section toc='exclude' anchor="ss:state_management:ST" title="Stateid Types">
+      <t>
+        With the exception of special stateids (see <xref target="ss:state_management:SS1" />), each
+        stateid represents locking objects of one of a set of types defined
+        by the NFSv4.1 protocol.  Note that in all these cases, where we
+        speak of guarantee, it is understood there are situations such as a
+        client restart, or lock revocation, that allow the guarantee to be
+        voided.
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            Stateids may represent opens of files.
+            <vspace blankLines="1"/>
+            Each stateid in this case represents the OPEN state for a given
+            client ID/open-owner/filehandle triple.  Such stateids are subject
+            to change (with consequent incrementing of the stateid's seqid) in
+            response to OPENs that result in upgrade and OPEN_DOWNGRADE
+            operations.
+          </t>
+
+          <t>
+            Stateids may represent sets of byte-range locks.
+            <vspace blankLines="1"/>
+            All locks held on a particular file by a particular owner and
+            gotten under the aegis of a particular open file are associated
+            with a single stateid with the seqid being incremented whenever
+            LOCK and LOCKU operations affect that set of locks.
+          </t>
+
+          <t>
+            Stateids may represent file delegations, which are recallable
+            guarantees by the server to the client that other clients will not
+            reference or modify a particular file, until the delegation is
+            returned.  In NFSv4.1, file delegations may be obtained on both
+            regular and non-regular files.
+            <vspace blankLines="1"/>
+            A stateid represents a single delegation held by a client for a
+            particular filehandle.
+          </t>
+
+          <t>
+            Stateids may represent directory delegations, which are recallable
+            guarantees by the server to the client that other clients will not
+            modify the directory, until the delegation is returned.
+            <vspace blankLines="1"/>
+            A stateid represents a single delegation held by a client for a
+            particular directory filehandle.
+          </t>
+
+          <t>
+            Stateids may represent layouts, which are recallable guarantees by
+            the server to the client that particular files may be accessed via
+            an alternate data access protocol at specific locations.  Such
+            access is limited to particular sets of byte-ranges and may
+            proceed until those byte-ranges are reduced or the layout is
+            returned.
+            <vspace blankLines="1"/>
+            A stateid represents the set of all layouts held by a particular
+            client for a particular filehandle with a given layout type.  The
+            seqid is updated as the layouts of that set of byte-ranges change,
+            via layout stateid changing operations such as LAYOUTGET and
+            LAYOUTRETURN.
+          </t>
+        </list>
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:state_management:SS" title="Stateid Structure">
+      <t>
+        Stateids are divided into two fields, a 96-bit "other" field
+        identifying the specific set of locks and a 32-bit "seqid" sequence
+        value.  Except in the case of special stateids (see <xref target="ss:state_management:SS1" />), a
+        particular value of the "other" field denotes a set of locks of the
+        same type (for example, byte-range locks, opens, delegations, or
+        layouts), for a specific file or directory, and sharing the same
+        ownership characteristics.  The seqid designates a specific instance
+        of such a set of locks, and is incremented to indicate changes in
+        such a set of locks, either by the addition or deletion of locks from
+        the set, a change in the byte-range they apply to, or an upgrade or
+        downgrade in the type of one or more locks.
+      </t>
+
+      <t>
+        When such a set of locks is first created, the server returns a
+        stateid with seqid value of one.  On subsequent operations that
+        modify the set of locks, the server is required to increment the
+        "seqid" field by one whenever it returns a stateid for the same
+        state-owner/file/type combination and there is some change in the set
+        of locks actually designated.  In this case, the server will return a
+        stateid with an "other" field the same as previously used for that
+        state-owner/file/type combination, with an incremented "seqid" field.
+        This pattern continues until the seqid is incremented past
+        NFS4_UINT32_MAX, and one (not zero) is the next seqid value.
+      </t>
+
+      <t>
+        The purpose of the incrementing of the seqid is to allow the server
+        to communicate to the client the order in which operations that
+        modified locking state associated with a stateid have been processed
+        and to make it possible for the client to send requests that are
+        conditional on the set of locks not having changed since the stateid
+        in question was returned.
+      </t>
+
+      <t>
+        Except for layout stateids (<xref target="ss:parallel_nfs:LS1" />), when a client sends a
+        stateid to the server, it has two choices with regard to the seqid
+        sent.  It may set the seqid to zero to indicate to the server that it
+        wishes the most up-to-date seqid for that stateid's "other" field to
+        be used.  This would be the common choice in the case of a stateid
+        sent with a READ or WRITE operation.  It also may set a non-zero
+        value, in which case the server checks if that seqid is the correct
+        one.  In that case, the server is required to return
+        NFS4ERR_OLD_STATEID if the seqid is lower than the most current value
+        and NFS4ERR_BAD_STATEID if the seqid is greater than the most current
+        value.  This would be the common choice in the case of stateids sent
+        with a CLOSE or OPEN_DOWNGRADE.  Because OPENs may be sent in
+        parallel for the same owner, a client might close a file without
+        knowing that an OPEN upgrade had been done by the server, changing
+        the lock in question.  If CLOSE were sent with a zero seqid, the OPEN
+        upgrade would be cancelled before the client even received an
+        indication that an upgrade had happened.
+      </t>
+
+      <t>
+        When a stateid is sent by the server to the client as part of a
+        callback operation, it is not subject to checking for a current seqid
+        and returning NFS4ERR_OLD_STATEID.  This is because the client is not
+        in a position to know the most up-to-date seqid and thus cannot
+        verify it.  Unless specially noted, the seqid value for a stateid
+        sent by the server to the client as part of a callback is required to
+        be zero with NFS4ERR_BAD_STATEID returned if it is not.
+      </t>
+
+      <t>
+        In making comparisons between seqids, both by the client in
+        determining the order of operations and by the server in determining
+        whether the NFS4ERR_OLD_STATEID is to be returned, the possibility of
+        the seqid being swapped around past the NFS4_UINT32_MAX value needs
+        to be taken into account.  When two seqid values are being compared,
+        the total count of slots for all sessions associated with the current
+        client is used to do this.  When one seqid value is less than this
+        total slot count and another seqid value is greater than
+        NFS4_UINT32_MAX minus the total slot count, the former is to be
+        treated as lower than the latter, despite the fact that it is
+        numerically greater.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:state_management:SS1" title="Special Stateids">
+      <t>
+        Stateid values whose "other" field is either all zeros or all ones
+        are reserved.  They may not be assigned by the server but have
+        special meanings defined by the protocol.  The particular meaning
+        depends on whether the "other" field is all zeros or all ones and the
+        specific value of the "seqid" field.
+      </t>
+  
+      <t>
+        The following combinations of "other" and "seqid" are defined in
+        NFSv4.1:
+      </t>
+  
+      <t>
+        <list style='symbols'>
+          <t>
+            When "other" and "seqid" are both zero, the stateid is treated as
+            a special anonymous stateid, which can be used in READ, WRITE, and
+            SETATTR requests to indicate the absence of any OPEN state
+            associated with the request.  When an anonymous stateid value is
+            used and an existing open denies the form of access requested,
+            then access will be denied to the request.  This stateid MUST NOT
+            be used on operations to data servers (<xref target="ss:nfsv4.1_as:OStNDS" />).
+          </t>
+  
+          <t>
+            When "other" and "seqid" are both all ones, the stateid is a
+            special READ bypass stateid.  When this value is used in WRITE or
+            SETATTR, it is treated like the anonymous value.  When used in
+            READ, the server MAY grant access, even if access would normally
+            be denied to READ operations.  This stateid MUST NOT be used on
+            operations to data servers.
+          </t>
+  
+          <t>
+            When "other" is zero and "seqid" is one, the stateid represents
+            the current stateid, which is whatever value is the last stateid
+            returned by an operation within the COMPOUND.  In the case of an
+            OPEN, the stateid returned for the open file and not the
+            delegation is used.  The stateid passed to the operation in place
+            of the special value has its "seqid" value set to zero, except
+            when the current stateid is used by the operation CLOSE or
+            OPEN_DOWNGRADE.  If there is no operation in the COMPOUND that has
+            returned a stateid value, the server MUST return the error
+            NFS4ERR_BAD_STATEID.  As illustrated in <xref target='fig:csid_example4' />, if the value of
+            a current stateid is a special stateid and the stateid of an
+            operation's arguments has "other" set to zero and "seqid" set to
+            one, then the server MUST return the error NFS4ERR_BAD_STATEID.
+          </t>
+  
+          <t>
+            When "other" is zero and "seqid" is NFS4_UINT32_MAX, the stateid
+            represents a reserved stateid value defined to be invalid.  When
+            this stateid is used, the server MUST return the error
+            NFS4ERR_BAD_STATEID.
+          </t>
+        </list>
+      </t>
+  
+      <t>
+        If a stateid value is used that has all zeros or all ones in the
+        "other" field but does not match one of the cases above, the server
+        MUST return the error NFS4ERR_BAD_STATEID.
+      </t>
+  
+      <t>
+        Special stateids, unlike other stateids, are not associated with
+        individual client IDs or filehandles and can be used with all valid
+        client IDs and filehandles.  In the case of a special stateid
+        designating the current stateid, the current stateid value
+        substituted for the special stateid is associated with a particular
+        client ID and filehandle, and so, if it is used where the current
+        filehandle does not match that associated with the current stateid,
+        the operation to which the stateid is passed will return
+        NFS4ERR_BAD_STATEID.
+      </t>
+    </section>
+  
+    <section toc='exclude' anchor="ss:state_management:SLaV" title="Stateid Lifetime and Validation">
+      <t>
+        Stateids must remain valid until either a client restart or a server
+        restart or until the client returns all of the locks associated with
+        the stateid by means of an operation such as CLOSE or DELEGRETURN.
+        If the locks are lost due to revocation, as long as the client ID is
+        valid, the stateid remains a valid designation of that revoked state
+        until the client frees it by using FREE_STATEID.  Stateids associated
+        with byte-range locks are an exception.  They remain valid even if a
+        LOCKU frees all remaining locks, so long as the open file with which
+        they are associated remains open, unless the client frees the
+        stateids via the FREE_STATEID operation.
+      </t>
+  
+      <t>
+        It should be noted that there are situations in which the client's
+        locks become invalid, without the client requesting they be returned.
+        These include lease expiration and a number of forms of lock
+        revocation within the lease period.  It is important to note that in
+        these situations, the stateid remains valid and the client can use it
+        to determine the disposition of the associated lost locks.
+      </t>
+  
+      <t>
+        An "other" value must never be reused for a different purpose (i.e.,
+        different filehandle, owner, or type of locks) within the context of
+        a single client ID.  A server may retain the "other" value for the
+        same purpose beyond the point where it may otherwise be freed, but if
+        it does so, it must maintain "seqid" continuity with previous values.
+      </t>
+  
+      <t>
+        One mechanism that may be used to satisfy the requirement that the
+        server recognize invalid and out-of-date stateids is for the server
+        to divide the "other" field of the stateid into two fields.
+      </t>
+  
+      <t>
+        <list style='symbols'>
+          <t>
+            an index into a table of locking-state structures.
+          </t>
+  
+          <t>
+            a generation number that is incremented on each allocation of a
+            table entry for a particular use.
+          </t>
+        </list>
+      </t>
+  
+      <t>
+        And then store in each table entry,
+      </t>
+  
+      <t>
+        <list style='symbols'>
+          <t>
+            the client ID with which the stateid is associated.
+          </t>
+  
+          <t>
+            the current generation number for the (at most one) valid stateid
+            sharing this index value.
+          </t>
+  
+          <t>
+            the filehandle of the file on which the locks are taken.
+          </t>
+  
+          <t>
+            an indication of the type of stateid (open, byte-range lock, file
+            delegation, directory delegation, layout).
+          </t>
+  
+          <t>
+            the last "seqid" value returned corresponding to the current
+            "other" value.
+          </t>
+  
+          <t>
+            an indication of the current status of the locks associated with
+            this stateid, in particular, whether these have been revoked and
+            if so, for what reason.
+          </t>
+        </list>
+      </t>
+  
+      <t>
+        With this information, an incoming stateid can be validated and the
+        appropriate error returned when necessary.  Special and non-special
+        stateids are handled separately.  (See <xref target="ss:state_management:SS1" /> for a discussion
+        of special stateids.)
+      </t>
+  
+      <t>
+        Note that stateids are implicitly qualified by the current client ID,
+        as derived from the client ID associated with the current session.
+        Note, however, that the semantics of the session will prevent
+        stateids associated with a previous client or server instance from
+        being analyzed by this procedure.
+      </t>
+  
+      <t>
+        If server restart has resulted in an invalid client ID or a session
+        ID that is invalid, SEQUENCE will return an error and the operation
+        that takes a stateid as an argument will never be processed.
+      </t>
+  
+      <t>
+        If there has been a server restart where there is a persistent
+        session and all leased state has been lost, then the session in
+        question will, although valid, be marked as dead, and any operation
+        not satisfied by means of the reply cache will receive the error
+        NFS4ERR_DEADSESSION, and thus not be processed as indicated below.
+      </t>
+  
+      <t>
+        When a stateid is being tested and the "other" field is all zeros or
+        all ones, a check that the "other" and "seqid" fields match a defined
+        combination for a special stateid is done and the results determined
+        as follows:
+      </t>
+  
+      <t>
+        <list style='symbols'>
+          <t>
+            If the "other" and "seqid" fields do not match a defined
+            combination associated with a special stateid, the error
+            NFS4ERR_BAD_STATEID is returned.
+          </t>
+  
+          <t>
+            If the special stateid is one designating the current stateid and
+            there is a current stateid, then the current stateid is
+            substituted for the special stateid and the checks appropriate to
+            non-special stateids are performed.
+          </t>
+  
+          <t>
+            If the combination is valid in general but is not appropriate to
+            the context in which the stateid is used (e.g., an all-zero
+            stateid is used when an OPEN stateid is required in a LOCK
+            operation), the error NFS4ERR_BAD_STATEID is also returned.
+          </t>
+  
+          <t>
+            Otherwise, the check is completed and the special stateid is
+            accepted as valid.
+          </t>
+        </list>
+      </t>
+  
+      <t>
+        When a stateid is being tested, and the "other" field is neither all
+        zeros nor all ones, the following procedure could be used to validate
+        an incoming stateid and return an appropriate error, when necessary,
+        assuming that the "other" field would be divided into a table index
+        and an entry generation.
+      </t>
+  
+      <t>
+        <list style='symbols'>
+          <t>
+            If the table index field is outside the range of the associated
+            table, return NFS4ERR_BAD_STATEID.
+          </t>
+  
+          <t>
+            If the selected table entry is of a different generation than that
+            specified in the incoming stateid, return NFS4ERR_BAD_STATEID.
+          </t>
+  
+          <t>
+            If the selected table entry does not match the current filehandle,
+            return NFS4ERR_BAD_STATEID.
+          </t>
+  
+          <t>
+            If the client ID in the table entry does not match the client ID
+            associated with the current session, return NFS4ERR_BAD_STATEID.
+          </t>
+  
+          <t>
+            If the stateid represents revoked state, then return
+            NFS4ERR_EXPIRED, NFS4ERR_ADMIN_REVOKED, or NFS4ERR_DELEG_REVOKED,
+            as appropriate.
+          </t>
+  
+          <t>
+            If the stateid type is not valid for the context in which the
+            stateid appears, return NFS4ERR_BAD_STATEID.  Note that a stateid
+            may be valid in general, as would be reported by the TEST_STATEID
+            operation, but be invalid for a particular operation, as, for
+            example, when a stateid that doesn't represent byte-range locks is
+            passed to the non-from_open case of LOCK or to LOCKU, or when a
+            stateid that does not represent an open is passed to CLOSE or
+            OPEN_DOWNGRADE.  In such cases, the server MUST return
+            NFS4ERR_BAD_STATEID.
+          </t>
+  
+          <t>
+            If the "seqid" field is not zero and it is greater than the
+            current sequence value corresponding to the current "other" field,
+            return NFS4ERR_BAD_STATEID.
+          </t>
+  
+          <t>
+            If the "seqid" field is not zero and it is less than the current
+            sequence value corresponding to the current "other" field, return
+            NFS4ERR_OLD_STATEID.
+          </t>
+  
+          <t>
+            Otherwise, the stateid is valid and the table entry should contain
+            any additional information about the type of stateid and
+            information associated with that particular type of stateid, such
+            as the associated set of locks, e.g., open-owner and lock-owner
+            information, as well as information on the specific locks, e.g.,
+            open modes and byte-ranges.
+          </t>
+        </list>
+      </t>
+    </section>
+  
+    <section toc='exclude' anchor="ss:state_management:SUfIO" title="Stateid Use for I/O Operations">
+      <t>
+        Clients performing I/O operations need to select an appropriate
+        stateid based on the locks (including opens and delegations) held by
+        the client and the various types of state-owners sending the I/O
+        requests.  SETATTR operations that change the file size are treated
+        like I/O operations in this regard.
+      </t>
+  
+      <t>
+        The following rules, applied in order of decreasing priority, govern
+        the selection of the appropriate stateid.  In following these rules,
+        the client will only consider locks of which it has actually received
+        notification by an appropriate operation response or callback.  Note
+        that the rules are slightly different in the case of I/O to data
+        servers when file layouts are being used (see <xref target="ss:nfsv4.1_as:GSR" />).
+      </t>
+  
+      <t>
+        <list style='symbols'>
+          <t>
+            If the client holds a delegation for the file in question, the
+            delegation stateid SHOULD be used.
+          </t>
+  
+          <t>
+            Otherwise, if the entity corresponding to the lock-owner (e.g., a
+            process) sending the I/O has a byte-range lock stateid for the
+            associated open file, then the byte-range lock stateid for that
+            lock-owner and open file SHOULD be used.
+          </t>
+  
+          <t>
+            If there is no byte-range lock stateid, then the OPEN stateid for
+            the open file in question SHOULD be used.
+          </t>
+  
+          <t>
+            Finally, if none of the above apply, then a special stateid SHOULD
+            be used.
+          </t>
+        </list>
+      </t>
+  
+      <t>
+        Ignoring these rules may result in situations in which the server
+        does not have information necessary to properly process the request.
+        For example, when mandatory byte-range locks are in effect, if the
+        stateid does not indicate the proper lock-owner, via a lock stateid,
+        a request might be avoidably rejected.
+      </t>
+  
+      <t>
+        The server however should not try to enforce these ordering rules and
+        should use whatever information is available to properly process I/O
+        requests.  In particular, when a client has a delegation for a given
+        file, it SHOULD take note of this fact in processing a request, even
+        if it is sent with a special stateid.
+      </t>
+    </section>
+  
+    <section toc='exclude' anchor="ss:state_management:SUfSO" title="Stateid Use for SETATTR Operations">
+      <t>
+        Because each operation is associated with a session ID and from that
+        the clientid can be determined, operations do not need to include a
+        stateid for the server to be able to determine whether they should
+        cause a delegation to be recalled or are to be treated as done within
+        the scope of the delegation.
+      </t>
+  
+      <t>
+        In the case of SETATTR operations, a stateid is present.  In cases
+        other than those that set the file size, the client may send either a
+        special stateid or, when a delegation is held for the file in
+        question, a delegation stateid.  While the server SHOULD validate the
+        stateid and may use the stateid to optimize the determination as to
+        whether a delegation is held, it SHOULD note the presence of a
+        delegation even when a special stateid is sent, and MUST accept a
+        valid delegation stateid when sent.
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:state_management:LR" title="Lease Renewal">
+    <t>
+      Each client/server pair, as represented by a client ID, has a single
+      lease.  The purpose of the lease is to allow the client to indicate
+      to the server, in a low-overhead way, that it is active, and thus
+      that the server is to retain the client's locks.  This arrangement
+      allows the server to remove stale locking-related objects that are
+      held by a client that has crashed or is otherwise unreachable, once
+      the relevant lease expires.  This in turn allows other clients to
+      obtain conflicting locks without being delayed indefinitely by
+      inactive or unreachable clients.  It is not a mechanism for cache
+      consistency and lease renewals may not be denied if the lease
+      interval has not expired.
+    </t>
+
+    <t>
+      Since each session is associated with a specific client (identified
+      by the client's client ID), any operation sent on that session is an
+      indication that the associated client is reachable.  When a request
+      is sent for a given session, successful execution of a SEQUENCE
+      operation (or successful retrieval of the result of SEQUENCE from the
+      reply cache) on an unexpired lease will result in the lease being
+      implicitly renewed, for the standard renewal period (equal to the
+      lease_time attribute).
+    </t>
+
+    <t>
+      If the client ID's lease has not expired when the server receives a
+      SEQUENCE operation, then the server MUST renew the lease.  If the
+      client ID's lease has expired when the server receives a SEQUENCE
+      operation, the server MAY renew the lease; this depends on whether
+      any state was revoked as a result of the client's failure to renew
+      the lease before expiration.
+    </t>
+
+    <t>
+      Absent other activity that would renew the lease, a COMPOUND
+      consisting of a single SEQUENCE operation will suffice.  The client
+      should also take communication-related delays into account and take
+      steps to ensure that the renewal messages actually reach the server
+      in good time.  For example:
+    </t>
+
+    <t>
+      <list style='symbols'>
+        <t>
+          When trunking is in effect, the client should consider sending
+          multiple requests on different connections, in order to ensure
+          that renewal occurs, even in the event of blockage in the path
+          used for one of those connections.
+        </t>
+
+        <t>
+          Transport retransmission delays might become so large as to
+          approach or exceed the length of the lease period.  This may be
+          particularly likely when the server is unresponsive due to a
+          restart; see <xref target="ss:state_management:SR" />.  If the client implementation is not
+          careful, transport retransmission delays can result in the client
+          failing to detect a server restart before the grace period ends.
+          The scenario is that the client is using a transport with
+          exponential backoff, such that the maximum retransmission timeout
+          exceeds both the grace period and the lease_time attribute.  A
+          network partition causes the client's connection's retransmission
+          interval to back off, and even after the partition heals, the next
+          transport-level retransmission is sent after the server has
+          restarted and its grace period ends.
+          <vspace blankLines='1' />
+          The client MUST either recover from the ensuing NFS4ERR_NO_GRACE
+          errors or it MUST ensure that, despite transport-level
+          retransmission intervals that exceed the lease_time, a SEQUENCE
+          operation is sent that renews the lease before expiration.  The
+          client can achieve this by associating a new connection with the
+          session, and sending a SEQUENCE operation on it.  However, if the
+          attempt to establish a new connection is delayed for some reason
+          (e.g., exponential backoff of the connection establishment
+          packets), the client will have to abort the connection
+          establishment attempt before the lease expires, and attempt to
+          reconnect.
+        </t>
+      </list>
+    </t>
+
+    <t>
+      If the server renews the lease upon receiving a SEQUENCE operation,
+      the server MUST NOT allow the lease to expire while the rest of the
+      operations in the COMPOUND procedure's request are still executing.
+    </t>
+
+    <t>
+      Once the last operation has finished, and the response to COMPOUND
+      has been sent, the server MUST set the lease to expire no sooner than
+      the sum of current time and the value of the lease_time attribute.
+    </t>
+
+    <t>
+      A client ID's lease can expire when it has been at least the lease
+      interval (lease_time) since the last lease-renewing SEQUENCE
+      operation was sent on any of the client ID's sessions and there are
+      no active COMPOUND operations on any such sessions.
+    </t>
+
+    <t>
+      Because the SEQUENCE operation is the basic mechanism to renew a
+      lease, and because it must be done at least once for each lease
+      period, it is the natural mechanism whereby the server will inform
+      the client of changes in the lease status that the client needs to be
+      informed of.  The client should inspect the status flags
+      (sr_status_flags) returned by sequence and take the appropriate
+      action (see <xref target="ss:op_SEQUENCE:D" /> for details).
+    </t>
+
+    <t>
+      <list style='symbols'>
+        <t>
+          The status bits SEQ4_STATUS_CB_PATH_DOWN and
+          SEQ4_STATUS_CB_PATH_DOWN_SESSION indicate problems with the
+          backchannel that the client may need to address in order to
+          receive callback requests.
+        </t>
+
+        <t>
+          The status bits SEQ4_STATUS_CB_GSS_CONTEXTS_EXPIRING and
+          SEQ4_STATUS_CB_GSS_CONTEXTS_EXPIRED indicate problems with GSS
+          contexts or RPCSEC_GSS handles for the backchannel that the client
+          might have to address in order to allow callback requests to be
+          sent.
+        </t>
+
+        <t>
+          The status bits SEQ4_STATUS_EXPIRED_ALL_STATE_REVOKED,
+          SEQ4_STATUS_EXPIRED_SOME_STATE_REVOKED,
+          SEQ4_STATUS_ADMIN_STATE_REVOKED, and
+          SEQ4_STATUS_RECALLABLE_STATE_REVOKED notify the client of lock
+          revocation events.  When these bits are set, the client should use
+          TEST_STATEID to find what stateids have been revoked and use
+          FREE_STATEID to acknowledge loss of the associated state.
+        </t>
+
+        <t>
+          The status bit SEQ4_STATUS_LEASE_MOVE indicates that
+          responsibility for lease renewal has been transferred to one or
+          more new servers.
+        </t>
+
+        <t>
+          The status bit SEQ4_STATUS_RESTART_RECLAIM_NEEDED indicates that
+          due to server restart the client must reclaim locking state.
+        </t>
+
+        <t>
+          The status bit SEQ4_STATUS_BACKCHANNEL_FAULT indicates that the
+          server has encountered an unrecoverable fault with the backchannel
+          (e.g., it has lost track of a sequence ID for a slot in the
+          backchannel).
+        </t>
+      </list>
+    </t>
+  </section>
+
+  <section anchor="ss:state_management:CR" title="Crash Recovery">
+    <t>
+      A critical requirement in crash recovery is that both the client and
+      the server know when the other has failed.  Additionally, it is
+      required that a client sees a consistent view of data across server
+      restarts.  All READ and WRITE operations that may have been queued
+      within the client or network buffers must wait until the client has
+      successfully recovered the locks protecting the READ and WRITE
+      operations.  Any that reach the server before the server can safely
+      determine that the client has recovered enough locking state to be
+      sure that such operations can be safely processed must be rejected.
+      This will happen because either:
+    </t>
+
+    <t>
+      <list style='symbols'>
+        <t>
+          The state presented is no longer valid since it is associated with
+          a now invalid client ID.  In this case, the client will receive
+          either an NFS4ERR_BADSESSION or NFS4ERR_DEADSESSION error, and any
+          attempt to attach a new session to that invalid client ID will
+          result in an NFS4ERR_STALE_CLIENTID error.
+        </t>
+
+        <t>
+          Subsequent recovery of locks may make execution of the operation
+          inappropriate (NFS4ERR_GRACE).
+        </t>
+      </list>
+    </t>
+
+    <section toc='exclude' anchor="ss:state_management:CFaR" title="Client Failure and Recovery">
+      <t>
+        In the event that a client fails, the server may release the client's
+        locks when the associated lease has expired.  Conflicting locks from
+        another client may only be granted after this lease expiration.  As
+        discussed in <xref target="ss:state_management:LR" />, when a client has not failed and
+        reestablishes its lease before expiration occurs, requests for
+        conflicting locks will not be granted.
+      </t>
+
+      <t>
+        To minimize client delay upon restart, lock requests are associated
+        with an instance of the client by a client-supplied verifier.  This
+        verifier is part of the client_owner4 sent in the initial EXCHANGE_ID
+        call made by the client.  The server returns a client ID as a result
+        of the EXCHANGE_ID operation.  The client then confirms the use of
+        the client ID by establishing a session associated with that client
+        ID (see <xref target="ss:op_CREATE_SESSION:D" /> for a description of how this is done).  All
+        locks, including opens, byte-range locks, delegations, and layouts
+        obtained by sessions using that client ID, are associated with that
+        client ID.
+      </t>
+
+      <t>
+        Since the verifier will be changed by the client upon each
+        initialization, the server can compare a new verifier to the verifier
+        associated with currently held locks and determine that they do not
+        match.  This signifies the client's new instantiation and subsequent
+        loss (upon confirmation of the new client ID) of locking state.  As a
+        result, the server is free to release all locks held that are
+        associated with the old client ID that was derived from the old
+        verifier.  At this point, conflicting locks from other clients, kept
+        waiting while the lease had not yet expired, can be granted.  In
+        addition, all stateids associated with the old client ID can also be
+        freed, as they are no longer reference-able.
+      </t>
+
+      <t>
+        Note that the verifier must have the same uniqueness properties as
+        the verifier for the COMMIT operation.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:state_management:SFaR" title="Server Failure and Recovery">
+      <t>
+        If the server loses locking state (usually as a result of a restart),
+        it must allow clients time to discover this fact and re-establish the
+        lost locking state.  The client must be able to re-establish the
+        locking state without having the server deny valid requests because
+        the server has granted conflicting access to another client.
+        Likewise, if there is a possibility that clients have not yet
+        reestablished their locking state for a file and that such locking
+        state might make it invalid to perform READ or WRITE operations.  For
+        example, if mandatory locks are a possibility, the server must
+        disallow READ and WRITE operations for that file.
+      </t>
+
+      <t>
+        A client can determine that loss of locking state has occurred via
+        several methods.
+      </t>
+
+      <t>
+        <list style='numbers'>
+          <t>
+            When a SEQUENCE (most common) or other operation returns
+            NFS4ERR_BADSESSION, this may mean that the session has been
+            destroyed but the client ID is still valid.  The client sends a
+            CREATE_SESSION request with the client ID to re-establish the
+            session.  If CREATE_SESSION fails with NFS4ERR_STALE_CLIENTID,
+            the client must establish a new client ID (see <xref target="ss:state_management:CaSI" />) and
+            re-establish its lock state with the new client ID, after the
+            CREATE_SESSION operation succeeds (see <xref target="ss:state_management:SR" />).
+          </t>
+
+          <t>
+            When a SEQUENCE (most common) or other operation on a persistent
+            session returns NFS4ERR_DEADSESSION, this indicates that a
+            session is no longer usable for new, i.e., not satisfied from the
+            reply cache, operations.  Once all pending operations are
+            determined to be either performed before the retry or not
+            performed, the client sends a CREATE_SESSION request with the
+            client ID to re-establish the session.  If CREATE_SESSION fails
+            with NFS4ERR_STALE_CLIENTID, the client must establish a new
+            client ID (see <xref target="ss:state_management:CaSI" />) and re-establish its lock state after
+            the CREATE_SESSION, with the new client ID, succeeds
+            (<xref target="ss:state_management:SR" />).
+          </t>
+
+          <t>
+            When an operation, neither SEQUENCE nor preceded by SEQUENCE (for
+            example, CREATE_SESSION, DESTROY_SESSION), returns
+            NFS4ERR_STALE_CLIENTID, the client MUST establish a new client ID
+            (<xref target="ss:state_management:CaSI" />) and re-establish its lock state (<xref target="ss:state_management:SR" />).
+          </t>
+        </list>
+      </t>
+
+      <section toc='exclude' anchor="ss:state_management:SR" title="State Reclaim">
+        <t>
+          When state information and the associated locks are lost as a result
+          of a server restart, the protocol must provide a way to cause that
+          state to be re-established.  The approach used is to define, for most
+          types of locking state (layouts are an exception), a request whose
+          function is to allow the client to re-establish on the server a lock
+          first obtained from a previous instance.  Generally, these requests
+          are variants of the requests normally used to create locks of that
+          type and are referred to as "reclaim-type" requests, and the process
+          of re-establishing such locks is referred to as "reclaiming" them.
+        </t>
+
+        <t>
+          Because each client must have an opportunity to reclaim all of the
+          locks that it has without the possibility that some other client will
+          be granted a conflicting lock, a "grace period" is devoted to the
+          reclaim process.  During this period, requests creating client IDs
+          and sessions are handled normally, but locking requests are subject
+          to special restrictions.  Only reclaim-type locking requests are
+          allowed, unless the server can reliably determine (through state
+          persistently maintained across restart instances) that granting any
+          such lock cannot possibly conflict with a subsequent reclaim.  When a
+          request is made to obtain a new lock (i.e., not a reclaim-type
+          request) during the grace period and such a determination cannot be
+          made, the server must return the error NFS4ERR_GRACE.
+        </t>
+
+        <t>
+          Once a session is established using the new client ID, the client
+          will use reclaim-type locking requests (e.g., LOCK operations with
+          reclaim set to TRUE and OPEN operations with a claim type of
+          CLAIM_PREVIOUS; see <xref target="ss:file_locking:RoOaBL" />) to re-establish its locking state.
+          Once this is done, or if there is no such locking state to reclaim,
+          the client sends a global RECLAIM_COMPLETE operation, i.e., one with
+          the rca_one_fs argument set to FALSE, to indicate that it has
+          reclaimed all of the locking state that it will reclaim.  Once a
+          client sends such a RECLAIM_COMPLETE operation, it may attempt
+          non-reclaim locking operations, although it might get an NFS4ERR_GRACE
+          status result from each such operation until the period of special
+          handling is over.  See <xref target="ss:multi-server_namespace:LSaFST" /> for a discussion of the
+          analogous handling lock reclamation in the case of file systems
+          transitioning from server to server.
+        </t>
+
+        <t>
+          During the grace period, the server must reject READ and WRITE
+          operations and non-reclaim locking requests (i.e., other LOCK and
+          OPEN operations) with an error of NFS4ERR_GRACE, unless it can
+          guarantee that these may be done safely, as described below.
+        </t>
+
+        <t>
+          The grace period may last until all clients that are known to
+          possibly have had locks have done a global RECLAIM_COMPLETE
+          operation, indicating that they have finished reclaiming the locks
+          they held before the server restart.  This means that a client that
+          has done a RECLAIM_COMPLETE must be prepared to receive an
+          NFS4ERR_GRACE when attempting to acquire new locks.  In order for the
+          server to know that all clients with possible prior lock state have
+          done a RECLAIM_COMPLETE, the server must maintain in stable storage a
+          list clients that may have such locks.  The server may also terminate
+          the grace period before all clients have done a global
+          RECLAIM_COMPLETE.  The server SHOULD NOT terminate the grace period
+          before a time equal to the lease period in order to give clients an
+          opportunity to find out about the server restart, as a result of
+          sending requests on associated sessions with a frequency governed by
+          the lease time.  Note that when a client does not send such requests
+          (or they are sent by the client but not received by the server), it
+          is possible for the grace period to expire before the client finds
+          out that the server restart has occurred.
+        </t>
+
+        <t>
+          Some additional time in order to allow a client to establish a new
+          client ID and session and to effect lock reclaims may be added to the
+          lease time.  Note that analogous rules apply to file system-specific
+          grace periods discussed in <xref target="ss:multi-server_namespace:LSaFST" />.
+        </t>
+
+        <t>
+          If the server can reliably determine that granting a non-reclaim
+          request will not conflict with reclamation of locks by other clients,
+          the NFS4ERR_GRACE error does not have to be returned even within the
+          grace period, although NFS4ERR_GRACE must always be returned to
+          clients attempting a non-reclaim lock request before doing their own
+          global RECLAIM_COMPLETE.  For the server to be able to service READ
+          and WRITE operations during the grace period, it must again be able
+          to guarantee that no possible conflict could arise between a
+          potential reclaim locking request and the READ or WRITE operation.
+          If the server is unable to offer that guarantee, the NFS4ERR_GRACE
+          error must be returned to the client.
+        </t>
+
+        <t>
+          For a server to provide simple, valid handling during the grace
+          period, the easiest method is to simply reject all non-reclaim
+          locking requests and READ and WRITE operations by returning the
+          NFS4ERR_GRACE error.  However, a server may keep information about
+          granted locks in stable storage.  With this information, the server
+          could determine if a locking, READ or WRITE operation can be safely
+          processed.
+        </t>
+
+        <t>
+          For example, if the server maintained on stable storage summary
+          information on whether mandatory locks exist, either mandatory
+          byte-range locks, or share reservations specifying deny modes, many
+          requests could be allowed during the grace period.  If it is known
+          that no such share reservations exist, OPEN request that do not
+          specify deny modes may be safely granted.  If, in addition, it is
+          known that no mandatory byte-range locks exist, either through
+          information stored on stable storage or simply because the server
+          does not support such locks, READ and WRITE operations may be safely
+          processed during the grace period.  Another important case is where
+          it is known that no mandatory byte-range locks exist, either because
+          the server does not provide support for them or because their absence
+          is known from persistently recorded data.  In this case, READ and
+          WRITE operations specifying stateids derived from reclaim-type
+          operations may be validly processed during the grace period because
+          of the fact that the valid reclaim ensures that no lock subsequently
+          granted can prevent the I/O.
+        </t>
+
+        <t>
+          To reiterate, for a server that allows non-reclaim lock and I/O
+          requests to be processed during the grace period, it MUST determine
+          that no lock subsequently reclaimed will be rejected and that no lock
+          subsequently reclaimed would have prevented any I/O operation
+          processed during the grace period.
+        </t>
+
+        <t>
+          Clients should be prepared for the return of NFS4ERR_GRACE errors for
+          non-reclaim lock and I/O requests.  In this case, the client should
+          employ a retry mechanism for the request.  A delay (on the order of
+          several seconds) between retries should be used to avoid overwhelming
+          the server.  Further discussion of the general issue is included in
+          <xref target="Floyd" />.  The client must account for the server that can perform I/O
+          and non-reclaim locking requests within the grace period as well as
+          those that cannot do so.
+        </t>
+
+        <t>
+          A reclaim-type locking request outside the server's grace period can
+          only succeed if the server can guarantee that no conflicting lock or
+          I/O request has been granted since restart.
+        </t>
+
+        <t>
+          A server may, upon restart, establish a new value for the lease
+          period.  Therefore, clients should, once a new client ID is
+          established, refetch the lease_time attribute and use it as the basis
+          for lease renewal for the lease associated with that server.
+          However, the server must establish, for this restart event, a grace
+          period at least as long as the lease period for the previous server
+          instantiation.  This allows the client state obtained during the
+          previous server instance to be reliably re-established.
+        </t>
+
+        <t>
+          The possibility exists that, because of server configuration events,
+          the client will be communicating with a server different than the one
+          on which the locks were obtained, as shown by the combination of
+          eir_server_scope and eir_server_owner.  This leads to the issue of if
+          and when the client should attempt to reclaim locks previously
+          obtained on what is being reported as a different server.  The rules
+          to resolve this question are as follows:
+        </t>
+
+        <t>
+          <list style='symbols'>
+            <t>
+              If the server scope is different, the client should not attempt to
+              reclaim locks.  In this situation, no lock reclaim is possible.
+              Any attempt to re-obtain the locks with non-reclaim operations is
+              problematic since there is no guarantee that the existing
+              filehandles will be recognized by the new server, or that if
+              recognized, they denote the same objects.  It is best to treat the
+              locks as having been revoked by the reconfiguration event.
+            </t>
+
+            <t>
+              If the server scope is the same, the client should attempt to
+              reclaim locks, even if the eir_server_owner value is different.
+              In this situation, it is the responsibility of the server to
+              return NFS4ERR_NO_GRACE if it cannot provide correct support for
+              lock reclaim operations, including the prevention of edge
+              conditions.
+            </t>
+          </list>
+        </t>
+
+        <t>
+          The eir_server_owner field is not used in making this determination.
+          Its function is to specify trunking possibilities for the client (see
+          <xref target="ss:core_infrastructure:T" />) and not to control lock reclaim.
+        </t>
+
+        <section toc='exclude' anchor="ss:state_management:SCfSR" title="Security Considerations for State Reclaim">
+          <t>
+            During the grace period, a client can reclaim state that it believes
+            or asserts it had before the server restarted.  Unless the server
+            maintained a complete record of all the state the client had, the
+            server has little choice but to trust the client.  (Of course, if the
+            server maintained a complete record, then it would not have to force
+            the client to reclaim state after server restart.)  While the server
+            has to trust the client to tell the truth, such trust does not have
+            any negative consequences for security.  The fundamental rule for the
+            server when processing reclaim requests is that it MUST NOT grant the
+            reclaim if an equivalent non-reclaim request would not be granted
+            during steady state due to access control or access conflict issues.
+            For example, an OPEN request during a reclaim will be refused with
+            NFS4ERR_ACCESS if the principal making the request does not have
+            access to open the file according to the discretionary ACL
+            (<xref target="ss:access_control:A5d" />) on the file.
+          </t>
+
+          <t>
+            Nonetheless, it is possible that a client operating in error or
+            maliciously could, during reclaim, prevent another client from
+            reclaiming access to state.  For example, an attacker could send an
+          </t>
+
+          <t>
+            OPEN reclaim operation with a deny mode that prevents another client
+            from reclaiming the OPEN state it had before the server restarted.
+            The attacker could perform the same denial of service during steady
+            state prior to server restart, as long as the attacker had
+            permissions.  Given that the attack vectors are equivalent, the grace
+            period does not offer any additional opportunity for denial of
+            service, and any concerns about this attack vector, whether during
+            grace or steady state, are addressed the same way: use RPCSEC_GSS for
+            authentication and limit access to the file only to principals that
+            the owner of the file trusts.
+          </t>
+
+          <t>
+            Note that if prior to restart the server had client IDs with the
+            EXCHGID4_FLAG_BIND_PRINC_STATEID (<xref target="op_EXCHANGE_ID" />) capability set, then
+            the server SHOULD record in stable storage the client owner and the
+            principal that established the client ID via EXCHANGE_ID.  If the
+            server does not, then there is a risk a client will be unable to
+            reclaim state if it does not have a credential for a principal that
+            was originally authorized to establish the state.
+          </t>
+        </section>
+      </section>
+    </section>
+
+    <section toc='exclude' anchor="ss:state_management:NPaR" title="Network Partitions and Recovery">
+      <t>
+        If the duration of a network partition is greater than the lease
+        period provided by the server, the server will not have received a
+        lease renewal from the client.  If this occurs, the server may free
+        all locks held for the client or it may allow the lock state to
+        remain for a considerable period, subject to the constraint that if a
+        request for a conflicting lock is made, locks associated with an
+        expired lease do not prevent such a conflicting lock from being
+        granted but MUST be revoked as necessary so as to avoid interfering
+        with such conflicting requests.
+      </t>
+
+      <t>
+        If the server chooses to delay freeing of lock state until there is a
+        conflict, it may either free all of the client's locks once there is
+        a conflict or it may only revoke the minimum set of locks necessary
+        to allow conflicting requests.  When it adopts the finer-grained
+        approach, it must revoke all locks associated with a given stateid,
+        even if the conflict is with only a subset of locks.
+      </t>
+
+      <t>
+        When the server chooses to free all of a client's lock state, either
+        immediately upon lease expiration or as a result of the first attempt
+        to obtain a conflicting a lock, the server may report the loss of
+        lock state in a number of ways.
+      </t>
+
+      <t>
+        The server may choose to invalidate the session and the associated
+        client ID.  In this case, once the client can communicate with the
+        server, it will receive an NFS4ERR_BADSESSION error.  Upon attempting
+        to create a new session, it would get an NFS4ERR_STALE_CLIENTID.
+        Upon creating the new client ID and new session, the client will
+        attempt to reclaim locks.  Normally, the server will not allow the
+        client to reclaim locks, because the server will not be in its
+        recovery grace period.
+      </t>
+
+      <t>
+        Another possibility is for the server to maintain the session and
+        client ID but for all stateids held by the client to become invalid
+        or stale.  Once the client can reach the server after such a network
+        partition, the status returned by the SEQUENCE operation will
+        indicate a loss of locking state; i.e., the flag
+        SEQ4_STATUS_EXPIRED_ALL_STATE_REVOKED will be set in sr_status_flags.
+        In addition, all I/O submitted by the client with the now invalid
+        stateids will fail with the server returning the error
+        NFS4ERR_EXPIRED.  Once the client learns of the loss of locking
+        state, it will suitably notify the applications that held the
+        invalidated locks.  The client should then take action to free
+        invalidated stateids, either by establishing a new client ID using a
+        new verifier or by doing a FREE_STATEID operation to release each of
+        the invalidated stateids.
+      </t>
+
+      <t>
+        When the server adopts a finer-grained approach to revocation of
+        locks when a client's lease has expired, only a subset of stateids
+        will normally become invalid during a network partition.  When the
+        client can communicate with the server after such a network partition
+        heals, the status returned by the SEQUENCE operation will indicate a
+        partial loss of locking state
+        (SEQ4_STATUS_EXPIRED_SOME_STATE_REVOKED).  In addition, operations,
+        including I/O submitted by the client, with the now invalid stateids
+        will fail with the server returning the error NFS4ERR_EXPIRED.  Once
+        the client learns of the loss of locking state, it will use the
+        TEST_STATEID operation on all of its stateids to determine which
+        locks have been lost and then suitably notify the applications that
+        held the invalidated locks.  The client can then release the
+        invalidated locking state and acknowledge the revocation of the
+        associated locks by doing a FREE_STATEID operation on each of the
+        invalidated stateids.
+      </t>
+
+      <t>
+        When a network partition is combined with a server restart, there are
+        edge conditions that place requirements on the server in order to
+        avoid silent data corruption following the server restart.  Two of
+        these edge conditions are known, and are discussed below.
+      </t>
+
+      <t>
+        The first edge condition arises as a result of the scenarios such as
+        the following:
+      </t>
+
+      <t>
+        <list style='numbers'>
+          <t>
+            Client A acquires a lock.
+          </t>
+
+          <t>
+            Client A and server experience mutual network partition, such
+            that client A is unable to renew its lease.
+          </t>
+
+          <t>
+            Client A's lease expires, and the server releases the lock.
+          </t>
+
+          <t>
+            Client B acquires a lock that would have conflicted with that of
+            client A.
+          </t>
+
+          <t>
+            Client B releases its lock.
+          </t>
+
+          <t>
+            Server restarts.
+          </t>
+
+          <t>
+            Network partition between client A and server heals.
+          </t>
+
+          <t>
+            Client A connects to a new server instance and finds out about
+            server restart.
+          </t>
+
+          <t>
+            Client A reclaims its lock within the server's grace period.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        Thus, at the final step, the server has erroneously granted client
+        A's lock reclaim.  If client B modified the object the lock was
+        protecting, client A will experience object corruption.
+      </t>
+
+      <t>
+        The second known edge condition arises in situations such as the
+        following:
+      </t>
+
+      <t>
+        <list style='numbers'>
+          <t>
+            Client A acquires one or more locks.
+          </t>
+
+          <t>
+            Server restarts.
+          </t>
+
+          <t>
+            Client A and server experience mutual network partition, such
+            that client A is unable to reclaim all of its locks within the
+            grace period.
+          </t>
+
+          <t>
+            Server's reclaim grace period ends.  Client A has either no
+            locks or an incomplete set of locks known to the server.
+          </t>
+
+          <t>
+            Client B acquires a lock that would have conflicted with a lock
+            of client A that was not reclaimed.
+          </t>
+
+          <t>
+            Client B releases the lock.
+          </t>
+
+          <t>
+            Server restarts a second time.
+          </t>
+
+          <t>
+            Network partition between client A and server heals.
+          </t>
+
+          <t>
+            Client A connects to new server instance and finds out about
+            server restart.
+          </t>
+
+          <t>
+            Client A reclaims its lock within the server's grace period.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        As with the first edge condition, the final step of the scenario of
+        the second edge condition has the server erroneously granting client
+        A's lock reclaim.
+      </t>
+
+      <t>
+        Solving the first and second edge conditions requires either that the
+        server always assumes after it restarts that some edge condition
+        occurs, and thus returns NFS4ERR_NO_GRACE for all reclaim attempts,
+        or that the server record some information in stable storage.  The
+        amount of information the server records in stable storage is in
+        inverse proportion to how harsh the server intends to be whenever
+        edge conditions arise.  The server that is completely tolerant of all
+        edge conditions will record in stable storage every lock that is
+        acquired, removing the lock record from stable storage only when the
+        lock is released.  For the two edge conditions discussed above, the
+        harshest a server can be, and still support a grace period for
+        reclaims, requires that the server record in stable storage some
+        minimal information.  For example, a server implementation could, for
+        each client, save in stable storage a record containing:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            the co_ownerid field from the client_owner4 presented in the
+            EXCHANGE_ID operation.
+          </t>
+
+          <t>
+            a boolean that indicates if the client's lease expired or if there
+            was administrative intervention (see <xref target="ss:state_management:SRoL" />) to revoke a
+            byte-range lock, share reservation, or delegation and there has
+            been no acknowledgment, via FREE_STATEID, of such revocation.
+          </t>
+
+          <t>
+            a boolean that indicates whether the client may have locks that it
+            believes to be reclaimable in situations in which the grace period
+            was terminated, making the server's view of lock reclaimability
+            suspect.  The server will set this for any client record in stable
+            storage where the client has not done a suitable RECLAIM_COMPLETE
+            (global or file system-specific depending on the target of the
+            lock request) before it grants any new (i.e., not reclaimed) lock
+            to any client.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        Assuming the above record keeping, for the first edge condition,
+        after the server restarts, the record that client A's lease expired
+        means that another client could have acquired a conflicting
+        byte-range lock, share reservation, or delegation.  Hence, the server must
+        reject a reclaim from client A with the error NFS4ERR_NO_GRACE.
+      </t>
+
+      <t>
+        For the second edge condition, after the server restarts for a second
+        time, the indication that the client had not completed its reclaims
+        at the time at which the grace period ended means that the server
+        must reject a reclaim from client A with the error NFS4ERR_NO_GRACE.
+      </t>
+
+      <t>
+        When either edge condition occurs, the client's attempt to reclaim
+        locks will result in the error NFS4ERR_NO_GRACE.  When this is
+        received, or after the client restarts with no lock state, the client
+        will send a global RECLAIM_COMPLETE.  When the RECLAIM_COMPLETE is
+        received, the server and client are again in agreement regarding
+        reclaimable locks and both booleans in persistent storage can be
+        reset, to be set again only when there is a subsequent event that
+        causes lock reclaim operations to be questionable.
+      </t>
+
+      <t>
+        Regardless of the level and approach to record keeping, the server
+        MUST implement one of the following strategies (which apply to
+        reclaims of share reservations, byte-range locks, and delegations):
+      </t>
+
+      <t>
+        <list style='numbers'>
+          <t>
+            Reject all reclaims with NFS4ERR_NO_GRACE.  This is extremely
+            unforgiving, but necessary if the server does not record lock
+            state in stable storage.
+          </t>
+
+          <t>
+            Record sufficient state in stable storage such that all known
+            edge conditions involving server restart, including the two noted
+            in this section, are detected.  It is acceptable to erroneously
+            recognize an edge condition and not allow a reclaim, when, with
+            sufficient knowledge, it would be allowed.  The error the server
+            would return in this case is NFS4ERR_NO_GRACE.  Note that it is
+            not known if there are other edge conditions.
+            <vspace blankLines="1"/>
+            In the event that, after a server restart, the server determines
+            there is unrecoverable damage or corruption to the information in
+            stable storage, then for all clients and/or locks that may be
+            affected, the server MUST return NFS4ERR_NO_GRACE.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        A mandate for the client's handling of the NFS4ERR_NO_GRACE error is
+        outside the scope of this specification, since the strategies for
+        such handling are very dependent on the client's operating
+        environment.  However, one potential approach is described below.
+      </t>
+
+      <t>
+        When the client receives NFS4ERR_NO_GRACE, it could examine the
+        change attribute of the objects for which the client is trying to
+        reclaim state, and use that to determine whether to re-establish the
+        state via normal OPEN or LOCK operations.  This is acceptable
+        provided that the client's operating environment allows it.  In other
+        words, the client implementor is advised to document for his users
+        the behavior.  The client could also inform the application that its
+        byte-range lock or share reservations (whether or not they were
+        delegated) have been lost, such as via a UNIX signal, a Graphical
+        User Interface (GUI) pop-up window, etc.  See <xref target="ss:client-side_caching:DCaR" /> for a
+        discussion of what the client should do for dealing with unreclaimed
+        delegations on client state.
+      </t>
+
+      <t>
+        For further discussion of revocation of locks, see <xref target="ss:state_management:SRoL" />.
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:state_management:SRoL" title="Server Revocation of Locks">
+    <t>
+      At any point, the server can revoke locks held by a client, and the
+      client must be prepared for this event.  When the client detects that
+      its locks have been or may have been revoked, the client is
+      responsible for validating the state information between itself and
+      the server.  Validating locking state for the client means that it
+      must verify or reclaim state for each lock currently held.
+    </t>
+
+    <t>
+      The first occasion of lock revocation is upon server restart.  Note
+      that this includes situations in which sessions are persistent and
+      locking state is lost.  In this class of instances, the client will
+      receive an error (NFS4ERR_STALE_CLIENTID) on an operation that takes
+      client ID, usually as part of recovery in response to a problem with
+      the current session), and the client will proceed with normal crash
+      recovery as described in the <xref target="ss:state_management:SR" />.
+    </t>
+
+    <t>
+      The second occasion of lock revocation is the inability to renew the
+      lease before expiration, as discussed in <xref target="ss:state_management:NPaR" />.  While this
+      is considered a rare or unusual event, the client must be prepared to
+      recover.  The server is responsible for determining the precise
+      consequences of the lease expiration, informing the client of the
+      scope of the lock revocation decided upon.  The client then uses the
+      status information provided by the server in the SEQUENCE results
+      (field sr_status_flags, see <xref target="ss:op_SEQUENCE:D" />) to synchronize its
+      locking state with that of the server, in order to recover.
+    </t>
+
+    <t>
+      The third occasion of lock revocation can occur as a result of
+      revocation of locks within the lease period, either because of
+      administrative intervention or because a recallable lock (a
+      delegation or layout) was not returned within the lease period after
+      having been recalled.  While these are considered rare events, they
+      are possible, and the client must be prepared to deal with them.
+      When either of these events occurs, the client finds out about the
+      situation through the status returned by the SEQUENCE operation.  Any
+      use of stateids associated with locks revoked during the lease period
+      will receive the error NFS4ERR_ADMIN_REVOKED or
+      NFS4ERR_DELEG_REVOKED, as appropriate.
+    </t>
+
+    <t>
+      In all situations in which a subset of locking state may have been
+      revoked, which include all cases in which locking state is revoked
+      within the lease period, it is up to the client to determine which
+      locks have been revoked and which have not.  It does this by using
+      the TEST_STATEID operation on the appropriate set of stateids.  Once
+      the set of revoked locks has been determined, the applications can be
+      notified, and the invalidated stateids can be freed and lock
+      revocation acknowledged by using FREE_STATEID.
+    </t>
+  </section>
+
+  <section anchor="ss:state_management:SaLL" title="Short and Long Leases">
+    <t>
+      When determining the time period for the server lease, the usual
+      lease tradeoffs apply.  A short lease is good for fast server
+      recovery at a cost of increased operations to effect lease renewal
+      (when there are no other operations during the period to effect lease
+      renewal as a side effect).  A long lease is certainly kinder and
+      gentler to servers trying to handle very large numbers of clients.
+      The number of extra requests to effect lock renewal drops in inverse
+      proportion to the lease time.  The disadvantages of a long lease
+      include the possibility of slower recovery after certain failures.
+      After server failure, a longer grace period may be required when some
+      clients do not promptly reclaim their locks and do a global
+      RECLAIM_COMPLETE.  In the event of client failure, the longer period
+      for a lease to expire will force conflicting requests to wait longer.
+    </t>
+
+    <t>
+      A long lease is practical if the server can store lease state in
+      stable storage.  Upon recovery, the server can reconstruct the lease
+      state from its stable storage and continue operation with its
+      clients.
+    </t>
+  </section>
+
+  <section anchor="ss:state_management:CPDaCLE" title="Clocks, Propagation Delay, and Calculating Lease Expiration">
+    <t>
+      To avoid the need for synchronized clocks, lease times are granted by
+      the server as a time delta.  However, there is a requirement that the
+      client and server clocks do not drift excessively over the duration
+      of the lease.  There is also the issue of propagation delay across
+      the network, which could easily be several hundred milliseconds, as
+      well as the possibility that requests will be lost and need to be
+      retransmitted.
+    </t>
+
+    <t>
+      To take propagation delay into account, the client should subtract it
+      from lease times (e.g., if the client estimates the one-way
+      propagation delay as 200 milliseconds, then it can assume that the
+      lease is already 200 milliseconds old when it gets it).  In addition,
+      it will take another 200 milliseconds to get a response back to the
+      server.  So the client must send a lease renewal or write data back
+      to the server at least 400 milliseconds before the lease would
+      expire.  If the propagation delay varies over the life of the lease
+      (e.g., the client is on a mobile host), the client will need to
+      continuously subtract the increase in propagation delay from the
+      lease times.
+    </t>
+
+    <t>
+      The server's lease period configuration should take into account the
+      network distance of the clients that will be accessing the server's
+      resources.  It is expected that the lease period will take into
+      account the network propagation delays and other network delay
+      factors for the client population.  Since the protocol does not allow
+      for an automatic method to determine an appropriate lease period, the
+      server's administrator may have to tune the lease period.
+    </t>
+  </section>
+
+  <section anchor="ss:state_management:OLIfN" title="Obsolete Locking Infrastructure from NFSv4.0">
+    <t>
+      There are a number of operations and fields within existing
+      operations that no longer have a function in NFSv4.1.  In one way or
+      another, these changes are all due to the implementation of sessions
+      that provide client context and exactly once semantics as a base
+      feature of the protocol, separate from locking itself.
+    </t>
+
+    <t>
+      The following NFSv4.0 operations MUST NOT be implemented in NFSv4.1.
+      The server MUST return NFS4ERR_NOTSUPP if these operations are found
+      in an NFSv4.1 COMPOUND.
+    </t>
+
+    <t>
+      <list style='symbols'>
+        <t>
+          SETCLIENTID since its function has been replaced by EXCHANGE_ID.
+        </t>
+
+        <t>
+          SETCLIENTID_CONFIRM since client ID confirmation now happens by
+          means of CREATE_SESSION.
+        </t>
+
+        <t>
+          OPEN_CONFIRM because state-owner-based seqids have been replaced
+          by the sequence ID in the SEQUENCE operation.
+        </t>
+
+        <t>
+          RELEASE_LOCKOWNER because lock-owners with no associated locks do
+          not have any sequence-related state and so can be deleted by the
+          server at will.
+        </t>
+
+        <t>
+          RENEW because every SEQUENCE operation for a session causes lease
+          renewal, making a separate operation superfluous.
+        </t>
+      </list>
+    </t>
+
+    <t>
+      Also, there are a number of fields, present in existing operations,
+      related to locking that have no use in minor version 1.  They were
+      used in minor version 0 to perform functions now provided in a
+      different fashion.
+    </t>
+
+    <t>
+      <list style='symbols'>
+        <t>
+          Sequence ids used to sequence requests for a given state-owner and
+          to provide retry protection, now provided via sessions.
+        </t>
+
+        <t>
+          Client IDs used to identify the client associated with a given
+          request.  Client identification is now available using the client
+          ID associated with the current session, without needing an
+          explicit client ID field.
+        </t>
+      </list>
+    </t>
+
+    <t>
+      Such vestigial fields in existing operations have no function in
+      NFSv4.1 and are ignored by the server.  Note that client IDs in
+      operations new to NFSv4.1 (such as CREATE_SESSION and
+      DESTROY_CLIENTID) are not ignored.
+    </t>
+  </section>
+</section>

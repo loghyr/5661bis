@@ -1,0 +1,162 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_READDIR" title="Operation 26: READDIR - Read Directory">
+    <section toc='exclude' anchor="ss:op_READDIR:A" title="ARGUMENT">
+      <?rfc include='autogen/readdir_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_READDIR:R" title="RESULT">
+      <?rfc include='autogen/readdir_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_READDIR:D" title="DESCRIPTION">
+      <t>
+        The READDIR operation retrieves a variable number of entries from a
+        file system directory and returns client-requested attributes for
+        each entry along with information to allow the client to request
+        additional directory entries in a subsequent READDIR.
+      </t>
+
+      <t>
+        The arguments contain a cookie value that represents where the
+        READDIR should start within the directory.  A value of zero for the
+        cookie is used to start reading at the beginning of the directory.
+        For subsequent READDIR requests, the client specifies a cookie value
+        that is provided by the server on a previous READDIR request.
+      </t>
+
+      <t>
+        The request's cookieverf field should be set to 0 zero) when the
+        request's cookie field is zero (first read of the directory).  On
+        subsequent requests, the cookieverf field must match the cookieverf
+        returned by the READDIR in which the cookie was acquired.  If the
+        server determines that the cookieverf is no longer valid for the
+        directory, the error NFS4ERR_NOT_SAME must be returned.
+      </t>
+
+      <t>
+        The dircount field of the request is a hint of the maximum number of
+        bytes of directory information that should be returned.  This value
+        represents the total length of the names of the directory entries and
+        the cookie value for these entries.  This length represents the XDR
+        encoding of the data (names and cookies) and not the length in the
+        native format of the server.
+      </t>
+
+      <t>
+        The maxcount field of the request represents the maximum total size
+        of all of the data being returned within the READDIR4resok structure
+        and includes the XDR overhead.  The server MAY return less data.  If
+        the server is unable to return a single directory entry within the
+        maxcount limit, the error NFS4ERR_TOOSMALL MUST be returned to the
+        client.
+      </t>
+
+      <t>
+        Finally, the request's attr_request field represents the list of
+        attributes to be returned for each directory entry supplied by the
+        server.
+      </t>
+
+      <t>
+        A successful reply consists of a list of directory entries.  Each of
+        these entries contains the name of the directory entry, a cookie
+        value for that entry, and the associated attributes as requested.
+        The "eof" flag has a value of TRUE if there are no more entries in
+        the directory.
+      </t>
+
+      <t>
+        The cookie value is only meaningful to the server and is used as a
+        cursor for the directory entry.  As mentioned, this cookie is used by
+        the client for subsequent READDIR operations so that it may continue
+        reading a directory.  The cookie is similar in concept to a READ
+        offset but MUST NOT be interpreted as such by the client.  Ideally,
+        the cookie value SHOULD NOT change if the directory is modified since
+        the client may be caching these values.
+      </t>
+
+      <t>
+        In some cases, the server may encounter an error while obtaining the
+        attributes for a directory entry.  Instead of returning an error for
+        the entire READDIR operation, the server can instead return the
+        attribute rdattr_error (<xref target="ss:file_attributes:A1r" />).  With this, the server is
+        able to communicate the failure to the client and not fail the entire
+        operation in the instance of what might be a transient failure.
+        Obviously, the client must request the fattr4_rdattr_error attribute
+        for this method to work properly.  If the client does not request the
+        attribute, the server has no choice but to return failure for the
+        entire READDIR operation.
+      </t>
+
+      <t>
+        For some file system environments, the directory entries "." and ".."
+        have special meaning, and in other environments, they do not.  If the
+        server supports these special entries within a directory, they SHOULD
+        NOT be returned to the client as part of the READDIR response.  To
+        enable some client environments, the cookie values of zero, 1, and 2
+        are to be considered reserved.  Note that the UNIX client will use
+        these values when combining the server's response and local
+        representations to enable a fully formed UNIX directory presentation
+        to the application.
+      </t>
+
+      <t>
+        For READDIR arguments, cookie values of one and two SHOULD NOT be
+        used, and for READDIR results, cookie values of zero, one, and two
+        SHOULD NOT be returned.
+      </t>
+
+      <t>
+        On success, the current filehandle retains its value.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_READDIR:I" title="IMPLEMENTATION">
+      <t>
+        The server's file system directory representations can differ
+        greatly.  A client's programming interfaces may also be bound to the
+        local operating environment in a way that does not translate well
+        into the NFS protocol.  Therefore, the use of the dircount and
+        maxcount fields are provided to enable the client to provide hints to
+        the server.  If the client is aggressive about attribute collection
+        during a READDIR, the server has an idea of how to limit the encoded
+        response.
+      </t>
+
+      <t>
+        If dircount is zero, the server bounds the reply's size based on the
+        request's maxcount field.
+      </t>
+
+      <t>
+        The cookieverf may be used by the server to help manage cookie values
+        that may become stale.  It should be a rare occurrence that a server
+        is unable to continue properly reading a directory with the provided
+        cookie/cookieverf pair.  The server SHOULD make every effort to avoid
+        this condition since the application at the client might be unable to
+        properly handle this type of failure.
+      </t>
+
+      <t>
+        The use of the cookieverf will also protect the client from using
+        READDIR cookie values that might be stale.  For example, if the file
+        system has been migrated, the server might or might not be able to
+        use the same cookie values to service READDIR as the previous server
+        used.  With the client providing the cookieverf, the server is able
+        to provide the appropriate response to the client.  This prevents the
+        case where the server accepts a cookie value but the underlying
+        directory has changed and the response is invalid from the client's
+        context of its previous READDIR.
+      </t>
+
+      <t>
+        Since some servers will not be returning "." and ".." entries as has
+        been done with previous versions of the NFS protocol, the client that
+        requires these entries be present in READDIR responses must fabricate
+        them.
+      </t>
+    </section>
+  </section>
+

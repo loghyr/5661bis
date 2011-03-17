@@ -1,0 +1,16 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+<section anchor="sec:nfsv4.1_callback" title="NFSv4.1 Callback Procedures">
+  <t>
+    The procedures used for callbacks are defined in the following
+    sections.  In the interest of clarity, the terms "client" and
+    "server" refer to NFS clients and servers, despite the fact that for
+    an individual callback RPC, the sense of these terms would be
+    precisely the opposite.
+  </t>
+
+  <t>
+    Both procedures, CB_NULL and CB_COMPOUND, MUST be implemented.
+  </t>
+

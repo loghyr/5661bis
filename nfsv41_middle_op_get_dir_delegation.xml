@@ -1,0 +1,167 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_GET_DIR_DELEGATION" title="Operation 46: GET_DIR_DELEGATION - Get a Directory Delegation">
+    <section toc='exclude' anchor="ss:op_GET_DIR_DELEGATION:A" title="ARGUMENT">
+      <?rfc include='autogen/get_dir_delegation_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_GET_DIR_DELEGATION:R" title="RESULT">
+      <?rfc include='autogen/get_dir_delegation_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_GET_DIR_DELEGATION:D" title="DESCRIPTION">
+      <t>
+        The GET_DIR_DELEGATION operation is used by a client to request a
+        directory delegation.  The directory is represented by the current
+        filehandle.  The client also specifies whether it wants the server to
+        notify it when the directory changes in certain ways by setting one
+        or more bits in a bitmap.  The server may refuse to grant the
+        delegation.  In that case, the server will return
+        NFS4ERR_DIRDELEG_UNAVAIL.  If the server decides to hand out the
+        delegation, it will return a cookie verifier for that directory.  If
+        the cookie verifier changes when the client is holding the
+        delegation, the delegation will be recalled unless the client has
+        asked for notification for this event.
+      </t>
+
+      <t>
+        The server will also return a directory delegation stateid,
+        gddr_stateid, as a result of the GET_DIR_DELEGATION operation.  This
+        stateid will appear in callback messages related to the delegation,
+        such as notifications and delegation recalls.  The client will use
+        this stateid to return the delegation voluntarily or upon recall.  A
+        delegation is returned by calling the DELEGRETURN operation.
+      </t>
+
+      <t>
+        The server might not be able to support notifications of certain
+        events.  If the client asks for such notifications, the server MUST
+        inform the client of its inability to do so as part of the
+        GET_DIR_DELEGATION reply by not setting the appropriate bits in the
+        supported notifications bitmask, gddr_notification, contained in the
+        reply.  The server MUST NOT add bits to gddr_notification that the
+        client did not request.
+      </t>
+
+      <t>
+        The GET_DIR_DELEGATION operation can be used for both normal and
+        named attribute directories.
+      </t>
+
+      <t>
+        If client sets gdda_signal_deleg_avail to TRUE, then it is
+        registering with the client a "want" for a directory delegation.  If
+        the delegation is not available, and the server supports and will
+        honor the "want", the results will have
+        gddrnf_will_signal_deleg_avail set to TRUE and no error will be
+        indicated on return.  If so, the client should expect a future
+        CB_RECALLABLE_OBJ_AVAIL operation to indicate that a directory
+        delegation is available.  If the server does not wish to honor the
+        "want" or is not able to do so, it returns the error
+        NFS4ERR_DIRDELEG_UNAVAIL.  If the delegation is immediately
+        available, the server SHOULD return it with the response to the
+        operation, rather than via a callback.
+      </t>
+
+      <t>
+        When a client makes a request for a directory delegation while it
+        already holds a directory delegation for that directory (including
+        the case where it has been recalled but not yet returned by the
+        client or revoked by the server), the server MUST reply with the
+        value of gddr_status set to NFS4_OK, the value of gddrnf_status set
+        to GDD4_UNAVAIL, and the value of gddrnf_will_signal_deleg_avail set
+        to FALSE.  The delegation the client held before the request remains
+        intact, and its state is unchanged.  The current stateid is not
+        changed (see <xref target="ss:proc_COMPOUND:CS" /> for a description of the current
+        stateid).
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_GET_DIR_DELEGATION:I" title="IMPLEMENTATION">
+      <t>
+        Directory delegations provide the benefit of improving cache
+        consistency of namespace information.  This is done through
+        synchronous callbacks.  A server must support synchronous callbacks
+        in order to support directory delegations.  In addition to that,
+        asynchronous notifications provide a way to reduce network traffic as
+        well as improve client performance in certain conditions.
+      </t>
+
+      <t>
+        Notifications are specified in terms of potential changes to the
+        directory.  A client can ask to be notified of events by setting one
+        or more bits in gdda_notification_types.  The client can ask for
+        notifications on addition of entries to a directory (by setting the
+        NOTIFY4_ADD_ENTRY in gdda_notification_types), notifications on entry
+        removal (NOTIFY4_REMOVE_ENTRY), renames (NOTIFY4_RENAME_ENTRY),
+        directory attribute changes (NOTIFY4_CHANGE_DIR_ATTRIBUTES), and
+        cookie verifier changes (NOTIFY4_CHANGE_COOKIE_VERIFIER) by setting
+        one or more corresponding bits in the gdda_notification_types field.
+      </t>
+
+      <t>
+        The client can also ask for notifications of changes to attributes of
+        directory entries (NOTIFY4_CHANGE_CHILD_ATTRIBUTES) in order to keep
+        its attribute cache up to date.  However, any changes made to child
+        attributes do not cause the delegation to be recalled.  If a client
+        is interested in directory entry caching or negative name caching, it
+        can set the gdda_notification_types appropriately to its particular
+        need and the server will notify it of all changes that would
+        otherwise invalidate its name cache.  The kind of notification a
+        client asks for may depend on the directory size, its rate of change,
+        and the applications being used to access that directory.  The
+        enumeration of the conditions under which a client might ask for a
+        notification is out of the scope of this specification.
+      </t>
+
+      <t>
+        For attribute notifications, the client will set bits in the
+        gdda_dir_attributes bitmap to indicate which attributes it wants to
+        be notified of.  If the server does not support notifications for
+        changes to a certain attribute, it SHOULD NOT set that attribute in
+        the supported attribute bitmap specified in the reply
+        (gddr_dir_attributes).  The client will also set in the
+        gdda_child_attributes bitmap the attributes of directory entries it
+        wants to be notified of, and the server will indicate in
+        gddr_child_attributes which attributes of directory entries it will
+        notify the client of.
+      </t>
+
+      <t>
+        The client will also let the server know if it wants to get the
+        notification as soon as the attribute change occurs or after a
+        certain delay by setting a delay factor; gdda_child_attr_delay is for
+        attribute changes to directory entries and gdda_dir_attr_delay is for
+        attribute changes to the directory.  If this delay factor is set to
+        zero, that indicates to the server that the client wants to be
+        notified of any attribute changes as soon as they occur.  If the
+        delay factor is set to N seconds, the server will make a best-effort
+        guarantee that attribute updates are synchronized within N seconds.
+        If the client asks for a delay factor that the server does not
+        support or that may cause significant resource consumption on the
+        server by causing the server to send a lot of notifications, the
+        server should not commit to sending out notifications for attributes
+        and therefore must not set the appropriate bit in the
+        gddr_child_attributes and gddr_dir_attributes bitmaps in the
+        response.
+      </t>
+
+      <t>
+        The client MUST use a security tuple (<xref target="ss:core_infrastructure:NST" />) that the
+        directory or its applicable ancestor (<xref target="ss:core_infrastructure:SSN" />) is exported with.
+        If not, the server MUST return NFS4ERR_WRONGSEC to the operation that
+        both precedes GET_DIR_DELEGATION and sets the current filehandle (see
+        <xref target="ss:core_infrastructure:UNSaS" />).
+      </t>
+
+      <t>
+        The directory delegation covers all the entries in the directory
+        except the parent entry.  That means if a directory and its parent
+        both hold directory delegations, any changes to the parent will not
+        cause a notification to be sent for the child even though the child's
+        parent entry points to the parent directory.
+      </t>
+    </section>
+  </section>
+

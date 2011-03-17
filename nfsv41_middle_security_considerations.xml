@@ -1,0 +1,87 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+<section anchor="sec:security_considerations" title="Security Considerations">
+  <t>
+    Historically, the authentication model of NFS was based on the entire
+    machine being the NFS client, with the NFS server trusting the NFS
+    client to authenticate the end-user.  The NFS server in turn shared
+    its files only to specific clients, as identified by the client's
+    source network address.  Given this model, the AUTH_SYS RPC security
+    flavor simply identified the end-user using the client to the NFS
+    server.  When processing NFS responses, the client ensured that the
+    responses came from the same network address and port number to which
+    the request was sent.  While such a model is easy to implement and
+    simple to deploy and use, it is unsafe.  Thus, NFSv4.1
+    implementations are REQUIRED to support a security model that uses
+    end-to-end authentication, where an end-user on a client mutually
+    authenticates (via cryptographic schemes that do not expose passwords
+    or keys in the clear on the network) to a principal on an NFS server.
+    Consideration is also given to the integrity and privacy of NFS
+    requests and responses.  The issues of end-to-end mutual
+    authentication, integrity, and privacy are discussed in
+    <xref target="ss:core_infrastructure:RaSS" />.  There are specific considerations when using
+    Kerberos V5 as described in <xref target="ss:core_infrastructure:SCfCAiKV" />.
+  </t>
+ 
+  <t>
+    Note that being REQUIRED to implement does not mean REQUIRED to use;
+    AUTH_SYS can be used by NFSv4.1 clients and servers.  However,
+    AUTH_SYS is merely an OPTIONAL security flavor in NFSv4.1, and so
+    interoperability via AUTH_SYS is not assured.
+  </t>
+ 
+  <t>
+    For reasons of reduced administration overhead, better performance,
+    and/or reduction of CPU utilization, users of NFSv4.1 implementations
+    might decline to use security mechanisms that enable integrity
+    protection on each remote procedure call and response.  The use
+    of mechanisms without integrity leaves the user vulnerable to a
+    man-in-the-middle of the NFS client and server that modifies the
+    RPC request and/or the response.  While implementations are free
+    to provide the option to use weaker security mechanisms, there
+    are three operations in particular that warrant the implementation
+    overriding user choices.
+  </t>
+ 
+  <t>
+    <list style='symbols'>
+      <t>
+        The first two such operations are SECINFO and SECINFO_NO_NAME.  It
+        is RECOMMENDED that the client send both operations such that they
+        are protected with a security flavor that has integrity
+        protection, such as RPCSEC_GSS with either the
+        rpc_gss_svc_integrity or rpc_gss_svc_privacy service.  Without
+        integrity protection encapsulating SECINFO and SECINFO_NO_NAME and
+        their results, a man-in-the-middle could modify results such that
+        the client might select a weaker algorithm in the set allowed by
+        the server, making the client and/or server vulnerable to further
+        attacks.
+      </t>
+ 
+      <t>
+        The third operation that SHOULD use integrity protection is any
+        GETATTR for the fs_locations and fs_locations_info attributes, in
+        order to mitigate the severity of a man-in-the-middle attack.  The
+        attack has two steps.  First the attacker modifies the unprotected
+        results of some operation to return NFS4ERR_MOVED.  Second, when
+        the client follows up with a GETATTR for the fs_locations or
+        fs_locations_info attributes, the attacker modifies the results to
+        cause the client to migrate its traffic to a server controlled by
+        the attacker.  With integrity protection, this attack is
+        mitigated.
+      </t>
+    </list>
+  </t>
+ 
+  <t>
+    Relative to previous NFS versions, NFSv4.1 has additional security
+    considerations for pNFS (see Sections <xref target="ss:parallel_nfs:SCfp" format='counter' />
+    and <xref target="ss:nfsv4.1_as:SCftFLT" format='counter' />), locking and
+    session state (see <xref target="ss:core_infrastructure:PfUSC" />),
+    and state recovery during grace
+    period (see <xref target="ss:state_management:SCfSR" />).  With respect to locking and session
+    state, if SP4_SSV state protection is being used, <xref target="ss:core_infrastructure:SCfRWUtSM" /> has
+    specific security considerations for the NFSv4.1 client and server.
+  </t>
+</section>

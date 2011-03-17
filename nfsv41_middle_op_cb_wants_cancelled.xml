@@ -1,0 +1,52 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_CB_WANTS_CANCELLED" title="Operation 12: CB_WANTS_CANCELLED - Cancel Pending Delegation Wants">
+    <section toc='exclude' anchor="ss:op_CB_WANTS_CANCELLED:A" title="ARGUMENT">
+      <?rfc include='autogen/cb_wants_cancelled_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_WANTS_CANCELLED:R" title="RESULT">
+      <?rfc include='autogen/cb_wants_cancelled_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_WANTS_CANCELLED:D" title="DESCRIPTION">
+      <t>
+        The CB_WANTS_CANCELLED operation is used to notify the client that
+        some or all of the wants it registered for recallable delegations and
+        layouts have been cancelled.
+      </t>
+
+      <t>
+        If cwca_contended_wants_cancelled is TRUE, this indicates that the
+        server will not be pushing to the client any delegations that become
+        available after contention passes.
+      </t>
+
+      <t>
+        If cwca_resourced_wants_cancelled is TRUE, this indicates that the
+        server will not notify the client when there are resources on the
+        server to grant delegations or layouts.
+      </t>
+
+      <t>
+        After receiving a CB_WANTS_CANCELLED operation, the client is free to
+        attempt to acquire the delegations or layouts it was waiting for, and
+        possibly re-register wants.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_WANTS_CANCELLED:I" title="IMPLEMENTATION">
+      <t>
+        When a client has an OPEN, WANT_DELEGATION, or GET_DIR_DELEGATION
+        request outstanding, when a CB_WANTS_CANCELLED is sent, the server
+        may need to make clear to the client whether a promise to signal
+        delegation availability happened before the CB_WANTS_CANCELLED and is
+        thus covered by it, or after the CB_WANTS_CANCELLED in which case it
+        was not covered by it.  The server can make this distinction by
+        putting the appropriate requests into the list of referring calls in
+        the associated CB_SEQUENCE.
+      </t>
+    </section>
+  </section>
+

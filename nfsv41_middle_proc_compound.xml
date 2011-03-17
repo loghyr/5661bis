@@ -1,0 +1,300 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="proc_COMPOUND" title="Procedure 1: COMPOUND - Compound Operations">
+
+    <section toc='exclude' anchor="ss:proc_COMPOUND:A" title="ARGUMENTS">
+      <?rfc include='autogen/type_nfs_opnum4.xml'?>
+      <?rfc include='autogen/type_nfs_argop4.xml'?>
+      <?rfc include='autogen/type_COMPOUND4args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:proc_COMPOUND:R" title="RESULTS">
+      <?rfc include='autogen/type_nfs_resop4.xml'?>
+      <?rfc include='autogen/type_COMPOUND4res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:proc_COMPOUND:D" title="DESCRIPTION">
+      <t>
+        The COMPOUND procedure is used to combine one or more NFSv4
+        operations into a single RPC request.  The server interprets each of
+        the operations in turn.  If an operation is executed by the server
+        and the status of that operation is NFS4_OK, then the next operation
+        in the COMPOUND procedure is executed.  The server continues this
+        process until there are no more operations to be executed or until
+        one of the operations has a status value other than NFS4_OK.
+      </t>
+
+      <t>
+        In the processing of the COMPOUND procedure, the server may find that
+        it does not have the available resources to execute any or all of the
+        operations within the COMPOUND sequence.  See <xref target="ss:core_infrastructure:CaCCI" /> for a
+        more detailed discussion.
+      </t>
+
+      <t>
+        The server will generally choose between two methods of decoding the
+        client's request.  The first would be the traditional one-pass XDR
+        decode.  If there is an XDR decoding error in this case, the RPC XDR
+        decode error would be returned.  The second method would be to make
+        an initial pass to decode the basic COMPOUND request and then to XDR
+        decode the individual operations; the most interesting is the decode
+        of attributes.  In this case, the server may encounter an XDR decode
+        error during the second pass.  If it does, the server would return
+        the error NFS4ERR_BADXDR to signify the decode error.
+      </t>
+
+      <t>
+        The COMPOUND arguments contain a "minorversion" field.  For NFSv4.1,
+        the value for this field is 1.  If the server receives a COMPOUND
+        procedure with a minorversion field value that it does not support,
+        the server MUST return an error of NFS4ERR_MINOR_VERS_MISMATCH and a
+        zero-length resultdata array.
+      </t>
+
+      <t>
+        Contained within the COMPOUND results is a "status" field.  If the
+        results array length is non-zero, this status must be equivalent to
+        the status of the last operation that was executed within the
+        COMPOUND procedure.  Therefore, if an operation incurred an error
+        then the "status" value will be the same error value as is being
+        returned for the operation that failed.
+      </t>
+
+      <t>
+        Note that operations zero and one are not defined for the COMPOUND
+        procedure.  Operation 2 is not defined and is reserved for future
+        definition and use with minor versioning.  If the server receives an
+        operation array that contains operation 2 and the minorversion field
+        has a value of zero, an error of NFS4ERR_OP_ILLEGAL, as described in
+        the next paragraph, is returned to the client.  If an operation array
+        contains an operation 2 and the minorversion field is non-zero and
+        the server does not support the minor version, the server returns an
+        error of NFS4ERR_MINOR_VERS_MISMATCH.  Therefore, the
+        NFS4ERR_MINOR_VERS_MISMATCH error takes precedence over all other
+        errors.
+      </t>
+
+      <t>
+        It is possible that the server receives a request that contains an
+        operation that is less than the first legal operation (OP_ACCESS) or
+        greater than the last legal operation (OP_RELEASE_LOCKOWNER).  In
+        this case, the server's response will encode the opcode OP_ILLEGAL
+        rather than the illegal opcode of the request.  The status field in
+        the ILLEGAL return results will be set to NFS4ERR_OP_ILLEGAL.  The
+        COMPOUND procedure's return results will also be NFS4ERR_OP_ILLEGAL.
+      </t>
+
+      <t>
+        The definition of the "tag" in the request is left to the
+        implementor.  It may be used to summarize the content of the Compound
+        request for the benefit of packet-sniffers and engineers debugging
+        implementations.  However, the value of "tag" in the response SHOULD
+        be the same value as provided in the request.  This applies to the
+        tag field of the CB_COMPOUND procedure as well.
+      </t>
+
+      <section toc='exclude' anchor="ss:proc_COMPOUND:CFaS" title="Current Filehandle and Stateid">
+        <t>
+          The COMPOUND procedure offers a simple environment for the execution
+          of the operations specified by the client.  The first two relate to
+          the filehandle while the second two relate to the current stateid.
+        </t>
+
+        <section toc='exclude' anchor="ss:proc_COMPOUND:CF" title="Current Filehandle">
+          <t>
+            The current and saved filehandles are used throughout the protocol.
+            Most operations implicitly use the current filehandle as an argument,
+            and many set the current filehandle as part of the results.  The
+            combination of client-specified sequences of operations and current
+            and saved filehandle arguments and results allows for greater
+            protocol flexibility.  The best or easiest example of current
+            filehandle usage is a sequence like the following:
+          </t>
+
+          <t>
+            <figure anchor="fig:curfh_example">
+              <artwork>
+    PUTFH fh1              {fh1}
+    LOOKUP "compA"         {fh2}
+    GETATTR                {fh2}
+    LOOKUP "compB"         {fh3}
+    GETATTR                {fh3}
+    LOOKUP "compC"         {fh4}
+    GETATTR                {fh4}
+    GETFH
+              </artwork>
+            </figure>
+          </t>
+
+          <t>
+            In this example, the PUTFH (<xref target="op_PUTFH" />) operation explicitly sets
+            the current filehandle value while the result of each LOOKUP
+            operation sets the current filehandle value to the resultant file
+            system object.  Also, the client is able to insert GETATTR operations
+            using the current filehandle as an argument.
+          </t>
+
+          <t>
+            The PUTROOTFH (<xref target="op_PUTROOTFH" />) and PUTPUBFH (<xref target="op_PUTPUBFH" />) operations
+            also set the current filehandle.  The above example would replace
+            "PUTFH fh1" with PUTROOTFH or PUTPUBFH with no filehandle argument in
+            order to achieve the same effect (on the assumption that "compA" is
+            directly below the root of the namespace).
+          </t>
+
+          <t>
+            Along with the current filehandle, there is a saved filehandle.
+            While the current filehandle is set as the result of operations like
+            LOOKUP, the saved filehandle must be set directly with the use of the
+            SAVEFH operation.  The SAVEFH operation copies the current filehandle
+            value to the saved value.  The saved filehandle value is used in
+            combination with the current filehandle value for the LINK and RENAME
+            operations.  The RESTOREFH operation will copy the saved filehandle
+            value to the current filehandle value; as a result, the saved
+            filehandle value may be used a sort of "scratch" area for the
+            client's series of operations.
+          </t>
+        </section>
+
+        <section toc='exclude' anchor="ss:proc_COMPOUND:CS" title="Current Stateid">
+          <t>
+            With NFSv4.1, additions of a current stateid and a saved stateid have
+            been made to the COMPOUND processing environment; this allows for the
+            passing of stateids between operations.  There are no changes to the
+            syntax of the protocol, only changes to the semantics of a few
+            operations.
+          </t>
+
+          <t>
+            A "current stateid" is the stateid that is associated with the
+            current filehandle.  The current stateid may only be changed by an
+            operation that modifies the current filehandle or returns a stateid.
+          </t>
+
+          <t>
+            If an operation returns a stateid, it MUST set the current stateid to
+            the returned value.  If an operation sets the current filehandle but
+            does not return a stateid, the current stateid MUST be set to the
+            all-zeros special stateid, i.e., (seqid, other) = (0, 0).  If an
+            operation uses a stateid as an argument but does not return a
+            stateid, the current stateid MUST NOT be changed.  For example,
+            PUTFH, PUTROOTFH, and PUTPUBFH will change the current server state
+            from {ocfh, (osid)} to {cfh, (0, 0)}, while LOCK will change the
+            current state from {cfh, (osid} to {cfh, (nsid)}.  Operations like
+            LOOKUP that transform a current filehandle and component name into a
+            new current filehandle will also change the current state to {0, 0}.
+            The SAVEFH and RESTOREFH operations will save and restore both the
+            current filehandle and the current stateid as a set.
+          </t>
+
+          <t>
+            The following example is the common case of a simple READ operation
+            with a normal stateid showing that the PUTFH initializes the current
+            stateid to (0, 0).  The subsequent READ with stateid (sid1) leaves
+            the current stateid unchanged.
+          </t>
+
+          <t>
+            <figure anchor="fig:csid_example1">
+              <artwork>
+    PUTFH fh1                             - -&gt; {fh1, (0, 0)}
+    READ (sid1), 0, 1024      {fh1, (0, 0)} -&gt; {fh1, (0, 0)}
+              </artwork>
+            </figure>
+          </t>
+
+          <t>
+            This next example performs an OPEN with the root filehandle and, as a
+            result, generates stateid (sid1).  The next operation specifies the
+            READ with the argument stateid set such that (seqid, other) are equal
+            to (1, 0), but the current stateid set by the previous operation is
+            actually used when the operation is evaluated.  This allows correct
+            interaction with any existing, potentially conflicting, locks.
+          </t>
+
+          <t>
+            <figure anchor="fig:csid_example2">
+              <artwork>
+    PUTROOTFH                             - -&gt; {fh1, (0, 0)}
+    OPEN "compA"              {fh1, (0, 0)} -&gt; {fh2, (sid1)}
+    READ (1, 0), 0, 1024      {fh2, (sid1)} -&gt; {fh2, (sid1)}
+    CLOSE (1, 0)              {fh2, (sid1)} -&gt; {fh2, (sid2)}
+              </artwork>
+            </figure>
+          </t>
+
+          <t>
+            This next example is similar to the second in how it passes the
+            stateid sid2 generated by the LOCK operation to the next READ
+            operation.  This allows the client to explicitly surround a single
+            I/O operation with a lock and its appropriate stateid to guarantee
+            correctness with other client locks.  The example also shows how
+            SAVEFH and RESTOREFH can save and later reuse a filehandle and
+            stateid, passing them as the current filehandle and stateid to a READ
+            operation.
+          </t>
+
+          <t>
+            <figure anchor="fig:csid_example3">
+              <artwork>
+    PUTFH fh1                             - -&gt; {fh1, (0, 0)}
+    LOCK 0, 1024, (sid1)      {fh1, (sid1)} -&gt; {fh1, (sid2)}
+    READ (1, 0), 0, 1024      {fh1, (sid2)} -&gt; {fh1, (sid2)}
+    LOCKU 0, 1024, (1, 0)     {fh1, (sid2)} -&gt; {fh1, (sid3)}
+    SAVEFH                    {fh1, (sid3)} -&gt; {fh1, (sid3)}
+
+    PUTFH fh2                 {fh1, (sid3)} -&gt; {fh2, (0, 0)}
+    WRITE (1, 0), 0, 1024     {fh2, (0, 0)} -&gt; {fh2, (0, 0)}
+
+    RESTOREFH                 {fh2, (0, 0)} -&gt; {fh1, (sid3)}
+    READ (1, 0), 1024, 1024   {fh1, (sid3)} -&gt; {fh1, (sid3)}
+              </artwork>
+            </figure>
+          </t>
+
+          <t>
+            The final example shows a disallowed use of the current stateid.  The
+            client is attempting to implicitly pass an anonymous special stateid,
+            (0,0), to the READ operation.  The server MUST return
+            NFS4ERR_BAD_STATEID in the reply to the READ operation.
+          </t>
+
+          <t>
+            <figure anchor="fig:csid_example4">
+              <artwork>
+    PUTFH fh1                             - -&gt; {fh1, (0, 0)}
+    READ (1, 0), 0, 1024      {fh1, (0, 0)} -&gt; NFS4ERR_BAD_STATEID
+              </artwork>
+            </figure>
+          </t>
+        </section>
+      </section>
+    </section>
+  </section>
+
+  <section toc='exclude' anchor="ss:proc_COMPOUND:E" title="ERRORS">
+    <t>
+       COMPOUND will of course return every error that each operation on the
+       fore channel can return (see <xref target='tbl:op_error_returns' />).  However, if COMPOUND returns
+       zero operations, obviously the error returned by COMPOUND has nothing
+       to do with an error returned by an operation.  The list of errors
+       COMPOUND will return if it processes zero operations include:
+    </t>
+
+    <texttable anchor="tbl:compounderrs">
+      <preamble>COMPOUND Error Returns</preamble>
+      <ttcol align="left">Error</ttcol>
+      <ttcol align="left">Notes</ttcol>
+      <c>NFS4ERR_BADCHAR              </c> <c>The tag argument has a character the replier does not support.</c>
+      <c>NFS4ERR_BADXDR               </c> <c></c>
+      <c>NFS4ERR_DELAY                </c> <c></c>
+      <c>NFS4ERR_INVAL                </c> <c>The tag argument is not in UTF-8 encoding.</c>
+      <c>NFS4ERR_MINOR_VERS_MISMATCH  </c> <c></c>
+      <c>NFS4ERR_SERVERFAULT          </c> <c></c>
+      <c>NFS4ERR_TOO_MANY_OPS         </c> <c></c>
+      <c>NFS4ERR_REP_TOO_BIG          </c> <c></c>
+      <c>NFS4ERR_REP_TOO_BIG_TO_CACHE </c> <c></c>
+      <c>NFS4ERR_REQ_TOO_BIG          </c> <c></c>
+    </texttable>
+  </section>

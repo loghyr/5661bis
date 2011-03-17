@@ -1,0 +1,58 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_OPENATTR" title="Operation 19: OPENATTR - Open Named Attribute Directory">
+    <section toc='exclude' anchor="ss:op_OPENATTR:A" title="ARGUMENT">
+      <?rfc include='autogen/openattr_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_OPENATTR:R" title="RESULT">
+      <?rfc include='autogen/openattr_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_OPENATTR:D" title="DESCRIPTION">
+      <t>
+        The OPENATTR operation is used to obtain the filehandle of the named
+        attribute directory associated with the current filehandle.  The
+        result of the OPENATTR will be a filehandle to an object of type
+        NF4ATTRDIR.  From this filehandle, READDIR and LOOKUP operations can
+        be used to obtain filehandles for the various named attributes
+        associated with the original file system object.  Filehandles
+        returned within the named attribute directory will designate objects
+        of type of NF4NAMEDATTR.
+      </t>
+
+      <t>
+        The createdir argument allows the client to signify if a named
+        attribute directory should be created as a result of the OPENATTR
+        operation.  Some clients may use the OPENATTR operation with a value
+        of FALSE for createdir to determine if any named attributes exist for
+        the object.  If none exist, then NFS4ERR_NOENT will be returned.  If
+        createdir has a value of TRUE and no named attribute directory
+        exists, one is created and its filehandle becomes the current
+        filehandle.  On the other hand, if createdir has a value of TRUE and
+        the named attribute directory already exists, no error results and
+        the filehandle of the existing directory becomes the current
+        filehandle.  The creation of a named attribute directory assumes that
+        the server has implemented named attribute support in this fashion
+        and is not required to do so by this definition.
+      </t>
+
+      <t>
+        If the current file handle designates an object of type NF4NAMEDATTR
+        (a named attribute) or NF4ATTRDIR (a named attribute directory), an
+        error of NFS4ERR_WRONG_TYPE is returned to the client.  Named
+        attributes or a named attribute directory MUST NOT have their own
+        named attributes.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_OPENATTR:I" title="IMPLEMENTATION">
+      <t>
+        If the server does not support named attributes for the current
+        filehandle, an error of NFS4ERR_NOTSUPP will be returned to the
+        client.
+      </t>
+    </section>
+  </section>
+

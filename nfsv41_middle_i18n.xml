@@ -1,0 +1,470 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+<section anchor="sec:internationalization" title="Internationalization">
+  <t>
+    The primary issue in which NFSv4.1 needs to deal with
+    internationalization, or I18N, is with respect to file names and
+    other strings as used within the protocol.  The choice of string
+    representation must allow reasonable name/string access to clients
+    that use various languages.  The UTF-8 encoding of the UCS (Universal
+    Multiple-Octet Coded Character Set) as defined by ISO10646 <xref target="ISO10646-1" />
+    allows for this type of access and follows the policy described in
+    "IETF Policy on Character Sets and Languages", RFC 2277 <xref target="RFC2277" />.
+  </t>
+
+  <t>
+    RFC 3454 <xref target="RFC3454" />, otherwise know as "stringprep", documents a framework
+    for using Unicode/UTF-8 in networking protocols so as "to increase
+    the likelihood that string input and string comparison work in ways
+    that make sense for typical users throughout the world".  A protocol
+    must define a profile of stringprep "in order to fully specify the
+    processing options".  The remainder of this section defines the
+    NFSv4.1 stringprep profiles.  Much of the terminology used for the
+    remainder of this section comes from stringprep.
+  </t>
+
+  <t>
+    There are three UTF-8 string types defined for NFSv4.1: utf8str_cs,
+    utf8str_cis, and utf8str_mixed.  Separate profiles are defined for
+    each.  Each profile defines the following, as required by stringprep:
+  </t>
+
+  <t>
+    <list style='symbols'>
+      <t>
+        The intended applicability of the profile.
+      </t>
+
+      <t>
+        The character repertoire that is the input and output to
+        stringprep (which is Unicode 3.2 for the referenced version of
+        stringprep).  However, NFSv4.1 implementations are not limited to
+        3.2.
+      </t>
+
+      <t>
+        The mapping tables from stringprep used (as described in <xref target="sec:protocol_constants" />
+        of stringprep).
+      </t>
+
+      <t>
+        Any additional mapping tables specific to the profile.
+      </t>
+
+      <t>
+        The Unicode normalization used, if any (as described in <xref target="sec:filehandles" />
+        of stringprep).
+      </t>
+
+      <t>
+        The tables from the stringprep listing of characters that are
+        prohibited as output (as described in <xref target="sec:file_attributes" /> of stringprep).
+      </t>
+
+      <t>
+        The bidirectional string testing used, if any (as described in
+        <xref target="sec:access_control" /> of stringprep).
+      </t>
+
+      <t>
+        Any additional characters that are prohibited as output specific
+        to the profile.
+      </t>
+    </list>
+  </t>
+
+  <t>
+    Stringprep discusses Unicode characters, whereas NFSv4.1 renders
+    UTF-8 characters.  Since there is a one-to-one mapping from UTF-8 to
+    Unicode, when the remainder of this document refers to Unicode, the
+    reader should assume UTF-8.
+  </t>
+
+  <t>
+    Much of the text for the profiles comes from RFC 3491 <xref target="RFC3491" />.
+  </t>
+
+  <section anchor="ss:internationalization:SPftuT" title="Stringprep Profile for the utf8str_cs Type">
+    <t>
+      Every use of the utf8str_cs type definition in the NFSv4 protocol
+      specification follows the profile named nfs4_cs_prep.
+    </t>
+
+    <section toc='exclude' anchor="ss:internationalization:IAotnP" title="Intended Applicability of the nfs4_cs_prep Profile">
+      <t>
+        The utf8str_cs type is a case-sensitive string of UTF-8 characters.
+        Its primary use in NFSv4.1 is for naming components and pathnames.
+        Components and pathnames are stored on the server's file system.  Two
+        valid distinct UTF-8 strings might be the same after processing via
+        the utf8str_cs profile.  If the strings are two names inside a
+        directory, the NFSv4.1 server will need to either:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            disallow the creation of a second name if its post-processed form
+            collides with that of an existing name, or
+          </t>
+
+          <t>
+            allow the creation of the second name, but arrange so that after
+            post-processing, the second name is different than the
+            post-processed form of the first name.
+          </t>
+        </list>
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:internationalization:CRon" title="Character Repertoire of nfs4_cs_prep">
+      <t>
+        The nfs4_cs_prep profile uses Unicode 3.2, as defined in stringprep's
+        Appendix A.1.  However, NFSv4.1 implementations are not limited to
+        3.2.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:internationalization:MUbn" title="Mapping Used by nfs4_cs_prep">
+      <t>
+        The nfs4_cs_prep profile specifies mapping using the following tables
+        from stringprep:
+      </t>
+
+      <t>
+        <list>
+          <t>
+            Table B.1
+          </t>
+        </list>
+      </t>
+
+      <t>
+        Table B.2 is normally not part of the nfs4_cs_prep profile as it is
+        primarily for dealing with case-insensitive comparisons.  However, if
+        the NFSv4.1 file server supports the case_insensitive file system
+        attribute, and if case_insensitive is TRUE, the NFSv4.1 server MUST
+        use Table B.2 (in addition to Table B1) when processing utf8str_cs
+        strings, and the NFSv4.1 client MUST assume Table B.2 (in addition to
+        Table B.1) is being used.
+      </t>
+
+      <t>
+        If the case_preserving attribute is present and set to FALSE, then
+        the NFSv4.1 server MUST use Table B.2 to map case when processing
+        utf8str_cs strings.  Whether the server maps from lower to upper case
+        or from upper to lower case is an implementation dependency.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:internationalization:Nubn" title="Normalization used by nfs4_cs_prep">
+      <t>
+        The nfs4_cs_prep profile does not specify a normalization form.  A
+        later revision of this specification may specify a particular
+        normalization form.  Therefore, the server and client can expect that
+        they may receive unnormalized characters within protocol requests and
+        responses.  If the operating environment requires normalization, then
+        the implementation must normalize utf8str_cs strings within the
+        protocol before presenting the information to an application (at the
+        client) or local file system (at the server).
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:internationalization:POfn" title="Prohibited Output for nfs4_cs_prep">
+      <t>
+        The nfs4_cs_prep profile RECOMMENDS prohibiting the use of the
+        following tables from stringprep:
+      </t>
+
+      <t>
+        <list>
+          <t>
+            Table C.5
+          </t>
+
+          <t>
+            Table C.6
+          </t>
+        </list>
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:internationalization:BOfn" title="Bidirectional Output for nfs4_cs_prep">
+      <t>
+        The nfs4_cs_prep profile does not specify any checking of
+        bidirectional strings.
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:internationalization:SPftuT1" title="Stringprep Profile for the utf8str_cis Type">
+    <t>
+      Every use of the utf8str_cis type definition in the NFSv4.1 protocol
+      specification follows the profile named nfs4_cis_prep.
+    </t>
+
+    <section toc='exclude' anchor="ss:internationalization:IAotnP1" title="Intended Applicability of the nfs4_cis_prep Profile">
+      <t>
+        The utf8str_cis type is a case-insensitive string of UTF-8
+        characters.  Its primary use in NFSv4.1 is for naming NFS servers.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:internationalization:CRon1" title="Character Repertoire of nfs4_cis_prep">
+      <t>
+        The nfs4_cis_prep profile uses Unicode 3.2, as defined in
+        stringprep's Appendix A.1.  However, NFSv4.1 implementations are not
+        limited to 3.2.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:internationalization:MUbn1" title="Mapping Used by nfs4_cis_prep">
+      <t>
+        The nfs4_cis_prep profile specifies mapping using the following
+        tables from stringprep:
+      </t>
+
+      <t>
+        <list>
+          <t>
+            Table B.1
+          </t>
+
+          <t>
+            Table B.2
+          </t>
+        </list>
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:internationalization:NUbn" title="Normalization Used by nfs4_cis_prep">
+      <t>
+        The nfs4_cis_prep profile specifies using Unicode normalization form
+        KC, as described in stringprep.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:internationalization:POfn1" title="Prohibited Output for nfs4_cis_prep">
+      <t>
+        The nfs4_cis_prep profile specifies prohibiting using the following
+        tables from stringprep:
+      </t>
+
+      <t>
+        <list>
+          <t>
+            Table C.1.2
+          </t>
+
+          <t>
+            Table C.2.2
+          </t>
+
+          <t>
+            Table C.3
+          </t>
+
+          <t>
+            Table C.4
+          </t>
+
+          <t>
+            Table C.5
+          </t>
+
+          <t>
+            Table C.6
+          </t>
+
+          <t>
+            Table C.7
+          </t>
+
+          <t>
+            Table C.8
+          </t>
+
+          <t>
+            Table C.9
+          </t>
+        </list>
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:internationalization:BOfn1" title="Bidirectional Output for nfs4_cis_prep">
+      <t>
+        The nfs4_cis_prep profile specifies checking bidirectional strings as
+        described in stringprep's <xref target="sec:access_control" />.
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:internationalization:SPftuT2" title="Stringprep Profile for the utf8str_mixed Type">
+    <t>
+      Every use of the utf8str_mixed type definition in the NFSv4.1
+      protocol specification follows the profile named nfs4_mixed_prep.
+    </t>
+
+    <section toc='exclude' anchor="ss:internationalization:IAotnP2" title="Intended Applicability of the nfs4_mixed_prep Profile">
+      <t>
+        The utf8str_mixed type is a string of UTF-8 characters, with a prefix
+        that is case sensitive, a separator equal to '@', and a suffix that
+        is a fully qualified domain name.  Its primary use in NFSv4.1 is for
+        naming principals identified in an Access Control Entry.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:internationalization:CRon2" title="Character Repertoire of nfs4_mixed_prep">
+      <t>
+        The nfs4_mixed_prep profile uses Unicode 3.2, as defined in
+        stringprep's Appendix A.1.  However, NFSv4.1 implementations are not
+        limited to 3.2.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:internationalization:MUbn2" title="Mapping Used by nfs4_cis_prep">
+      <t>
+        For the prefix and the separator of a utf8str_mixed string, the
+        nfs4_mixed_prep profile specifies mapping using the following table
+        from stringprep:
+      </t>
+
+      <t>
+        <list>
+          <t>
+           Table B.1
+          </t>
+        </list>
+      </t>
+
+      <t>
+        For the suffix of a utf8str_mixed string, the nfs4_mixed_prep profile
+        specifies mapping using the following tables from stringprep:
+      </t>
+
+      <t>
+        <list>
+          <t>
+           Table B.1
+          </t>
+
+          <t>
+           Table B.2
+          </t>
+        </list>
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:internationalization:NUbn1" title="Normalization Used by nfs4_mixed_prep">
+      <t>
+        The nfs4_mixed_prep profile specifies using Unicode normalization
+        form KC, as described in stringprep.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:internationalization:POfn2" title="Prohibited Output for nfs4_mixed_prep">
+      <t>
+        The nfs4_mixed_prep profile specifies prohibiting using the following
+        tables from stringprep:
+      </t>
+
+      <t>
+        <list>
+          <t>
+           Table C.1.2
+          </t>
+
+          <t>
+           Table C.2.2
+          </t>
+
+          <t>
+           Table C.3
+          </t>
+
+          <t>
+           Table C.4
+          </t>
+
+          <t>
+           Table C.5
+          </t>
+
+          <t>
+           Table C.6
+          </t>
+
+          <t>
+           Table C.7
+          </t>
+
+          <t>
+           Table C.8
+          </t>
+
+          <t>
+           Table C.9
+          </t>
+        </list>
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:internationalization:BOfn2" title="Bidirectional Output for nfs4_mixed_prep">
+      <t>
+        The nfs4_mixed_prep profile specifies checking bidirectional strings
+        as described in stringprep's <xref target="sec:access_control" />.
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:internationalization:UC" title="UTF-8 Capabilities">
+    <?rfc include='autogen/type_fs_charset_cap4.xml'?>
+
+    <t>
+      Because some operating environments and file systems do not enforce
+      character set encodings, NFSv4.1 supports the fs_charset_cap
+      attribute (<xref target="ss:file_attributes:A7f" />) that indicates to the client a file
+      system's UTF-8 capabilities.  The attribute is an integer containing
+      a pair of flags.  The first flag is FSCHARSET_CAP4_CONTAINS_NON_UTF8,
+      which, if set to one, tells the client that the file system contains
+      non-UTF-8 characters, and the server will not convert non-UTF
+      characters to UTF-8 if the client reads a symlink or directory,
+      neither will operations with component names or pathnames in the
+      arguments convert the strings to UTF-8.  The second flag is
+      FSCHARSET_CAP4_ALLOWS_ONLY_UTF8, which, if set to one, indicates that
+      the server will accept (and generate) only UTF-8 characters on the
+      file system.  If FSCHARSET_CAP4_ALLOWS_ONLY_UTF8 is set to one,
+      FSCHARSET_CAP4_CONTAINS_NON_UTF8 MUST be set to zero.
+      FSCHARSET_CAP4_ALLOWS_ONLY_UTF8 SHOULD always be set to one.
+    </t>
+  </section>
+
+  <section anchor="ss:internationalization:URE" title="UTF-8 Related Errors">
+    <t>
+       Where the client sends an invalid UTF-8 string, the server should
+       return NFS4ERR_INVAL (see Table 5).  This includes cases in which
+       inappropriate prefixes are detected and where the count includes
+       trailing bytes that do not constitute a full UCS character.
+    </t>
+
+    <t>
+       Where the client-supplied string is valid UTF-8 but contains
+       characters that are not supported by the server as a value for that
+       string (e.g., names containing characters outside of Unicode plane 0
+       on file systems that fail to support such characters despite their
+       presence in the Unicode standard), the server should return
+       NFS4ERR_BADCHAR.
+    </t>
+
+    <t>
+       Where a UTF-8 string is used as a file name, and the file system
+       (while supporting all of the characters within the name) does not
+       allow that particular name to be used, the server should return the
+       error NFS4ERR_BADNAME (Table 5).  This includes situations in which
+       the server file system imposes a normalization constraint on name
+       strings, but will also include such situations as file system
+       prohibitions of "." and ".." as file names for certain operations,
+       and other such constraints.
+    </t>
+  </section>
+</section>

@@ -1,0 +1,70 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_LOOKUPP" title="Operation 16: LOOKUPP - Lookup Parent Directory">
+    <section toc='exclude' anchor="ss:op_LOOKUPP:A" title="ARGUMENT">
+      <figure>
+        <artwork>
+/* CURRENT_FH: object */
+void;
+        </artwork>
+      </figure>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LOOKUPP:R" title="RESULT">
+      <?rfc include='autogen/lookupp_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LOOKUPP:D" title="DESCRIPTION">
+      <t>
+        The current filehandle is assumed to refer to a regular directory or
+        a named attribute directory.  LOOKUPP assigns the filehandle for its
+        parent directory to be the current filehandle.  If there is no parent
+        directory, an NFS4ERR_NOENT error must be returned.  Therefore,
+        NFS4ERR_NOENT will be returned by the server when the current
+        filehandle is at the root or top of the server's file tree.
+      </t>
+
+      <t>
+        As is the case with LOOKUP, LOOKUPP will also cross mountpoints.
+      </t>
+
+      <t>
+        If the current filehandle is not a directory or named attribute
+        directory, the error NFS4ERR_NOTDIR is returned.
+      </t>
+
+      <t>
+        If the requester's security flavor does not match that configured for
+        the parent directory, then the server SHOULD return NFS4ERR_WRONGSEC
+        (a future minor revision of NFSv4 may upgrade this to MUST) in the
+        LOOKUPP response.  However, if the server does so, it MUST support
+        the SECINFO_NO_NAME operation (<xref target="op_SECINFO_NO_NAME" />), so that the client can
+        gracefully determine the correct security flavor.
+      </t>
+
+      <t>
+        If the current filehandle is a named attribute directory that is
+        associated with a file system object via OPENATTR (i.e., not a
+        sub-directory of a named attribute directory), LOOKUPP SHOULD
+        return the filehandle of the associated file system object.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LOOKUPP:I" title="IMPLEMENTATION">
+      <t>
+        An issue to note is upward navigation from named attribute
+        directories.  The named attribute directories are essentially
+        detached from the namespace, and this property should be safely
+        represented in the client operating environment.  LOOKUPP on a named
+        attribute directory may return the filehandle of the associated file,
+        and conveying this to applications might be unsafe as many
+        applications expect the parent of an object to always be a directory.
+        Therefore, the client may want to hide the parent of named attribute
+        directories (represented as ".." in UNIX) or represent the named
+        attribute directory as its own parent (as is typically done for the
+        file system root directory in UNIX).
+      </t>
+    </section>
+  </section>
+

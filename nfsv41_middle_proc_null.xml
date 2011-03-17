@@ -1,0 +1,39 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="proc_NULL" title="Procedure 0: NULL - No Operation">
+    <section anchor="ss:proc_NULL:A" title="ARGUMENTS">
+      <figure>
+        <artwork>
+   void;
+        </artwork>
+      </figure>
+    </section>
+
+    <section toc='exclude' anchor="ss:proc_NULL:R" title="RESULTS">
+      <figure>
+        <artwork>
+   void;
+        </artwork>
+      </figure>
+    </section>
+
+    <section toc='exclude' anchor="ss:proc_NULL:D" title="DESCRIPTION">
+      <t>
+        This is the standard NULL procedure with the standard void argument
+        and void response.  This procedure has no functionality associated
+        with it.  Because of this, it is sometimes used to measure the
+        overhead of processing a service request.  Therefore, the server
+        SHOULD ensure that no unnecessary work is done in servicing this
+        procedure.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:proc_NULL:E" title="ERRORS">
+      <figure>
+        <artwork>
+   None.
+        </artwork>
+      </figure>
+    </section>
+  </section>

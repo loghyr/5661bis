@@ -1,0 +1,53 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_GETFH" title="Operation 10: GETFH - Get Current Filehandle">
+    <section toc='exclude' anchor="ss:op_GETFH:A" title="ARGUMENT">
+      <figure>
+        <artwork>
+/* CURRENT_FH: */
+void;
+        </artwork>
+      </figure>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_GETFH:R" title="RESULT">
+      <?rfc include='autogen/getfh_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_GETFH:D" title="DESCRIPTION">
+      <t>
+        This operation returns the current filehandle value.
+      </t>
+
+      <t>
+        On success, the current filehandle retains its value.
+      </t>
+
+      <t>
+        As described in <xref target="ss:core_infrastructure:CaCCI" />, GETFH is REQUIRED or RECOMMENDED to
+        immediately follow certain operations, and servers are free to reject
+        such operations if the client fails to insert GETFH in the request as
+        REQUIRED or RECOMMENDED.  <xref target="ss:op_OPEN:WtCI" /> provides additional
+        justification for why GETFH MUST follow OPEN.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_GETFH:I" title="IMPLEMENTATION">
+      <t>
+        Operations that change the current filehandle like LOOKUP or CREATE
+        do not automatically return the new filehandle as a result.  For
+        instance, if a client needs to look up a directory entry and obtain
+        its filehandle, then the following request is needed.
+      </t>
+
+      <figure>
+        <artwork>
+    PUTFH (directory filehandle)
+    LOOKUP (entry name)
+    GETFH
+        </artwork>
+      </figure>
+    </section>
+  </section>
+

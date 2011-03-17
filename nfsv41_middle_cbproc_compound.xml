@@ -1,0 +1,94 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="proc_CB_COMPOUND" title="Procedure 1: CB_COMPOUND - Compound Operations">
+    <section toc='exclude' anchor="ss:proc_CB_COMPOUND:A" title="ARGUMENTS">
+      <?rfc include='autogen/type_nfs_cb_opnum4.xml'?> 
+      <?rfc include='autogen/type_nfs_cb_argop4.xml'?> 
+      <?rfc include='autogen/type_CB_COMPOUND4args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:proc_CB_COMPOUND:R" title="RESULTS">
+      <?rfc include='autogen/type_nfs_cb_resop4.xml'?>
+      <?rfc include='autogen/type_CB_COMPOUND4res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:proc_CB_COMPOUND:D" title="DESCRIPTION">
+      <t>
+        The CB_COMPOUND procedure is used to combine one or more of the
+        callback procedures into a single RPC request.  The main callback RPC
+        program has two main procedures: CB_NULL and CB_COMPOUND.  All other
+        operations use the CB_COMPOUND procedure as a wrapper.
+      </t>
+
+      <t>
+        During the processing of the CB_COMPOUND procedure, the client may
+        find that it does not have the available resources to execute any or
+        all of the operations within the CB_COMPOUND sequence.  Refer to
+        <xref target="ss:core_infrastructure:CaCCI" /> for details.
+      </t>
+
+      <t>
+        The minorversion field of the arguments MUST be the same as the
+        minorversion of the COMPOUND procedure used to create the client ID
+        and session.  For NFSv4.1, minorversion MUST be set to 1.
+      </t>
+
+      <t>
+        Contained within the CB_COMPOUND results is a "status" field.  This
+        status MUST be equal to the status of the last operation that was
+        executed within the CB_COMPOUND procedure.  Therefore, if an
+        operation incurred an error, then the "status" value will be the same
+        error value as is being returned for the operation that failed.
+      </t>
+
+      <t>
+        The "tag" field is handled the same way as that of the COMPOUND
+        procedure (see <xref target="ss:proc_COMPOUND:D" />).
+      </t>
+
+      <t>
+        Illegal operation codes are handled in the same way as they are
+        handled for the COMPOUND procedure.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:proc_CB_COMPOUND:I" title="IMPLEMENTATION">
+      <t>
+        The CB_COMPOUND procedure is used to combine individual operations
+        into a single RPC request.  The client interprets each of the
+        operations in turn.  If an operation is executed by the client and
+        the status of that operation is NFS4_OK, then the next operation in
+        the CB_COMPOUND procedure is executed.  The client continues this
+        process until there are no more operations to be executed or one of
+        the operations has a status value other than NFS4_OK.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:proc_CB_COMPOUND:E" title="ERRORS">
+      <t>
+        CB_COMPOUND will of course return every error that each operation on
+        the backchannel can return (see <xref target='tbl:cb_op_error_returns' />).  However, if CB_COMPOUND
+        returns zero operations, obviously the error returned by COMPOUND has
+        nothing to do with an error returned by an operation.  The list of
+        errors CB_COMPOUND will return if it processes zero operations
+        includes:
+      </t>
+
+      <texttable anchor="tbl:CB_compounderrs">
+        <preamble>CB_COMPOUND error returns</preamble>
+        <ttcol align="left">Error</ttcol>
+        <ttcol align="left">Notes</ttcol>
+        <c>NFS4ERR_BADCHAR             </c> <c>The tag argument has a character the replier does not support.</c>
+        <c>NFS4ERR_BADXDR              </c> <c></c>
+        <c>NFS4ERR_DELAY               </c> <c></c>
+        <c>NFS4ERR_INVAL               </c> <c>The tag argument is not in UTF-8 encoding.</c>
+        <c>NFS4ERR_MINOR_VERS_MISMATCH </c> <c></c>
+        <c>NFS4ERR_SERVERFAULT         </c> <c></c>
+        <c>NFS4ERR_TOO_MANY_OPS        </c> <c></c>
+        <c>NFS4ERR_REP_TOO_BIG         </c> <c></c>
+        <c>NFS4ERR_REP_TOO_BIG_TO_CACHE</c> <c></c>
+        <c>NFS4ERR_REQ_TOO_BIG         </c> <c></c>
+      </texttable>
+    </section>
+  </section>

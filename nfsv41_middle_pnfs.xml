@@ -1,0 +1,1857 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+<section anchor="sec:parallel_nfs" title="Parallel NFS (pNFS)">
+  <section anchor="ss:parallel_nfs:I" title="Introduction">
+    <t>
+      pNFS is an OPTIONAL feature within NFSv4.1; the pNFS feature set
+      allows direct client access to the storage devices containing file
+      data.  When file data for a single NFSv4 server is stored on multiple
+      and/or higher-throughput storage devices (by comparison to the
+      server's throughput capability), the result can be significantly
+      better file access performance.  The relationship among multiple
+      clients, a single server, and multiple storage devices for pNFS
+      (server and clients have access to all storage devices) is shown in
+      <xref target="fig:pnfs_system" />.
+    </t>
+
+    <figure anchor="fig:pnfs_system">
+      <artwork>
+    +-----------+
+    |+-----------+                                 +-----------+
+    ||+-----------+                                |           |
+    |||           |        NFSv4.1 + pNFS          |           |
+    +||  Clients  |&lt;------------------------------&gt;|   Server  |
+     +|           |                                |           |
+      +-----------+                                |           |
+           |||                                     +-----------+
+           |||                                           |
+           |||                                           |
+           ||| Storage        +-----------+              |
+           ||| Protocol       |+-----------+             |
+           ||+----------------||+-----------+  Control   |
+           |+-----------------|||           |    Protocol|
+           +------------------+||  Storage  |------------+
+                               +|  Devices  |
+                                +-----------+
+      </artwork>
+    </figure>
+
+    <t>
+      In this model, the clients, server, and storage devices are
+      responsible for managing file access.  This is in contrast to NFSv4
+      without pNFS, where it is primarily the server's responsibility; some
+      of this responsibility may be delegated to the client under strictly
+      specified conditions.  See <xref target="ss:parallel_nfs:SP" /> for a discussion of the
+      Storage Protocol.  See <xref target="ss:parallel_nfs:CP" /> for a discussion of the Control
+      Protocol.
+    </t>
+
+    <t>
+      pNFS takes the form of OPTIONAL operations that manage protocol
+      objects called 'layouts' (<xref target="ss:parallel_nfs:LT" />) that contain a byte-range
+      and storage location information.  The layout is managed in a similar
+      fashion as NFSv4.1 data delegations.  For example, the layout is
+      leased, recallable, and revocable.  However, layouts are distinct
+      abstractions and are manipulated with new operations.  When a client
+      holds a layout, it is granted the ability to directly access the
+      byte-range at the storage location specified in the layout.
+    </t>
+
+    <t>
+      There are interactions between layouts and other NFSv4.1 abstractions
+      such as data delegations and byte-range locking.  Delegation issues
+      are discussed in <xref target="ss:parallel_nfs:RL" />.  Byte-range locking issues are
+      discussed in Sections <xref target="ss:parallel_nfs:LI" format='counter' />
+      and <xref target="ss:parallel_nfs:GPbL" format='counter' />.
+    </t>
+  </section>
+
+  <section anchor="ss:parallel_nfs:pD" title="pNFS Definitions">
+    <t>
+      NFSv4.1's pNFS feature provides parallel data access to a file system
+      that stripes its content across multiple storage servers.  The first
+      instantiation of pNFS, as part of NFSv4.1, separates the file system
+      protocol processing into two parts: metadata processing and data
+      processing.  Data consist of the contents of regular files that are
+      striped across storage servers.  Data striping occurs in at least two
+      ways: on a file-by-file basis and, within sufficiently large files,
+      on a block-by-block basis.  In contrast, striped access to metadata
+      by pNFS clients is not provided in NFSv4.1, even though the file
+      system back end of a pNFS server might stripe metadata.  Metadata
+      consist of everything else, including the contents of non-regular
+      files (e.g., directories); see <xref target="ss:parallel_nfs:M" />.  The metadata
+      functionality is implemented by an NFSv4.1 server that supports pNFS
+      and the operations described in <xref target="sec:nfsv4.1_operations" />; such a server is called a
+      metadata server (<xref target="ss:parallel_nfs:MS" />).
+    </t>
+
+    <t>
+      The data functionality is implemented by one or more storage devices,
+      each of which are accessed by the client via a storage protocol.  A
+      subset (defined in <xref target="ss:nfsv4.1_as:OStNDS" />) of NFSv4.1 is one such storage
+      protocol.  New terms are introduced to the NFSv4.1 nomenclature and
+      existing terms are clarified to allow for the description of the pNFS
+      feature.
+    </t>
+
+    <section toc='exclude' anchor="ss:parallel_nfs:M" title="Metadata">
+      <t>
+        Information about a file system object, such as its name, location
+        within the namespace, owner, ACL, and other attributes.  Metadata may
+        also include storage location information, and this will vary based
+        on the underlying storage mechanism that is used.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:parallel_nfs:MS" title="Metadata Server">
+      <t>
+        An NFSv4.1 server that supports the pNFS feature.  A variety of
+        architectural choices exist for the metadata server and its use of
+        file system information held at the server.  Some servers may contain
+        metadata only for file objects residing at the metadata server, while
+        the file data resides on associated storage devices.  Other metadata
+        servers may hold both metadata and a varying degree of file data.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:parallel_nfs:pC" title="pNFS Client">
+      <t>
+        An NFSv4.1 client that supports pNFS operations and supports at least
+        one storage protocol for performing I/O to storage devices.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:parallel_nfs:SD" title="Storage Device">
+      <t>
+        A storage device stores a regular file's data, but leaves metadata
+        management to the metadata server.  A storage device could be another
+        NFSv4.1 server, an object-based storage device (OSD), a block device
+        accessed over a System Area Network (SAN, e.g., either FiberChannel
+        or iSCSI SAN), or some other entity.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:parallel_nfs:SP" title="Storage Protocol">
+      <t>
+        As noted in <xref target="fig:pnfs_system" />, the storage protocol is the method used by the
+        client to store and retrieve data directly from the storage devices.
+      </t>
+
+      <t>
+        The NFSv4.1 pNFS feature has been structured to allow for a variety
+        of storage protocols to be defined and used.  One example storage
+        protocol is NFSv4.1 itself (as documented in <xref target="sec:nfsv4.1_as" />).  Other
+        options for the storage protocol are described elsewhere and include:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            Block/volume protocols such as Internet SCSI (iSCSI) <xref target="RFC3720" /> and FCP
+            <xref target="FCP-2" />.  The block/volume protocol support can be independent of the
+            addressing structure of the block/volume protocol used, allowing
+            more than one protocol to access the same file data and enabling
+            extensibility to other block/volume protocols.  See <xref target="RFC5663" /> for a
+            layout specification that allows pNFS to use block/volume storage
+            protocols.
+          </t>
+
+          <t>
+            Object protocols such as OSD over iSCSI or Fibre Channel <xref target="OSD-T10" />.
+            See <xref target="RFC5664" /> for a layout specification that allows pNFS to use object
+            storage protocols.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        It is possible that various storage protocols are available to both
+        client and server and it may be possible that a client and server do
+        not have a matching storage protocol available to them.  Because of
+        this, the pNFS server MUST support normal NFSv4.1 access to any file
+        accessible by the pNFS feature; this will allow for continued
+        interoperability between an NFSv4.1 client and server.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:parallel_nfs:CP" title="Control Protocol">
+      <t>
+        As noted in <xref target="fig:pnfs_system" />, the control protocol is used by the exported
+        file system between the metadata server and storage devices.
+        Specification of such protocols is outside the scope of the NFSv4.1
+        protocol.  Such control protocols would be used to control activities
+        such as the allocation and deallocation of storage, the management of
+        state required by the storage devices to perform client access
+        control, and, depending on the storage protocol, the enforcement of
+        authentication and authorization so that restrictions that would be
+        enforced by the metadata server are also enforced by the storage
+        device.
+      </t>
+
+      <t>
+        A particular control protocol is not REQUIRED by NFSv4.1 but
+        requirements are placed on the control protocol for maintaining
+        attributes like modify time, the change attribute, and the
+        end-of-file (EOF) position.  Note that if pNFS is layered over
+        a clustered, parallel file system (e.g., PVFS <xref target="Carns2000" />),
+        the mechanisms that enable clustering and parallelism in
+        that file system can be considered the control protocol.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:parallel_nfs:LT" title="Layout Types">
+      <t>
+        A layout describes the mapping of a file's data to the storage
+        devices that hold the data.  A layout is said to belong to a specific
+        layout type (data type layouttype4, see <xref target="ss:protocol_constants:l1" />).  The layout
+        type allows for variants to handle different storage protocols, such
+        as those associated with block/volume <xref target="RFC5663" />, object <xref target="RFC5664" />, and file
+        (<xref target="sec:nfsv4.1_as" />) layout types.  A metadata server, along with its control
+        protocol, MUST support at least one layout type.  A private sub-range
+        of the layout type namespace is also defined.  Values from the
+        private layout type range MAY be used for internal testing or
+        experimentation (see <xref target="ss:protocol_constants:l1" />).
+      </t>
+
+      <t>
+        As an example, the organization of the file layout type could be an
+        array of tuples (e.g., device ID, filehandle), along with a
+        definition of how the data is stored across the devices (e.g.,
+        striping).  A block/volume layout might be an array of tuples that
+        store &lt;device ID, block number, block count&gt; along with information
+        about block size and the associated file offset of the block number.
+        An object layout might be an array of tuples &lt;device ID, object ID&gt;
+        and an additional structure (i.e., the aggregation map) that defines
+        how the logical byte sequence of the file data is serialized into the
+        different objects.  Note that the actual layouts are typically more
+        complex than these simple expository examples.
+      </t>
+
+      <t>
+        Requests for pNFS-related operations will often specify a layout
+        type.  Examples of such operations are GETDEVICEINFO and LAYOUTGET.
+        The response for these operations will include structures such as a
+        device_addr4 or a layout4, each of which includes a layout type
+        within it.  The layout type sent by the server MUST always be the
+        same one requested by the client.  When a server sends a response
+        that includes a different layout type, the client SHOULD ignore the
+        response and behave as if the server had returned an error response.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:parallel_nfs:L" title="Layout">
+      <t>
+        A layout defines how a file's data is organized on one or more
+        storage devices.  There are many potential layout types; each of the
+        layout types are differentiated by the storage protocol used to
+        access data and by the aggregation scheme that lays out the file data
+        on the underlying storage devices.  A layout is precisely identified
+        by the tuple &lt;client ID, filehandle, layout type, iomode, range&gt;,
+        where filehandle refers to the filehandle of the file on the metadata
+        server.
+      </t>
+
+      <t>
+        It is important to define when layouts overlap and/or conflict with
+        each other.  For two layouts with overlapping byte-ranges to actually
+        overlap each other, both layouts must be of the same layout type,
+        correspond to the same filehandle, and have the same iomode.  Layouts
+        conflict when they overlap and differ in the content of the layout
+        (i.e., the storage device/file mapping parameters differ).  Note that
+        differing iomodes do not lead to conflicting layouts.  It is
+        permissible for layouts with different iomodes, pertaining to the
+        same byte-range, to be held by the same client.  An example of this
+        would be copy-on-write functionality for a block/volume layout type.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:parallel_nfs:LI" title="Layout Iomode">
+      <t>
+        The layout iomode (data type layoutiomode4, see <xref target="ss:protocol_constants:l6" />)
+        indicates to the metadata server the client's intent to perform
+        either just READ operations or a mixture containing READ and WRITE
+        operations.  For certain layout types, it is useful for a client to
+        specify this intent at the time it sends LAYOUTGET (<xref target="op_LAYOUTGET" />).
+        For example, for block/volume-based protocols, block allocation could
+        occur when a LAYOUTIOMODE4_RW iomode is specified.  A special
+        LAYOUTIOMODE4_ANY iomode is defined and can only be used for
+        LAYOUTRETURN and CB_LAYOUTRECALL, not for LAYOUTGET.  It specifies
+        that layouts pertaining to both LAYOUTIOMODE4_READ and
+        LAYOUTIOMODE4_RW iomodes are being returned or recalled,
+        respectively.
+      </t>
+
+      <t>
+        A storage device may validate I/O with regard to the iomode; this is
+        dependent upon storage device implementation and layout type.  Thus,
+        if the client's layout iomode is inconsistent with the I/O being
+        performed, the storage device may reject the client's I/O with an
+        error indicating that a new layout with the correct iomode should be
+        obtained via LAYOUTGET.  For example, if a client gets a layout with
+        a LAYOUTIOMODE4_READ iomode and performs a WRITE to a storage device,
+        the storage device is allowed to reject that WRITE.
+      </t>
+
+      <t>
+        The use of the layout iomode does not conflict with OPEN share modes
+        or byte-range LOCK operations; open share mode and byte-range lock
+        conflicts are enforced as they are without the use of pNFS and are
+        logically separate from the pNFS layout level.  Open share modes and
+        byte-range locks are the preferred method for restricting user access
+        to data files.  For example, an OPEN of OPEN4_SHARE_ACCESS_WRITE does
+        not conflict with a LAYOUTGET containing an iomode of
+        LAYOUTIOMODE4_RW performed by another client.  Applications that
+        depend on writing into the same file concurrently may use byte-range
+        locking to serialize their accesses.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:parallel_nfs:DI" title="Device IDs">
+      <t>
+        The device ID (data type deviceid4, see <xref target="ss:protocol_constants:d" />) identifies a
+        group of storage devices.  The scope of a device ID is the pair
+        &lt;client ID, layout type&gt;.  In practice, a significant amount of
+        information may be required to fully address a storage device.
+        Rather than embedding all such information in a layout, layouts embed
+        device IDs.  The NFSv4.1 operation GETDEVICEINFO (<xref target="op_GETDEVICEINFO" />) is
+        used to retrieve the complete address information (including all
+        device addresses for the device ID) regarding the storage device
+        according to its layout type and device ID.  For example, the address
+        of an NFSv4.1 data server or of an object-based storage device could
+        be an IP address and port.  The address of a block storage device
+        could be a volume label.
+      </t>
+
+      <t>
+        Clients cannot expect the mapping between a device ID and its storage
+        device address(es) to persist across metadata server restart.  See
+        <xref target="ss:parallel_nfs:RfMSR" /> for a description of how recovery works in that
+        situation.
+      </t>
+
+      <t>
+        A device ID lives as long as there is a layout referring to the
+        device ID.  If there are no layouts referring to the device ID, the
+        server is free to delete the device ID any time.  Once a device ID is
+        deleted by the server, the server MUST NOT reuse the device ID for
+        the same layout type and client ID again.  This requirement is
+        feasible because the device ID is 16 bytes long, leaving sufficient
+        room to store a generation number if the server's implementation
+        requires most of the rest of the device ID's content to be reused.
+        This requirement is necessary because otherwise the race conditions
+        between asynchronous notification of device ID addition and deletion
+        would be too difficult to sort out.
+      </t>
+
+      <t>
+        Device ID to device address mappings are not leased, and can be
+        changed at any time.  (Note that while device ID to device address
+        mappings are likely to change after the metadata server restarts, the
+        server is not required to change the mappings.)  A server has two
+        choices for changing mappings.  It can recall all layouts referring
+        to the device ID or it can use a notification mechanism.
+      </t>
+
+      <t>
+        The NFSv4.1 protocol has no optimal way to recall all layouts that
+        referred to a particular device ID (unless the server associates a
+        single device ID with a single fsid or a single client ID; in which
+        case, CB_LAYOUTRECALL has options for recalling all layouts
+        associated with the fsid, client ID pair, or just the client ID).
+      </t>
+
+      <t>
+        Via a notification mechanism (see <xref target="op_CB_NOTIFY_DEVICEID" />), device ID to device
+        address mappings can change over the duration of server operation
+        without recalling or revoking the layouts that refer to device ID.
+      </t>
+
+      <t>
+        The notification mechanism can also delete a device ID, but only if
+        the client has no layouts referring to the device ID.  A notification
+        of a change to a device ID to device address mapping will immediately
+        or eventually invalidate some or all of the device ID's mappings.
+        The server MUST support notifications and the client must request
+        them before they can be used.  For further information about the
+        notification types <xref target="op_CB_NOTIFY_DEVICEID" />.
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:parallel_nfs:pO" title="pNFS Operations">
+    <t>
+      NFSv4.1 has several operations that are needed for pNFS servers,
+      regardless of layout type or storage protocol.  These operations are
+      all sent to a metadata server and summarized here.  While pNFS is an
+      OPTIONAL feature, if pNFS is implemented, some operations are
+      REQUIRED in order to comply with pNFS.  See <xref target="sec:operations:_required," />.
+    </t>
+
+    <t>
+      These are the fore channel pNFS operations:
+    </t>
+
+    <t>
+      <list style='hanging'>
+        <t hangText='GETDEVICEINFO'>
+          (<xref target="op_GETDEVICEINFO" />), as noted previously
+          (<xref target="ss:parallel_nfs:DI" />), returns the mapping of device ID to storage
+          device address.
+        </t>
+
+        <t hangText='GETDEVICELIST'>
+          (<xref target="op_GETDEVICELIST" />) allows clients to fetch all device IDs
+          for a specific file system.
+        </t>
+
+        <t hangText='LAYOUTGET'>
+          (<xref target="op_LAYOUTGET" />) is used by a client to get a layout for a
+          file.
+        </t>
+
+        <t hangText='LAYOUTCOMMIT'>
+          (<xref target="op_LAYOUTCOMMIT" />) is used to inform the metadata server
+          of the client's intent to commit data that has been written to the
+          storage device (the storage device as originally indicated in the
+          return value of LAYOUTGET).
+        </t>
+
+        <t hangText='LAYOUTRETURN'>
+          (<xref target="op_LAYOUTRETURN" />) is used to return layouts for a file, a
+          file system ID (FSID), or a client ID.
+        </t>
+      </list>
+    </t>
+
+    <t>
+      These are the backchannel pNFS operations:
+    </t>
+
+    <t>
+      <list style='hanging'>
+        <t hangText='CB_LAYOUTRECALL'>
+          (<xref target="op_CB_LAYOUTRECALL" />) recalls a layout, all layouts
+          belonging to a file system, or all layouts belonging to a client
+          ID.
+        </t>
+
+        <t hangText='CB_RECALL_ANY'>
+          (<xref target="op_CB_RECALL_ANY" />) tells a client that it needs to return
+          some number of recallable objects, including layouts, to the
+          metadata server.
+        </t>
+
+        <t hangText='CB_RECALLABLE_OBJ_AVAIL'>
+          (<xref target="op_CB_RECALLABLE_OBJ_AVAIL" />) tells a client that a
+           recallable object that it was denied (in case of pNFS, a layout
+         denied by LAYOUTGET) due to resource exhaustion is now available.
+        </t>
+
+        <t hangText='CB_NOTIFY_DEVICEID'>
+          (<xref target="op_CB_NOTIFY_DEVICEID" />) notifies the client of changes to
+          device IDs.
+        </t>
+      </list>
+    </t>
+  </section>
+
+  <section anchor="ss:parallel_nfs:pA" title="pNFS Attributes">
+    <t>
+      A number of attributes specific to pNFS are listed and described in
+      <xref target="ss:file_attributes:pAD" />.
+    </t>
+  </section>
+
+  <section anchor="ss:parallel_nfs:LS" title="Layout Semantics">
+    <section toc='exclude' anchor="ss:parallel_nfs:GPbL" title="Guarantees Provided by Layouts">
+      <t>
+        Layouts grant to the client the ability to access data located at a
+        storage device with the appropriate storage protocol.  The client is
+        guaranteed the layout will be recalled when one of two things occur:
+        either a conflicting layout is requested or the state encapsulated by
+        the layout becomes invalid (this can happen when an event directly or
+        indirectly modifies the layout).  When a layout is recalled and
+        returned by the client, the client continues with the ability to
+        access file data with normal NFSv4.1 operations through the metadata
+        server.  Only the ability to access the storage devices is affected.
+      </t>
+
+      <t>
+        The requirement of NFSv4.1 that all user access rights MUST be
+        obtained through the appropriate OPEN, LOCK, and ACCESS operations is
+        not modified with the existence of layouts.  Layouts are provided to
+        NFSv4.1 clients, and user access still follows the rules of the
+        protocol as if they did not exist.  It is a requirement that for a
+        client to access a storage device, a layout must be held by the
+        client.  If a storage device receives an I/O request for a byte-range
+        for which the client does not hold a layout, the storage device
+        SHOULD reject that I/O request.  Note that the act of modifying a
+        file for which a layout is held does not necessarily conflict with
+        the holding of the layout that describes the file being modified.
+        Therefore, it is the requirement of the storage protocol or layout
+        type that determines the necessary behavior.  For example, block/
+        volume layout types require that the layout's iomode agree with the
+        type of I/O being performed.
+      </t>
+
+      <t>
+        Depending upon the layout type and storage protocol in use, storage
+        device access permissions may be granted by LAYOUTGET and may be
+        encoded within the type-specific layout.  For an example of storage
+        device access permissions, see an object-based protocol such as <xref target="OSD-T10" />.
+        If access permissions are encoded within the layout, the metadata
+        server SHOULD recall the layout when those permissions become invalid
+        for any reason -- for example, when a file becomes unwritable or
+        inaccessible to a client.  Note, clients are still required to
+        perform the appropriate OPEN, LOCK, and ACCESS operations as
+        described above.  The degree to which it is possible for the client
+        to circumvent these operations and the consequences of doing so must
+        be clearly specified by the individual layout type specifications.
+        In addition, these specifications must be clear about the
+        requirements and non-requirements for the checking performed by the
+        server.
+      </t>
+
+      <t>
+        In the presence of pNFS functionality, mandatory byte-range locks
+        MUST behave as they would without pNFS.  Therefore, if mandatory file
+        locks and layouts are provided simultaneously, the storage device
+        MUST be able to enforce the mandatory byte-range locks.  For example,
+        if one client obtains a mandatory byte-range lock and a second client
+        accesses the storage device, the storage device MUST appropriately
+        restrict I/O for the range of the mandatory byte-range lock.  If the
+        storage device is incapable of providing this check in the presence
+        of mandatory byte-range locks, then the metadata server MUST NOT
+        grant layouts and mandatory byte-range locks simultaneously.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:parallel_nfs:GL" title="Getting a Layout">
+      <t>
+        A client obtains a layout with the LAYOUTGET operation.  The metadata
+        server will grant layouts of a particular type (e.g., block/volume,
+        object, or file).  The client selects an appropriate layout type that
+        the server supports and the client is prepared to use.  The layout
+        returned to the client might not exactly match the requested
+        byte-range as described in <xref target="ss:op_LAYOUTGET:D" />.  As needed a client
+        may send multiple LAYOUTGET operations; these might result in
+        multiple overlapping, non-conflicting layouts (see <xref target='ss:parallel_nfs:L' />).
+      </t>
+
+      <t>
+        In order to get a layout, the client must first have opened the file
+        via the OPEN operation.  When a client has no layout on a file, it
+        MUST present an open stateid, a delegation stateid, or a byte-range
+        lock stateid in the loga_stateid argument.  A successful LAYOUTGET
+        result includes a layout stateid.  The first successful LAYOUTGET
+        processed by the server using a non-layout stateid as an argument
+        MUST have the "seqid" field of the layout stateid in the response set
+        to one.  Thereafter, the client MUST use a layout stateid (see
+        <xref target="ss:parallel_nfs:LS1" />) on future invocations of LAYOUTGET on the file, and
+        the "seqid" MUST NOT be set to zero.  Once the layout has been
+        retrieved, it can be held across multiple OPEN and CLOSE sequences.
+        Therefore, a client may hold a layout for a file that is not
+        currently open by any user on the client.  This allows for the
+        caching of layouts beyond CLOSE.
+      </t>
+
+      <t>
+        The storage protocol used by the client to access the data on the
+        storage device is determined by the layout's type.  The client is
+        responsible for matching the layout type with an available method to
+        interpret and use the layout.  The method for this layout type
+        selection is outside the scope of the pNFS functionality.
+      </t>
+
+      <t>
+        Although the metadata server is in control of the layout for a file,
+        the pNFS client can provide hints to the server when a file is opened
+        or created about the preferred layout type and aggregation schemes.
+        pNFS introduces a layout_hint attribute (<xref target="ss:file_attributes:A6l2" />) that the
+        client can set at file creation time to provide a hint to the server
+        for new files.  Setting this attribute separately, after the file has
+        been created might make it difficult, or impossible, for the server
+        implementation to comply.
+      </t>
+
+      <t>
+        Because the EXCLUSIVE4 createmode4 does not allow the setting of
+        attributes at file creation time, NFSv4.1 introduces the EXCLUSIVE4_1
+        createmode4, which does allow attributes to be set at file creation
+        time.  In addition, if the session is created with persistent reply
+        caches, EXCLUSIVE4_1 is neither necessary nor allowed.  Instead,
+        GUARDED4 both works better and is prescribed.  <xref target='tbl:exclusive_create' /> in
+        <xref target="ss:op_OPEN:D" /> summarizes how a client is allowed to send an
+        exclusive create.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:parallel_nfs:LS1" title="Layout Stateid">
+      <t>
+        As with all other stateids, the layout stateid consists of a "seqid"
+        and "other" field.  Once a layout stateid is established, the "other"
+        field will stay constant unless the stateid is revoked or the client
+        returns all layouts on the file and the server disposes of the
+        stateid.  The "seqid" field is initially set to one, and is never
+        zero on any NFSv4.1 operation that uses layout stateids, whether it
+        is a fore channel or backchannel operation.  After the layout stateid
+        is established, the server increments by one the value of the "seqid"
+        in each subsequent LAYOUTGET and LAYOUTRETURN response, and in each
+        CB_LAYOUTRECALL request.
+      </t>
+
+      <t>
+        Given the design goal of pNFS to provide parallelism, the layout
+        stateid differs from other stateid types in that the client is
+        expected to send LAYOUTGET and LAYOUTRETURN operations in parallel.
+        The "seqid" value is used by the client to properly sort responses to
+        LAYOUTGET and LAYOUTRETURN.  The "seqid" is also used to prevent race
+        conditions between LAYOUTGET and CB_LAYOUTRECALL.  Given that the
+        processing rules differ from layout stateids and other stateid types,
+        only the pNFS sections of this document should be considered to
+        determine proper layout stateid handling.
+      </t>
+
+      <t>
+        Once the client receives a layout stateid, it MUST use the correct
+        "seqid" for subsequent LAYOUTGET or LAYOUTRETURN operations.  The
+        correct "seqid" is defined as the highest "seqid" value from
+        responses of fully processed LAYOUTGET or LAYOUTRETURN operations or
+        arguments of a fully processed CB_LAYOUTRECALL operation.  Since the
+        server is incrementing the "seqid" value on each layout operation,
+        the client may determine the order of operation processing by
+        inspecting the "seqid" value.  In the case of overlapping layout
+        ranges, the ordering information will provide the client the
+        knowledge of which layout ranges are held.  Note that overlapping
+        layout ranges may occur because of the client's specific requests or
+        because the server is allowed to expand the range of a requested
+        layout and notify the client in the LAYOUTRETURN results.  Additional
+        layout stateid sequencing requirements are provided in
+        <xref target="ss:parallel_nfs:SoLO" />.
+      </t>
+
+      <t>
+        The client's receipt of a "seqid" is not sufficient for subsequent
+        use.  The client must fully process the operations before the "seqid"
+        can be used.  For LAYOUTGET results, if the client is not using the
+        forgetful model (<xref target="ss:parallel_nfs:LRCR" />), it MUST first update its record
+        of what ranges of the file's layout it has before using the seqid.
+        For LAYOUTRETURN results, the client MUST delete the range from its
+        record of what ranges of the file's layout it had before using the
+        seqid.  For CB_LAYOUTRECALL arguments, the client MUST send a
+        response to the recall before using the seqid.  The fundamental
+        requirement in client processing is that the "seqid" is used to
+        provide the order of processing.  LAYOUTGET results may be processed
+        in parallel.  LAYOUTRETURN results may be processed in parallel.
+        LAYOUTGET and LAYOUTRETURN responses may be processed in parallel as
+        long as the ranges do not overlap.  CB_LAYOUTRECALL request
+        processing MUST be processed in "seqid" order at all times.
+      </t>
+
+      <t>
+        Once a client has no more layouts on a file, the layout stateid is no
+        longer valid and MUST NOT be used.  Any attempt to use such a layout
+        stateid will result in NFS4ERR_BAD_STATEID.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:parallel_nfs:CL" title="Committing a Layout">
+      <t>
+        Allowing for varying storage protocol capabilities, the pNFS protocol
+        does not require the metadata server and storage devices to have a
+        consistent view of file attributes and data location mappings.  Data
+        location mapping refers to aspects such as which offsets store data
+        as opposed to storing holes (see <xref target="ss:nfsv4.1_as:SaDSUP" /> for a discussion).
+        Related issues arise for storage protocols where a layout may hold
+        provisionally allocated blocks where the allocation of those blocks
+        does not survive a complete restart of both the client and server.
+      </t>
+
+      <t>
+        Because of this inconsistency, it is necessary to resynchronize the
+        client with the metadata server and its storage devices and make any
+        potential changes available to other clients.  This is accomplished
+        by use of the LAYOUTCOMMIT operation.
+      </t>
+
+      <t>
+        The LAYOUTCOMMIT operation is responsible for committing a modified
+        layout to the metadata server.  The data should be written and
+        committed to the appropriate storage devices before the LAYOUTCOMMIT
+        occurs.  The scope of the LAYOUTCOMMIT operation depends on the
+        storage protocol in use.  It is important to note that the level of
+        synchronization is from the point of view of the client that sent the
+        LAYOUTCOMMIT.  The updated state on the metadata server need only
+        reflect the state as of the client's last operation previous to the
+        LAYOUTCOMMIT.  The metadata server is not REQUIRED to maintain a
+        global view that accounts for other clients' I/O that may have
+        occurred within the same time frame.
+      </t>
+
+      <t>
+        For block/volume-based layouts, LAYOUTCOMMIT may require updating the
+        block list that comprises the file and committing this layout to
+        stable storage.  For file-based layouts, synchronization of
+        attributes between the metadata and storage devices, primarily the
+        size attribute, is required.
+      </t>
+
+      <t>
+        The control protocol is free to synchronize the attributes before it
+        receives a LAYOUTCOMMIT; however, upon successful completion of a
+        LAYOUTCOMMIT, state that exists on the metadata server that describes
+        the file MUST be synchronized with the state that exists on the
+        storage devices that comprise that file as of the client's last sent
+        operation.  Thus, a client that queries the size of a file between a
+        WRITE to a storage device and the LAYOUTCOMMIT might observe a size
+        that does not reflect the actual data written.
+      </t>
+
+      <t>
+        The client MUST have a layout in order to send a LAYOUTCOMMIT
+        operation.
+      </t>
+
+      <section toc='exclude' anchor="ss:parallel_nfs:Lac" title="LAYOUTCOMMIT and change/time_modify">
+        <t>
+          The change and time_modify attributes may be updated by the server
+          when the LAYOUTCOMMIT operation is processed.  The reason for this is
+          that some layout types do not support the update of these attributes
+          when the storage devices process I/O operations.  If a client has a
+          layout with the LAYOUTIOMODE4_RW iomode on the file, the client MAY
+          provide a suggested value to the server for time_modify within the
+          arguments to LAYOUTCOMMIT.  Based on the layout type, the provided
+          value may or may not be used.  The server should sanity-check the
+          client-provided values before they are used.  For example, the server
+          should ensure that time does not flow backwards.  The client always
+          has the option to set time_modify through an explicit SETATTR
+          operation.
+        </t>
+
+        <t>
+          For some layout protocols, the storage device is able to notify the
+          metadata server of the occurrence of an I/O; as a result, the change
+          and time_modify attributes may be updated at the metadata server.
+          For a metadata server that is capable of monitoring updates to the
+          change and time_modify attributes, LAYOUTCOMMIT processing is not
+          required to update the change attribute.  In this case, the metadata
+          server must ensure that no further update to the data has occurred
+          since the last update of the attributes; file-based protocols may
+          have enough information to make this determination or may update the
+          change attribute upon each file modification.  This also applies for
+          the time_modify attribute.  If the server implementation is able to
+          determine that the file has not been modified since the last
+          time_modify update, the server need not update time_modify at
+          LAYOUTCOMMIT.  At LAYOUTCOMMIT completion, the updated attributes
+          should be visible if that file was modified since the latest previous
+          LAYOUTCOMMIT or LAYOUTGET.
+        </t>
+      </section>
+
+      <section toc='exclude' anchor="ss:parallel_nfs:Las" title="LAYOUTCOMMIT and size">
+        <t>
+          The size of a file may be updated when the LAYOUTCOMMIT operation is
+          used by the client.  One of the fields in the argument to
+          LAYOUTCOMMIT is loca_last_write_offset; this field indicates the
+          highest byte offset written but not yet committed with the
+          LAYOUTCOMMIT operation.  The data type of loca_last_write_offset is
+          newoffset4 and is switched on a boolean value, no_newoffset, that
+          indicates if a previous write occurred or not.  If no_newoffset is
+          FALSE, an offset is not given.  If the client has a layout with
+          LAYOUTIOMODE4_RW iomode on the file, with a byte-range (denoted by
+          the values of lo_offset and lo_length) that overlaps
+          loca_last_write_offset, then the client MAY set no_newoffset to TRUE
+          and provide an offset that will update the file size.  Keep in mind
+          that offset is not the same as length, though they are related.  For
+          example, a loca_last_write_offset value of zero means that one byte
+          was written at offset zero, and so the length of the file is at least
+          one byte.
+        </t>
+
+        <t>
+          The metadata server may do one of the following:
+        </t>
+
+        <t>
+          <list style='numbers'>
+            <t>
+              Update the file's size using the last write offset provided by
+              the client as either the true file size or as a hint of the file
+              size.  If the metadata server has a method available, any new
+              value for file size should be sanity-checked.  For example, the
+              file must not be truncated if the client presents a last write
+              offset less than the file's current size.
+            </t>
+
+            <t>
+              Ignore the client-provided last write offset; the metadata server
+              must have sufficient knowledge from other sources to determine
+              the file's size.  For example, the metadata server queries the
+              storage devices with the control protocol.
+            </t>
+          </list>
+        </t>
+
+        <t>
+          The method chosen to update the file's size will depend on the
+          storage device's and/or the control protocol's capabilities.  For
+          example, if the storage devices are block devices with no knowledge
+          of file size, the metadata server must rely on the client to set the
+          last write offset appropriately.
+        </t>
+
+        <t>
+          The results of LAYOUTCOMMIT contain a new size value in the form of a
+          newsize4 union data type.  If the file's size is set as a result of
+          LAYOUTCOMMIT, the metadata server must reply with the new size;
+          otherwise, the new size is not provided.  If the file size is
+          updated, the metadata server SHOULD update the storage devices such
+          that the new file size is reflected when LAYOUTCOMMIT processing is
+          complete.  For example, the client should be able to read up to the
+          new file size.
+        </t>
+
+        <t>
+          The client can extend the length of a file or truncate a file by
+          sending a SETATTR operation to the metadata server with the size
+          attribute specified.  If the size specified is larger than the
+          current size of the file, the file is "zero extended", i.e., zeros
+          are implicitly added between the file's previous EOF and the new EOF.
+          (In many implementations, the zero-extended byte-range of the file
+          consists of unallocated holes in the file.)  When the client writes
+          past EOF via WRITE, the SETATTR operation does not need to be used.
+        </t>
+      </section>
+
+      <section toc='exclude' anchor="ss:parallel_nfs:Lal" title="LAYOUTCOMMIT and layoutupdate">
+        <t>
+          The LAYOUTCOMMIT argument contains a loca_layoutupdate field
+          (<xref target="ss:op_LAYOUTCOMMIT:A" />) of data type layoutupdate4 (<xref target="ss:protocol_constants:l4" />).  This
+          argument is a layout-type-specific structure.  The structure can be
+          used to pass arbitrary layout-type-specific information from the
+          client to the metadata server at LAYOUTCOMMIT time.  For example, if
+          using a block/volume layout, the client can indicate to the metadata
+          server which reserved or allocated blocks the client used or did not
+          use.  The content of loca_layoutupdate (field lou_body) need not be
+          the same layout-type-specific content returned by LAYOUTGET
+          (<xref target="ss:op_LAYOUTGET:R" />) in the loc_body field of the lo_content field of
+          the logr_layout field.  The content of loca_layoutupdate is defined
+          by the layout type specification and is opaque to LAYOUTCOMMIT.
+        </t>
+      </section>
+    </section>
+
+    <section toc='exclude' anchor="ss:parallel_nfs:RL" title="Recalling a Layout">
+      <t>
+        Since a layout protects a client's access to a file via a direct
+        client-storage-device path, a layout need only be recalled when it is
+        semantically unable to serve this function.  Typically, this occurs
+        when the layout no longer encapsulates the true location of the file
+        over the byte-range it represents.  Any operation or action, such as
+        server-driven restriping or load balancing, that changes the layout
+        will result in a recall of the layout.  A layout is recalled by the
+        CB_LAYOUTRECALL callback operation (see <xref target="op_CB_LAYOUTRECALL" />) and returned
+        with LAYOUTRETURN (see <xref target="op_LAYOUTRETURN" />).  The CB_LAYOUTRECALL operation
+        may recall a layout identified by a byte-range, all layouts
+        associated with a file system ID (FSID), or all layouts associated
+        with a client ID.  <xref target="ss:parallel_nfs:SoLO" /> discusses sequencing issues
+        surrounding the getting, returning, and recalling of layouts.
+      </t>
+
+      <t>
+        An iomode is also specified when recalling a layout.  Generally, the
+        iomode in the recall request must match the layout being returned;
+        for example, a recall with an iomode of LAYOUTIOMODE4_RW should cause
+        the client to only return LAYOUTIOMODE4_RW layouts and not
+        LAYOUTIOMODE4_READ layouts.  However, a special LAYOUTIOMODE4_ANY
+        enumeration is defined to enable recalling a layout of any iomode; in
+        other words, the client must return both LAYOUTIOMODE4_READ and
+        LAYOUTIOMODE4_RW layouts.
+      </t>
+
+      <t>
+        A REMOVE operation SHOULD cause the metadata server to recall the
+        layout to prevent the client from accessing a non-existent file and
+        to reclaim state stored on the client.  Since a REMOVE may be delayed
+        until the last close of the file has occurred, the recall may also be
+        delayed until this time.  After the last reference on the file has
+        been released and the file has been removed, the client should no
+        longer be able to perform I/O using the layout.  In the case of a
+        file-based layout, the data server SHOULD return NFS4ERR_STALE in
+        response to any operation on the removed file.
+      </t>
+
+      <t>
+        Once a layout has been returned, the client MUST NOT send I/Os to the
+        storage devices for the file, byte-range, and iomode represented by
+        the returned layout.  If a client does send an I/O to a storage
+        device for which it does not hold a layout, the storage device SHOULD
+        reject the I/O.
+      </t>
+
+      <t>
+        Although pNFS does not alter the file data caching capabilities of
+        clients, or their semantics, it recognizes that some clients may
+        perform more aggressive write-behind caching to optimize the benefits
+        provided by pNFS.  However, write-behind caching may negatively
+        affect the latency in returning a layout in response to a
+        CB_LAYOUTRECALL; this is similar to file delegations and the impact
+        that file data caching has on DELEGRETURN.  Client implementations
+      </t>
+
+      <t>
+        SHOULD limit the amount of unwritten data they have outstanding at
+        any one time in order to prevent excessively long responses to
+        CB_LAYOUTRECALL.  Once a layout is recalled, a server MUST wait one
+        lease period before taking further action.  As soon as a lease period
+        has passed, the server may choose to fence the client's access to the
+        storage devices if the server perceives the client has taken too long
+        to return a layout.  However, just as in the case of data delegation
+        and DELEGRETURN, the server may choose to wait, given that the client
+        is showing forward progress on its way to returning the layout.  This
+        forward progress can take the form of successful interaction with the
+        storage devices or of sub-portions of the layout being returned by
+        the client.  The server can also limit exposure to these problems by
+        limiting the byte-ranges initially provided in the layouts and thus
+        the amount of outstanding modified data.
+      </t>
+
+      <section toc='exclude' anchor="ss:parallel_nfs:LRCR" title="Layout Recall Callback Robustness">
+        <t>
+          It has been assumed thus far that pNFS client state (layout ranges
+          and iomode) for a file exactly matches that of the pNFS server for
+          that file.  This assumption leads to the implication that any
+          callback results in a LAYOUTRETURN or set of LAYOUTRETURNs that
+          exactly match the range in the callback, since both client and server
+          agree about the state being maintained.  However, it can be useful if
+          this assumption does not always hold.  For example:
+        </t>
+
+        <t>
+          <list style='symbols'>
+            <t>
+              If conflicts that require callbacks are very rare, and a server
+              can use a multi-file callback to recover per-client resources
+              (e.g., via an FSID recall or a multi-file recall within a single
+              CB_COMPOUND), the result may be significantly less client-server
+              pNFS traffic.
+            </t>
+
+            <t>
+              It may be useful for servers to maintain information about what
+              ranges are held by a client on a coarse-grained basis, leading to
+              the server's layout ranges being beyond those actually held by the
+              client.  In the extreme, a server could manage conflicts on
+              a per-file basis, only sending whole-file callbacks even
+              though clients may request and be granted sub-file ranges.
+            </t>
+
+            <t>
+              It may be useful for clients to "forget" details about what
+              layouts and ranges the client actually has, leading to the
+              server's layout ranges being beyond those that the client "thinks"
+              it has.  As long as the client does not assume it has layouts that
+              are beyond what the server has granted, this is a safe practice.
+              When a client forgets what ranges and layouts it has, and it
+              receives a CB_LAYOUTRECALL operation, the client MUST follow up
+              with a LAYOUTRETURN for what the server recalled, or alternatively
+              return the NFS4ERR_NOMATCHING_LAYOUT error if it has no layout to
+              return in the recalled range.
+            </t>
+
+            <t>
+              In order to avoid errors, it is vital that a client not assign
+              itself layout permissions beyond what the server has granted, and
+              that the server not forget layout permissions that have been
+              granted.  On the other hand, if a server believes that a client
+              holds a layout that the client does not know about, it is useful
+              for the client to cleanly indicate completion of the requested
+              recall either by sending a LAYOUTRETURN operation for the entire
+              requested range or by returning an NFS4ERR_NOMATCHING_LAYOUT error
+              to the CB_LAYOUTRECALL.
+            </t>
+          </list>
+        </t>
+
+        <t>
+          Thus, in light of the above, it is useful for a server to be able to
+          send callbacks for layout ranges it has not granted to a client, and
+          for a client to return ranges it does not hold.  A pNFS client MUST
+          always return layouts that comprise the full range specified by the
+          recall.  Note, the full recalled layout range need not be returned as
+          part of a single operation, but may be returned in portions.  This
+          allows the client to stage the flushing of dirty data and commits and
+          returns of layouts.  Also, it indicates to the metadata server that
+          the client is making progress.
+        </t>
+
+        <t>
+          When a layout is returned, the client MUST NOT have any outstanding
+          I/O requests to the storage devices involved in the layout.
+          Rephrasing, the client MUST NOT return the layout while it has
+          outstanding I/O requests to the storage device.
+        </t>
+
+        <t>
+          Even with this requirement for the client, it is possible that I/O
+          requests may be presented to a storage device no longer allowed to
+          perform them.  Since the server has no strict control as to when the
+          client will return the layout, the server may later decide to
+          unilaterally revoke the client's access to the storage devices as
+          provided by the layout.  In choosing to revoke access, the server
+          must deal with the possibility of lingering I/O requests, i.e., I/O
+          requests that are still in flight to storage devices identified by
+          the revoked layout.  All layout type specifications MUST define
+          whether unilateral layout revocation by the metadata server is
+          supported; if it is, the specification must also describe how
+          lingering writes are processed.  For example, storage devices
+          identified by the revoked layout could be fenced off from the client
+          that held the layout.
+        </t>
+
+        <t>
+          In order to ensure client/server convergence with regard to layout
+          state, the final LAYOUTRETURN operation in a sequence of LAYOUTRETURN
+          operations for a particular recall MUST specify the entire range
+          being recalled, echoing the recalled layout type, iomode, recall/
+          return type (FILE, FSID, or ALL), and byte-range, even if layouts
+          pertaining to partial ranges were previously returned.  In addition,
+          if the client holds no layouts that overlap the range being recalled,
+          the client should return the NFS4ERR_NOMATCHING_LAYOUT error code to
+          CB_LAYOUTRECALL.  This allows the server to update its view of the
+          client's layout state.
+        </t>
+      </section>
+
+      <section toc='exclude' anchor="ss:parallel_nfs:SoLO" title="Sequencing of Layout Operations">
+        <t>
+          As with other stateful operations, pNFS requires the correct
+          sequencing of layout operations. pNFS uses the "seqid" in the layout
+          stateid to provide the correct sequencing between regular operations
+          and callbacks.  It is the server's responsibility to avoid
+          inconsistencies regarding the layouts provided and the client's
+          responsibility to properly serialize its layout requests and layout
+          returns.
+        </t>
+
+        <section toc='exclude' anchor="ss:parallel_nfs:LRaRS" title="Layout Recall and Return Sequencing">
+          <t>
+            One critical issue with regard to layout operations sequencing
+            concerns callbacks.  The protocol must defend against races between
+            the reply to a LAYOUTGET or LAYOUTRETURN operation and a subsequent
+            CB_LAYOUTRECALL.  A client MUST NOT process a CB_LAYOUTRECALL that
+            implies one or more outstanding LAYOUTGET or LAYOUTRETURN operations
+            to which the client has not yet received a reply.  The client detects
+            such a CB_LAYOUTRECALL by examining the "seqid" field of the recall's
+            layout stateid.  If the "seqid" is not exactly one higher than what
+            the client currently has recorded, and the client has at least one
+            LAYOUTGET and/or LAYOUTRETURN operation outstanding, the client knows
+            the server sent the CB_LAYOUTRECALL after sending a response to an
+            outstanding LAYOUTGET or LAYOUTRETURN.  The client MUST wait before
+            processing such a CB_LAYOUTRECALL until it processes all replies for
+            outstanding LAYOUTGET and LAYOUTRETURN operations for the
+            corresponding file with seqid less than the seqid given by
+            CB_LAYOUTRECALL (lor_stateid; see <xref target="op_CB_LAYOUTRECALL" />.)
+          </t>
+
+          <t>
+            In addition to the seqid-based mechanism, <xref target="ss:core_infrastructure:RSCR" /> describes
+            the sessions mechanism for allowing the client to detect callback
+            race conditions and delay processing such a CB_LAYOUTRECALL.  The
+            server MAY reference conflicting operations in the CB_SEQUENCE that
+            precedes the CB_LAYOUTRECALL.  Because the server has already sent
+            replies for these operations before sending the callback, the replies
+            may race with the CB_LAYOUTRECALL.  The client MUST wait for all the
+            referenced calls to complete and update its view of the layout state
+            before processing the CB_LAYOUTRECALL.
+          </t>
+
+          <section toc='exclude' anchor="ss:parallel_nfs:GS" title="Get/Return Sequencing">
+            <t>
+              The protocol allows the client to send concurrent LAYOUTGET and
+              LAYOUTRETURN operations to the server.  The protocol does not provide
+              any means for the server to process the requests in the same order in
+              which they were created.  However, through the use of the "seqid"
+              field in the layout stateid, the client can determine the order in
+              which parallel outstanding operations were processed by the server.
+              Thus, when a layout retrieved by an outstanding LAYOUTGET operation
+              intersects with a layout returned by an outstanding LAYOUTRETURN on
+              the same file, the order in which the two conflicting operations are
+              processed determines the final state of the overlapping layout.  The
+              order is determined by the "seqid" returned in each operation: the
+              operation with the higher seqid was executed later.
+            </t>
+
+            <t>
+              It is permissible for the client to send multiple parallel LAYOUTGET
+              operations for the same file or multiple parallel LAYOUTRETURN
+              operations for the same file or a mix of both.
+            </t>
+
+            <t>
+              It is permissible for the client to use the current stateid (see
+              <xref target="ss:proc_COMPOUND:CS" />) for LAYOUTGET operations, for example, when
+              compounding LAYOUTGETs or compounding OPEN and LAYOUTGETs.  It is
+              also permissible to use the current stateid when compounding
+              LAYOUTRETURNs.
+            </t>
+
+            <t>
+              It is permissible for the client to use the current stateid when
+              combining LAYOUTRETURN and LAYOUTGET operations for the same file in
+              the same COMPOUND request since the server MUST process these in
+              order.  However, if a client does send such COMPOUND requests, it
+              MUST NOT have more than one outstanding for the same file at the same
+              time, and it MUST NOT have other LAYOUTGET or LAYOUTRETURN operations
+              outstanding at the same time for that same file.
+            </t>
+          </section>
+
+          <section toc='exclude' anchor="ss:parallel_nfs:CC" title="Client Considerations">
+            <t>
+              Consider a pNFS client that has sent a LAYOUTGET, and before it
+              receives the reply to LAYOUTGET, it receives a CB_LAYOUTRECALL for
+              the same file with an overlapping range.  There are two
+              possibilities, which the client can distinguish via the layout
+              stateid in the recall.
+            </t>
+
+            <t>
+              <list style='numbers'>
+                <t>
+                  The server processed the LAYOUTGET before sending the recall, so
+                  the LAYOUTGET must be waited for because it may be carrying
+                  layout information that will need to be returned to deal with the
+                  CB_LAYOUTRECALL.
+                </t>
+
+                <t>
+                  The server sent the callback before receiving the LAYOUTGET.  The
+                  server will not respond to the LAYOUTGET until the
+                  CB_LAYOUTRECALL is processed.
+                </t>
+              </list>
+            </t>
+
+            <t>
+              If these possibilities cannot be distinguished, a deadlock could
+              result, as the client must wait for the LAYOUTGET response before
+              processing the recall in the first case, but that response will not
+              arrive until after the recall is processed in the second case.  Note
+              that in the first case, the "seqid" in the layout stateid of the
+              recall is two greater than what the client has recorded; in the
+              second case, the "seqid" is one greater than what the client has
+              recorded.  This allows the client to disambiguate between the two
+              cases.  The client thus knows precisely which possibility applies.
+            </t>
+
+            <t>
+              In case 1, the client knows it needs to wait for the LAYOUTGET
+              response before processing the recall (or the client can return
+              NFS4ERR_DELAY).
+            </t>
+
+            <t>
+              In case 2, the client will not wait for the LAYOUTGET response before
+              processing the recall because waiting would cause deadlock.
+              Therefore, the action at the client will only require waiting in the
+              case that the client has not yet seen the server's earlier responses
+              to the LAYOUTGET operation(s).
+            </t>
+
+            <t>
+              The recall process can be considered completed when the final
+              LAYOUTRETURN operation for the recalled range is completed.  The
+              LAYOUTRETURN uses the layout stateid (with seqid) specified in
+              CB_LAYOUTRECALL.  If the client uses multiple LAYOUTRETURNs in
+              processing the recall, the first LAYOUTRETURN will use the layout
+              stateid as specified in CB_LAYOUTRECALL.  Subsequent LAYOUTRETURNs
+              will use the highest seqid as is the usual case.
+            </t>
+          </section>
+
+          <section toc='exclude' anchor="ss:parallel_nfs:SC" title="Server Considerations">
+            <t>
+              Consider a race from the metadata server's point of view.  The
+              metadata server has sent a CB_LAYOUTRECALL and receives an
+              overlapping LAYOUTGET for the same file before the LAYOUTRETURN(s)
+              that respond to the CB_LAYOUTRECALL.  There are three cases:
+            </t>
+
+            <t>
+              <list style='numbers'>
+                <t>
+                  The client sent the LAYOUTGET before processing the
+                  CB_LAYOUTRECALL.  The "seqid" in the layout stateid of the
+                  arguments of LAYOUTGET is one less than the "seqid" in
+                  CB_LAYOUTRECALL.  The server returns NFS4ERR_RECALLCONFLICT to
+                  the client, which indicates to the client that there is a pending
+                  recall.
+                </t>
+
+                <t>
+                  The client sent the LAYOUTGET after processing the
+                  CB_LAYOUTRECALL, but the LAYOUTGET arrived before the
+                  LAYOUTRETURN and the response to CB_LAYOUTRECALL that completed
+                  that processing.  The "seqid" in the layout stateid of LAYOUTGET
+                  is equal to or greater than that of the "seqid" in
+                  CB_LAYOUTRECALL.  The server has not received a response to the
+                  CB_LAYOUTRECALL, so it returns NFS4ERR_RECALLCONFLICT.
+                </t>
+
+                <t>
+                  The client sent the LAYOUTGET after processing the
+                  CB_LAYOUTRECALL; the server received the CB_LAYOUTRECALL
+                  response, but the LAYOUTGET arrived before the LAYOUTRETURN that
+                  completed that processing.  The "seqid" in the layout stateid of
+                  LAYOUTGET is equal to that of the "seqid" in CB_LAYOUTRECALL.
+                  The server has received a response to the CB_LAYOUTRECALL, so it
+                  returns NFS4ERR_RETURNCONFLICT.
+                </t>
+              </list>
+            </t>
+          </section>
+
+          <section toc='exclude' anchor="ss:parallel_nfs:WaVoS" title="Wraparound and Validation of Seqid">
+            <t>
+              The rules for layout stateid processing differ from other stateids in
+              the protocol because the "seqid" value cannot be zero and the
+              stateid's "seqid" value changes in a CB_LAYOUTRECALL operation.  The
+              non-zero requirement combined with the inherent parallelism of layout
+              operations means that a set of LAYOUTGET and LAYOUTRETURN operations
+              may contain the same value for "seqid".  The server uses a slightly
+              modified version of the modulo arithmetic as described in
+              <xref target="ss:core_infrastructure:SIaRC" /> when incrementing the layout stateid's "seqid".  The
+              difference is that zero is not a valid value for "seqid"; when the
+              value of a "seqid" is 0xFFFFFFFF, the next valid value will be
+              0x00000001.  The modulo arithmetic is also used for the comparisons
+              of "seqid" values in the processing of CB_LAYOUTRECALL events as
+              described above in <xref target="ss:parallel_nfs:SC" />.
+            </t>
+
+            <t>
+              Just as the server validates the "seqid" in the event of
+              CB_LAYOUTRECALL usage, as described in <xref target="ss:parallel_nfs:SC" />, the
+              server also validates the "seqid" value to ensure that it is within
+              an appropriate range.  This range represents the degree of
+              parallelism the server supports for layout stateids.  If the client
+              is sending multiple layout operations to the server in parallel, by
+              definition, the "seqid" value in the supplied stateid will not be the
+              current "seqid" as held by the server.  The range of parallelism
+              spans from the highest or current "seqid" to a "seqid" value in the
+              past.  To assist in the discussion, the server's current "seqid"
+              value for a layout stateid is defined as SERVER_CURRENT_SEQID.  The
+              lowest "seqid" value that is acceptable to the server is represented
+              by PAST_SEQID.  And the value for the range of valid "seqid"s or
+              range of parallelism is VALID_SEQID_RANGE.  Therefore, the following
+              holds: VALID_SEQID_RANGE = SERVER_CURRENT_SEQID - PAST_SEQID.  In the
+              following, all arithmetic is the modulo arithmetic as described
+              above.
+            </t>
+
+            <t>
+              The server MUST support a minimum VALID_SEQID_RANGE.  The minimum is
+              defined as: VALID_SEQID_RANGE = summation over 1..N of
+              (ca_maxoperations(i) - 1), where N is the number of session fore
+              channels and ca_maxoperations(i) is the value of the ca_maxoperations
+              returned from CREATE_SESSION of the i'th session.  The reason
+              for "-1" is to allow for the required SEQUENCE operation.  The
+              server MAY support a VALID_SEQID_RANGE value larger than the
+              minimum.  The maximum VALID_SEQID_RANGE is (2 ^ 32 - 2) (accounting
+              for zero not being a valid "seqid" value).
+            </t>
+
+            <t>
+              If the server finds the "seqid" is zero, the NFS4ERR_BAD_STATEID
+              error is returned to the client.  The server further validates the
+              "seqid" to ensure it is within the range of parallelism,
+              VALID_SEQID_RANGE.  If the "seqid" value is outside of that range,
+              the error NFS4ERR_OLD_STATEID is returned to the client.  Upon
+              receipt of NFS4ERR_OLD_STATEID, the client updates the stateid in the
+              layout request based on processing of other layout requests and
+              re-sends the operation to the server.
+            </t>
+          </section>
+
+          <section toc='exclude' anchor="ss:parallel_nfs:BRaR" title="Bulk Recall and Return">
+            <t>
+              pNFS supports recalling and returning all layouts that are for files
+              belonging to a particular fsid (LAYOUTRECALL4_FSID,
+              LAYOUTRETURN4_FSID) or client ID (LAYOUTRECALL4_ALL,
+              LAYOUTRETURN4_ALL).  There are no "bulk" stateids, so detection of
+              races via the seqid is not possible.  The server MUST NOT initiate
+              bulk recall while another recall is in progress, or the corresponding
+              LAYOUTRETURN is in progress or pending.  In the event the server
+              sends a bulk recall while the client has a pending or in-progress
+              LAYOUTRETURN, CB_LAYOUTRECALL, or LAYOUTGET, the client returns
+              NFS4ERR_DELAY.  In the event the client sends a LAYOUTGET or
+              LAYOUTRETURN while a bulk recall is in progress, the server returns
+              NFS4ERR_RECALLCONFLICT.  If the client sends a LAYOUTGET or
+              LAYOUTRETURN after the server receives NFS4ERR_DELAY from a bulk
+              recall, then to ensure forward progress, the server MAY return
+              NFS4ERR_RECALLCONFLICT.
+            </t>
+
+            <t>
+              Once a CB_LAYOUTRECALL of LAYOUTRECALL4_ALL is sent, the server MUST
+              NOT allow the client to use any layout stateid except for
+              LAYOUTCOMMIT operations.  Once the client receives a CB_LAYOUTRECALL
+              of LAYOUTRECALL4_ALL, it MUST NOT use any layout stateid except for
+              LAYOUTCOMMIT operations.  Once a LAYOUTRETURN of LAYOUTRETURN4_ALL is
+              sent, all layout stateids granted to the client ID are freed.  The
+              client MUST NOT use the layout stateids again.  It MUST use LAYOUTGET
+              to obtain new layout stateids.
+            </t>
+
+            <t>
+              Once a CB_LAYOUTRECALL of LAYOUTRECALL4_FSID is sent, the server MUST
+              NOT allow the client to use any layout stateid that refers to a file
+              with the specified fsid except for LAYOUTCOMMIT operations.  Once the
+              client receives a CB_LAYOUTRECALL of LAYOUTRECALL4_ALL, it MUST NOT
+              use any layout stateid that refers to a file with the specified fsid
+              except for LAYOUTCOMMIT operations.  Once a LAYOUTRETURN of
+              LAYOUTRETURN4_FSID is sent, all layout stateids granted to the
+              referenced fsid are freed.  The client MUST NOT use those freed
+              layout stateids for files with the referenced fsid again.
+              Subsequently, for any file with the referenced fsid, to use a layout,
+              the client MUST first send a LAYOUTGET operation in order to obtain a
+              new layout stateid for that file.
+            </t>
+
+            <t>
+              If the server has sent a bulk CB_LAYOUTRECALL and receives a
+              LAYOUTGET, or a LAYOUTRETURN with a stateid, the server MUST return
+              NFS4ERR_RECALLCONFLICT.  If the server has sent a bulk
+              CB_LAYOUTRECALL and receives a LAYOUTRETURN with an lr_returntype
+              that is not equal to the lor_recalltype of the CB_LAYOUTRECALL, the
+              server MUST return NFS4ERR_RECALLCONFLICT.
+            </t>
+          </section>
+        </section>
+      </section>
+    </section>
+
+    <section toc='exclude' anchor="ss:parallel_nfs:RL1" title="Revoking Layouts">
+      <t>
+        Parallel NFS permits servers to revoke layouts from clients that fail
+        to respond to recalls and/or fail to renew their lease in time.
+        Depending on the layout type, the server might revoke the layout and
+        might take certain actions with respect to the client's I/O to data
+        servers.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:parallel_nfs:MSWP" title="Metadata Server Write Propagation">
+      <t>
+        Asynchronous writes written through the metadata server may be
+        propagated lazily to the storage devices.  For data written
+        asynchronously through the metadata server, a client performing a
+        read at the appropriate storage device is not guaranteed to see the
+        newly written data until a COMMIT occurs at the metadata server.
+        While the write is pending, reads to the storage device may give out
+        either the old data, the new data, or a mixture of new and old.  Upon
+        completion of a synchronous WRITE or COMMIT (for asynchronously
+        written data), the metadata server MUST ensure that storage devices
+        give out the new data and that the data has been written to stable
+        storage.  If the server implements its storage in any way such that
+        it cannot obey these constraints, then it MUST recall the layouts to
+        prevent reads being done that cannot be handled correctly.  Note that
+        the layouts MUST be recalled prior to the server responding to the
+        associated WRITE operations.
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:parallel_nfs:pM" title="pNFS Mechanics">
+    <t>
+      This section describes the operations flow taken by a pNFS client to
+      a metadata server and storage device.
+    </t>
+
+    <t>
+      When a pNFS client encounters a new FSID, it sends a GETATTR to the
+      NFSv4.1 server for the fs_layout_type (<xref target="ss:file_attributes:A6f2" />) attribute.  If
+      the attribute returns at least one layout type, and the layout types
+      returned are among the set supported by the client, the client knows
+      that pNFS is a possibility for the file system.  If, from the server
+      that returned the new FSID, the client does not have a client ID that
+      came from an EXCHANGE_ID result that returned
+      EXCHGID4_FLAG_USE_PNFS_MDS, it MUST send an EXCHANGE_ID to the server
+      with the EXCHGID4_FLAG_USE_PNFS_MDS bit set.  If the server's
+      response does not have EXCHGID4_FLAG_USE_PNFS_MDS, then contrary to
+      what the fs_layout_type attribute said, the server does not support
+      pNFS, and the client will not be able use pNFS to that server; in
+      this case, the server MUST return NFS4ERR_NOTSUPP in response to any
+      pNFS operation.
+    </t>
+
+    <t>
+      The client then creates a session, requesting a persistent session,
+      so that exclusive creates can be done with single round trip via the
+      createmode4 of GUARDED4.  If the session ends up not being
+      persistent, the client will use EXCLUSIVE4_1 for exclusive creates.
+    </t>
+
+    <t>
+      If a file is to be created on a pNFS-enabled file system, the client
+      uses the OPEN operation.  With the normal set of attributes that may
+      be provided upon OPEN used for creation, there is an OPTIONAL
+      layout_hint attribute.  The client's use of layout_hint allows the
+      client to express its preference for a layout type and its associated
+      layout details.  The use of a createmode4 of UNCHECKED4, GUARDED4, or
+      EXCLUSIVE4_1 will allow the client to provide the layout_hint
+      attribute at create time.  The client MUST NOT use EXCLUSIVE4 (see
+      Table 10).  The client is RECOMMENDED to combine a GETATTR operation
+      after the OPEN within the same COMPOUND.  The GETATTR may then
+      retrieve the layout_type attribute for the newly created file.  The
+      client will then know what layout type the server has chosen for the
+      file and therefore what storage protocol the client must use.
+    </t>
+
+    <t>
+      If the client wants to open an existing file, then it also includes a
+      GETATTR to determine what layout type the file supports.
+    </t>
+
+    <t>
+      The GETATTR in either the file creation or plain file open case can
+      also include the layout_blksize and layout_alignment attributes so
+      that the client can determine optimal offsets and lengths for I/O on
+      the file.
+    </t>
+
+    <t>
+      Assuming the client supports the layout type returned by GETATTR and
+      it chooses to use pNFS for data access, it then sends LAYOUTGET using
+      the filehandle and stateid returned by OPEN, specifying the range it
+      wants to do I/O on.  The response is a layout, which may be a subset
+      of the range for which the client asked.  It also includes device IDs
+      and a description of how data is organized (or in the case of
+      writing, how data is to be organized) across the devices.  The device
+      IDs and data description are encoded in a format that is specific to
+      the layout type, but the client is expected to understand.
+    </t>
+
+    <t>
+      When the client wants to send an I/O, it determines to which device
+      ID it needs to send the I/O command by examining the data description
+      in the layout.  It then sends a GETDEVICEINFO to find the device
+      address(es) of the device ID.  The client then sends the I/O request
+      to one of device ID's device addresses, using the storage protocol
+      defined for the layout type.  Note that if a client has multiple I/Os
+      to send, these I/O requests may be done in parallel.
+    </t>
+
+    <t>
+      If the I/O was a WRITE, then at some point the client may want to use
+      LAYOUTCOMMIT to commit the modification time and the new size of the
+      file (if it believes it extended the file size) to the metadata
+      server and the modified data to the file system.
+    </t>
+  </section>
+
+  <section anchor="ss:parallel_nfs:R" title="Recovery">
+    <t>
+      Recovery is complicated by the distributed nature of the pNFS
+      protocol.  In general, crash recovery for layouts is similar to crash
+      recovery for delegations in the base NFSv4.1 protocol.  However, the
+      client's ability to perform I/O without contacting the metadata
+      server introduces subtleties that must be handled correctly if the
+      possibility of file system corruption is to be avoided.
+    </t>
+
+    <section toc='exclude' anchor="ss:parallel_nfs:RfCR" title="Recovery from Client Restart">
+      <t>
+        Client recovery for layouts is similar to client recovery for other
+        lock and delegation state.  When a pNFS client restarts, it will lose
+        all information about the layouts that it previously owned.  There
+        are two methods by which the server can reclaim these resources and
+        allow otherwise conflicting layouts to be provided to other clients.
+      </t>
+
+      <t>
+        The first is through the expiry of the client's lease.  If the client
+        recovery time is longer than the lease period, the client's lease
+        will expire and the server will know that state may be released.  For
+        layouts, the server may release the state immediately upon lease
+        expiry or it may allow the layout to persist, awaiting possible lease
+        revival, as long as no other layout conflicts.
+      </t>
+
+      <t>
+        The second is through the client restarting in less time than it
+        takes for the lease period to expire.  In such a case, the client
+        will contact the server through the standard EXCHANGE_ID protocol.
+        The server will find that the client's co_ownerid matches the
+        co_ownerid of the previous client invocation, but that the verifier
+        is different.  The server uses this as a signal to release all layout
+        state associated with the client's previous invocation.  In this
+        scenario, the data written by the client but not covered by a
+        successful LAYOUTCOMMIT is in an undefined state; it may have been
+        written or it may now be lost.  This is acceptable behavior and it is
+        the client's responsibility to use LAYOUTCOMMIT to achieve the
+        desired level of stability.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:parallel_nfs:DwLEotC" title="Dealing with Lease Expiration on the Client">
+      <t>
+        If a client believes its lease has expired, it MUST NOT send I/O to
+        the storage device until it has validated its lease.  The client can
+        send a SEQUENCE operation to the metadata server.  If the SEQUENCE
+        operation is successful, but sr_status_flag has
+        SEQ4_STATUS_EXPIRED_ALL_STATE_REVOKED,
+        SEQ4_STATUS_EXPIRED_SOME_STATE_REVOKED, or
+        SEQ4_STATUS_ADMIN_STATE_REVOKED set, the client MUST NOT use
+        currently held layouts.  The client has two choices to recover from
+        the lease expiration.  First, for all modified but uncommitted data,
+        the client writes it to the metadata server using the FILE_SYNC4 flag
+        for the WRITEs, or WRITE and COMMIT.  Second, the client
+        re-establishes a client ID and session with the server and obtains
+        new layouts and device-ID-to-device-address mappings for the
+        modified data ranges and then writes the data to the storage
+        devices with the newly obtained layouts.
+      </t>
+
+      <t anchor='para:pnfs_clnt_case2'>
+        If sr_status_flags from the metadata server has
+        SEQ4_STATUS_RESTART_RECLAIM_NEEDED set (or SEQUENCE returns
+        NFS4ERR_BAD_SESSION and CREATE_SESSION returns
+        NFS4ERR_STALE_CLIENTID), then the metadata server has restarted, and
+        the client SHOULD recover using the methods described in
+        <xref target="ss:parallel_nfs:RfMSR" />.
+      </t>
+
+      <t>
+        If sr_status_flags from the metadata server has
+        SEQ4_STATUS_LEASE_MOVED set, then the client recovers by following
+        the procedure described in <xref target="ss:multi-server_namespace:LaFST" />.  After that, the client
+        may get an indication that the layout state was not moved with the
+        file system.  The client recovers as in the other applicable
+        situations discussed in the first two paragraphs of this section.
+      </t>
+
+      <t>
+        If sr_status_flags reports no loss of state, then the lease for the
+        layouts that the client has are valid and renewed, and the client can
+        once again send I/O requests to the storage devices.
+      </t>
+
+      <t>
+        While clients SHOULD NOT send I/Os to storage devices that may extend
+        past the lease expiration time period, this is not always possible,
+        for example, an extended network partition that starts after the I/O
+        is sent and does not heal until the I/O request is received by the
+        storage device.  Thus, the metadata server and/or storage devices are
+        responsible for protecting themselves from I/Os that are both sent
+        before the lease expires and arrive after the lease expires.  See
+        <xref target="ss:parallel_nfs:DwLoLSotMS" />.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:parallel_nfs:DwLoLSotMS" title="Dealing with Loss of Layout State on the Metadata Server">
+      <t>
+        This is a description of the case where all of the following are
+        true:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            the metadata server has not restarted
+          </t>
+
+          <t>
+            a pNFS client's layouts have been discarded (usually because the
+            client's lease expired) and are invalid
+          </t>
+
+          <t>
+            an I/O from the pNFS client arrives at the storage device
+          </t>
+        </list>
+      </t>
+
+      <t>
+        The metadata server and its storage devices MUST solve this by
+        fencing the client.  In other words, they MUST solve this by
+        preventing the execution of I/O operations from the client to the
+        storage devices after layout state loss.  The details of how fencing
+        is done are specific to the layout type.  The solution for NFSv4.1
+        file-based layouts is described in (<xref target="ss:nfsv4.1_as:LRaF" />), and solutions for
+        other layout types are in their respective external specification
+        documents.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:parallel_nfs:RfMSR" title="Recovery from Metadata Server Restart">
+      <t>
+        The pNFS client will discover that the metadata server has
+        restarted via the methods described in <xref target="ss:state_management:SFaR" /> and discussed
+        in a pNFS-specific context in <xref target="para:pnfs_clnt_case2" />, of <xref target="ss:parallel_nfs:DwLEotC" />.
+        The client MUST stop using layouts and delete the device ID to
+        device address mappings it previously received from the metadata
+        server.  Having done that, if the client wrote data to the storage
+        device without committing the layouts via LAYOUTCOMMIT, then the
+        client has additional work to do in order to have the client,
+        metadata server, and storage device(s) all synchronized on the
+        state of the data.
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            If the client has data still modified and unwritten in the
+            client's memory, the client has only two choices.
+
+            <list style='numbers'>
+              <t>
+                The client can obtain a layout via LAYOUTGET after the
+                server's grace period and write the data to the storage
+                devices.
+              </t>
+
+              <t>
+                The client can WRITE that data through the metadata server
+                using the WRITE (<xref target="op_WRITE" />) operation, and then obtain
+                layouts as desired.
+              </t>
+            </list>
+          </t>
+
+          <t>
+            If the client asynchronously wrote data to the storage device, but
+            still has a copy of the data in its memory, then it has available
+            to it the recovery options listed above in the previous bullet
+            point.  If the metadata server is also in its grace period, the
+            client has available to it the options below in the next bullet
+            point.
+          </t>
+
+          <t>
+            The client does not have a copy of the data in its memory and the
+            metadata server is still in its grace period.  The client cannot
+            use LAYOUTGET (within or outside the grace period) to reclaim a
+            layout because the contents of the response from LAYOUTGET may not
+            match what it had previously.  The range might be different or the
+            client might get the same range but the content of the layout
+            might be different.  Even if the content of the layout appears to
+            be the same, the device IDs may map to different device addresses,
+            and even if the device addresses are the same, the device
+            addresses could have been assigned to a different storage device.
+            The option of retrieving the data from the storage device and
+            writing it to the metadata server per the recovery scenario
+            described above is not available because, again, the mappings of
+            range to device ID, device ID to device address, and device
+            address to physical device are stale, and new mappings via new
+            LAYOUTGET do not solve the problem.
+            <vspace blankLines="1"/>
+            The only recovery option for this scenario is to send a
+            LAYOUTCOMMIT in reclaim mode, which the metadata server will
+            accept as long as it is in its grace period.  The use of
+            LAYOUTCOMMIT in reclaim mode informs the metadata server that the
+            layout has changed.  It is critical that the metadata server
+            receive this information before its grace period ends, and thus
+            before it starts allowing updates to the file system.
+            <vspace blankLines="1"/>
+            To send LAYOUTCOMMIT in reclaim mode, the client sets the
+            loca_reclaim field of the operation's arguments (<xref target="ss:op_LAYOUTCOMMIT:A" />)
+            to TRUE.  During the metadata server's recovery grace period (and
+            only during the recovery grace period) the metadata server is
+            prepared to accept LAYOUTCOMMIT requests with the loca_reclaim
+            field set to TRUE.
+            <vspace blankLines="1"/>
+            When loca_reclaim is TRUE, the client is attempting to commit
+            changes to the layout that occurred prior to the restart of the
+            metadata server.  The metadata server applies some consistency
+            checks on the loca_layoutupdate field of the arguments to
+            determine whether the client can commit the data written to the
+            storage device to the file system.  The loca_layoutupdate field is
+            of data type layoutupdate4 and contains layout-type-specific
+            content (in the lou_body field of loca_layoutupdate).  The layout-
+            type-specific information that loca_layoutupdate might have is
+            discussed in <xref target="ss:parallel_nfs:Lal" />.  If the metadata server's
+            consistency checks on loca_layoutupdate succeed, then the metadata
+            server MUST commit the data (as described by the loca_offset,
+            loca_length, and loca_layoutupdate fields of the arguments) that
+            was written to the storage device.  If the metadata server's
+            consistency checks on loca_layoutupdate fail, the metadata server
+            rejects the LAYOUTCOMMIT operation and makes no changes to the
+            file system.  However, any time LAYOUTCOMMIT with loca_reclaim
+            TRUE fails, the pNFS client has lost all the data in the range
+            defined by &lt;loca_offset, loca_length&gt;.  A client can defend
+            against this risk by caching all data, whether written
+            synchronously or asynchronously in its memory, and by not
+            releasing the cached data until a successful LAYOUTCOMMIT.  This
+            condition does not hold true for all layout types; for example,
+            file-based storage devices need not suffer from this limitation.
+          </t>
+
+          <t>
+            The client does not have a copy of the data in its memory and the
+            metadata server is no longer in its grace period; i.e., the
+            metadata server returns NFS4ERR_NO_GRACE.  As with the scenario in
+            the above bullet point, the failure of LAYOUTCOMMIT means the data
+            in the range &lt;loca_offset, loca_length&gt; lost.  The defense against
+            the risk is the same -- cache all written data on the client until
+            a successful LAYOUTCOMMIT.
+          </t>
+        </list>
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:parallel_nfs:OdMSGP" title="Operations during Metadata Server Grace Period">
+      <t>
+        Some of the recovery scenarios thus far noted that some operations
+        (namely, WRITE and LAYOUTGET) might be permitted during the metadata
+        server's grace period.  The metadata server may allow these
+        operations during its grace period.  For LAYOUTGET, the metadata
+        server must reliably determine that servicing such a request will not
+        conflict with an impending LAYOUTCOMMIT reclaim request.  For WRITE,
+        the metadata server must reliably determine that servicing the
+        request will not conflict with an impending OPEN or with a LOCK where
+        the file has mandatory byte-range locking enabled.
+      </t>
+
+      <t>
+        As mentioned previously, for expediency, the metadata server
+        might reject some operations (namely, WRITE and LAYOUTGET) during
+        its grace period, because the simplest correct approach is to
+        reject all non- reclaim pNFS requests and WRITE operations by
+        returning the NFS4ERR_GRACE error.  However, depending on the
+        storage protocol (which is specific to the layout type) and
+        metadata server implementation, the metadata server may be able
+        to determine that a particular request is safe.  For example, a
+        metadata server may save provisional allocation mappings for
+        each file to stable storage, as well as information about
+        potentially conflicting OPEN share modes and mandatory byte-range
+        locks that might have been in effect at the time of restart, and
+        the metadata server may use this information during the recovery
+        grace period to determine that a WRITE request is safe.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:parallel_nfs:SDR" title="Storage Device Recovery">
+      <t>
+        Recovery from storage device restart is mostly dependent upon the
+        layout type in use.  However, there are a few general techniques a
+        client can use if it discovers a storage device has crashed while
+        holding modified, uncommitted data that was asynchronously written.
+        First and foremost, it is important to realize that the client is the
+        only one that has the information necessary to recover non-committed
+        data since it holds the modified data and probably nothing else does.
+        Second, the best solution is for the client to err on the side of
+        caution and attempt to rewrite the modified data through another
+        path.
+      </t>
+
+      <t>
+        The client SHOULD immediately WRITE the data to the metadata server,
+        with the stable field in the WRITE4args set to FILE_SYNC4.  Once it
+        does this, there is no need to wait for the original storage device.
+      </t>
+    </section>
+  </section>
+
+  <section anchor="ss:parallel_nfs:MaSDR" title="Metadata and Storage Device Roles">
+    <t>
+      If the same physical hardware is used to implement both a metadata
+      server and storage device, then the same hardware entity is to be
+      understood to be implementing two distinct roles and it is important
+      that it be clearly understood on behalf of which role the hardware is
+      executing at any given time.
+    </t>
+
+    <t>
+      Two sub-cases can be distinguished.
+    </t>
+
+    <t>
+      <list style='numbers'>
+        <t>
+          The storage device uses NFSv4.1 as the storage protocol, i.e.,
+          the same physical hardware is used to implement both a metadata
+          and data server.  See <xref target="ss:nfsv4.1_as:CIaSC" /> for a description of how
+          multiple roles are handled.
+        </t>
+
+        <t>
+          The storage device does not use NFSv4.1 as the storage protocol,
+          and the same physical hardware is used to implement both a
+          metadata and storage device.  Whether distinct network addresses
+          are used to access the metadata server and storage device is
+          immaterial.  This is because it is always clear to the pNFS
+          client and server, from the upper-layer protocol being used
+          (NFSv4.1 or non-NFSv4.1), to which role the request to the common
+          server network address is directed.
+        </t>
+      </list>
+    </t>
+  </section>
+
+  <section anchor="ss:parallel_nfs:SCfp" title="Security Considerations for pNFS">
+    <t>
+      pNFS separates file system metadata and data and provides access to
+      both.  There are pNFS-specific operations (listed in <xref target="ss:parallel_nfs:pO" />)
+      that provide access to the metadata; all existing NFSv4.1
+      conventional (non-pNFS) security mechanisms and features apply to
+      accessing the metadata.  The combination of components in a pNFS
+      system (see <xref target="fig:pnfs_system" />) is required to preserve the security properties
+      of NFSv4.1 with respect to an entity that is accessing a storage
+      device from a client, including security countermeasures to defend
+      against threats for which NFSv4.1 provides defenses in environments
+      where these threats are considered significant.
+    </t>
+
+    <t>
+      In some cases, the security countermeasures for connections to
+      storage devices may take the form of physical isolation or a
+      recommendation to avoid the use of pNFS in an environment.  For
+      example, it may be impractical to provide confidentiality protection
+      for some storage protocols to protect against eavesdropping.  In
+      environments where eavesdropping on such protocols is of sufficient
+      concern to require countermeasures, physical isolation of the
+      communication channel (e.g., via direct connection from client(s) to
+      storage device(s)) and/or a decision to forgo use of pNFS (e.g., and
+      fall back to conventional NFSv4.1) may be appropriate courses of
+      action.
+    </t>
+
+    <t>
+      Where communication with storage devices is subject to the same
+      threats as client-to-metadata server communication, the protocols
+      used for that communication need to provide security mechanisms as
+      strong as or no weaker than those available via RPCSEC_GSS for
+      NFSv4.1.  Except for the storage protocol used for the
+      LAYOUT4_NFSV4_1_FILES layout (see <xref target="sec:nfsv4.1_as" />), i.e., except for
+      NFSv4.1, it is beyond the scope of this document to specify the
+      security mechanisms for storage access protocols.
+    </t>
+
+    <t>
+      pNFS implementations MUST NOT remove NFSv4.1's access controls.  The
+      combination of clients, storage devices, and the metadata server are
+      responsible for ensuring that all client-to-storage-device file data
+      access respects NFSv4.1's ACLs and file open modes.  This entails
+      performing both of these checks on every access in the client, the
+      storage device, or both (as applicable; when the storage device is an
+      NFSv4.1 server, the storage device is ultimately responsible for
+      controlling access as described in <xref target="ss:nfsv4.1_as:DSSP" />).  If a pNFS
+      configuration performs these checks only in the client, the risk of a
+      misbehaving client obtaining unauthorized access is an important
+      consideration in determining when it is appropriate to use such a
+      pNFS configuration.  Such layout types SHOULD NOT be used when
+      client-only access checks do not provide sufficient assurance that
+      NFSv4.1 access control is being applied correctly.  (This is not a
+      problem for the file layout type described in <xref target="sec:nfsv4.1_as" /> because the
+      storage access protocol for LAYOUT4_NFSV4_1_FILES is NFSv4.1, and
+      thus the security model for storage device access via
+      LAYOUT4_NFSv4_1_FILES is the same as that of the metadata server.)
+      For handling of access control specific to a layout, the reader
+      should examine the layout specification, such as the NFSv4.1/
+      file-based layout (<xref target="sec:nfsv4.1_as" />) of this document, the blocks layout
+      <xref target="RFC5663" />, and objects layout <xref target="RFC5664" />.
+    </t>
+  </section>
+</section>

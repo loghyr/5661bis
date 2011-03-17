@@ -1,0 +1,181 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_LOCK" title="Operation 12: LOCK - Create Lock">
+    <section toc='exclude' anchor="ss:op_LOCK:A" title="ARGUMENT">
+      <?rfc include='autogen/lock_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LOCK:R" title="RESULT">
+      <?rfc include='autogen/lock_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LOCK:D" title="DESCRIPTION">
+      <t>
+        The LOCK operation requests a byte-range lock for the byte-range
+        specified by the offset and length parameters, and lock type
+        specified in the locktype parameter.  If this is a reclaim request,
+        the reclaim parameter will be TRUE.
+      </t>
+
+      <t>
+        Bytes in a file may be locked even if those bytes are not currently
+        allocated to the file.  To lock the file from a specific offset
+        through the end-of-file (no matter how long the file actually is) use
+        a length field equal to NFS4_UINT64_MAX.  The server MUST return
+        NFS4ERR_INVAL under the following combinations of length and offset:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            Length is equal to zero.
+          </t>
+
+          <t>
+            Length is not equal to NFS4_UINT64_MAX, and the sum of length and
+            offset exceeds NFS4_UINT64_MAX.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        32-bit servers are servers that support locking for byte offsets that
+        fit within 32 bits (i.e., less than or equal to NFS4_UINT32_MAX).  If
+        the client specifies a range that overlaps one or more bytes beyond
+        offset NFS4_UINT32_MAX but does not end at offset NFS4_UINT64_MAX,
+        then such a 32-bit server MUST return the error NFS4ERR_BAD_RANGE.
+      </t>
+
+      <t>
+        If the server returns NFS4ERR_DENIED, the owner, offset, and length
+        of a conflicting lock are returned.
+      </t>
+
+      <t>
+        The locker argument specifies the lock-owner that is associated with
+        the LOCK operation.  The locker4 structure is a switched union that
+        indicates whether the client has already created byte-range locking
+        state associated with the current open file and lock-owner.  In the
+        case in which it has, the argument is just a stateid representing the
+        set of locks associated with that open file and lock-owner, together
+        with a lock_seqid value that MAY be any value and MUST be ignored by
+        the server.  In the case where no byte-range locking state has been
+        established, or the client does not have the stateid available, the
+        argument contains the stateid of the open file with which this lock
+        is to be associated, together with the lock-owner with which the lock
+        is to be associated.  The open_to_lock_owner case covers the very
+        first lock done by a lock-owner for a given open file and offers a
+        method to use the established state of the open_stateid to transition
+        to the use of a lock stateid.
+      </t>
+
+      <t>
+        The following fields of the locker parameter MAY be set to any value
+        by the client and MUST be ignored by the server:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            The clientid field of the lock_owner field of the open_owner field
+            (locker.open_owner.lock_owner.clientid).  The reason the server
+            MUST ignore the clientid field is that the server MUST derive the
+            client ID from the session ID from the SEQUENCE operation of the
+            COMPOUND request.
+          </t>
+
+          <t>
+            The open_seqid and lock_seqid fields of the open_owner field
+            (locker.open_owner.open_seqid and locker.open_owner.lock_seqid).
+          </t>
+
+          <t>
+            The lock_seqid field of the lock_owner field
+            (locker.lock_owner.lock_seqid).
+          </t>
+        </list>
+      </t>
+
+      <t>
+        Note that the client ID appearing in a LOCK4denied structure is the
+        actual client associated with the conflicting lock, whether this is
+        the client ID associated with the current session or a different one.
+        Thus, if the server returns NFS4ERR_DENIED, it MUST set the clientid
+        field of the owner field of the denied field.
+      </t>
+
+      <t>
+        If the current filehandle is not an ordinary file, an error will be
+        returned to the client.  In the case that the current filehandle
+        represents an object of type NF4DIR, NFS4ERR_ISDIR is returned.  If
+        the current filehandle designates a symbolic link, NFS4ERR_SYMLINK is
+        returned.  In all other cases, NFS4ERR_WRONG_TYPE is returned.
+      </t>
+
+      <t>
+        On success, the current filehandle retains its value.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LOCK:I" title="IMPLEMENTATION">
+      <t>
+        If the server is unable to determine the exact offset and length of
+        the conflicting byte-range lock, the same offset and length that were
+        provided in the arguments should be returned in the denied results.
+      </t>
+
+      <t>
+        LOCK operations are subject to permission checks and to checks
+        against the access type of the associated file.  However, the
+        specific right and modes required for various types of locks reflect
+        the semantics of the server-exported file system, and are not
+        specified by the protocol.  For example, Windows 2000 allows a write
+        lock of a file open for read access, while a POSIX-compliant system
+        does not.
+      </t>
+
+      <t>
+        When the client sends a LOCK operation that corresponds to a range
+        that the lock-owner has locked already (with the same or different
+        lock type), or to a sub-range of such a range, or to a byte-range
+        that includes multiple locks already granted to that lock-owner, in
+        whole or in part, and the server does not support such locking
+        operations (i.e., does not support POSIX locking semantics), the
+        server will return the error NFS4ERR_LOCK_RANGE.  In that case, the
+        client may return an error, or it may emulate the required
+        operations, using only LOCK for ranges that do not include any bytes
+        already locked by that lock-owner and LOCKU of locks held by that
+        lock-owner (specifying an exactly matching range and type).
+        Similarly, when the client sends a LOCK operation that amounts to
+        upgrading (changing from a READ_LT lock to a WRITE_LT lock) or
+        downgrading (changing from WRITE_LT lock to a READ_LT lock) an
+        existing byte-range lock, and the server does not support such a
+        lock, the server will return NFS4ERR_LOCK_NOTSUPP.  Such operations
+        may not perfectly reflect the required semantics in the face of
+        conflicting LOCK operations from other clients.
+      </t>
+
+      <t>
+        When a client holds an OPEN_DELEGATE_WRITE delegation, the client
+        holding that delegation is assured that there are no opens by other
+        clients.  Thus, there can be no conflicting LOCK operations from such
+        clients.  Therefore, the client may be handling locking requests
+        locally, without doing LOCK operations on the server.  If it does
+        that, it must be prepared to update the lock status on the server, by
+        sending appropriate LOCK and LOCKU operations before returning the
+        delegation.
+      </t>
+
+      <t>
+        When one or more clients hold OPEN_DELEGATE_READ delegations, any
+        LOCK operation where the server is implementing mandatory locking
+        semantics MUST result in the recall of all such delegations.  The
+        LOCK operation may not be granted until all such delegations are
+        returned or revoked.  Except where this happens very quickly, one or
+        more NFS4ERR_DELAY errors will be returned to requests made while the
+        delegation remains outstanding.
+      </t>
+    </section>
+  </section>
+

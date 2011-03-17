@@ -1,0 +1,97 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_TEST_STATEID" title="Operation 55: TEST_STATEID - Test Stateids for Validity">
+    <section toc='exclude' anchor="ss:op_TEST_STATEID:A" title="ARGUMENT">
+      <?rfc include='autogen/test_stateid_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_TEST_STATEID:R" title="RESULT">
+      <?rfc include='autogen/test_stateid_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_TEST_STATEID:D" title="DESCRIPTION">
+      <t>
+        The TEST_STATEID operation is used to check the validity of a set of
+        stateids.  It can be used at any time, but the client should
+        definitely use it when it receives an indication that one or more of
+        its stateids have been invalidated due to lock revocation.  This
+        occurs when the SEQUENCE operation returns with one of the following
+        sr_status_flags set:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            SEQ4_STATUS_EXPIRED_SOME_STATE_REVOKED
+          </t>
+
+          <t>
+            SEQ4_STATUS_EXPIRED_ADMIN_STATE_REVOKED
+          </t>
+
+          <t>
+            SEQ4_STATUS_EXPIRED_RECALLABLE_STATE_REVOKED
+          </t>
+        </list>
+      </t>
+
+      <t>
+        The client can use TEST_STATEID one or more times to test the
+        validity of its stateids.  Each use of TEST_STATEID allows a large
+        set of such stateids to be tested and avoids problems with earlier
+        stateids in a COMPOUND request from interfering with the checking of
+        subsequent stateids, as would happen if individual stateids were
+        tested by a series of corresponding by operations in a COMPOUND
+        request.
+      </t>
+
+      <t>
+        For each stateid, the server returns the status code that would be
+        returned if that stateid were to be used in normal operation.
+        Returning such a status indication is not an error and does not cause
+        COMPOUND processing to terminate.  Checks for the validity of the
+        stateid proceed as they would for normal operations with a number of
+        exceptions:
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            There is no check for the type of stateid object, as would be the
+            case for normal use of a stateid.
+          </t>
+
+          <t>
+            There is no reference to the current filehandle.
+          </t>
+
+          <t>
+            Special stateids are always considered invalid (they result in the
+            error code NFS4ERR_BAD_STATEID).
+          </t>
+        </list>
+      </t>
+
+      <t>
+        All stateids are interpreted as being associated with the client for
+        the current session.  Any possible association with a previous
+        instance of the client (as stale stateids) is not considered.
+      </t>
+
+      <t>
+        The valid status values in the returned status_code array are
+        NFS4ERR_OK, NFS4ERR_BAD_STATEID, NFS4ERR_OLD_STATEID,
+        NFS4ERR_EXPIRED, NFS4ERR_ADMIN_REVOKED, and NFS4ERR_DELEG_REVOKED.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_TEST_STATEID:I" title="IMPLEMENTATION">
+      <t>
+        See Sections <xref target="ss:state_management:SS" format='counter' />
+        and <xref target="ss:state_management:SLaV" format='counter' /> for a discussion of stateid structure,
+        lifetime, and validation.
+      </t>
+    </section>
+  </section>
+

@@ -1,0 +1,138 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_LINK" title="Operation 11: LINK - Create Link to a File">
+    <section toc='exclude' anchor="ss:op_LINK:A" title="ARGUMENT">
+      <?rfc include='autogen/link_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LINK:R" title="RESULT">
+      <?rfc include='autogen/link_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LINK:D" title="DESCRIPTION">
+      <t>
+        The LINK operation creates an additional newname for the file
+        represented by the saved filehandle, as set by the SAVEFH operation,
+        in the directory represented by the current filehandle.  The existing
+        file and the target directory must reside within the same file system
+        on the server.  On success, the current filehandle will continue to
+        be the target directory.  If an object exists in the target directory
+        with the same name as newname, the server must return NFS4ERR_EXIST.
+      </t>
+
+      <t>
+        For the target directory, the server returns change_info4 information
+        in cinfo.  With the atomic field of the change_info4 data type, the
+        server will indicate if the before and after change attributes were
+        obtained atomically with respect to the link creation.
+      </t>
+
+      <t>
+        If the newname has a length of zero, or if newname does not obey the
+        UTF-8 definition, the error NFS4ERR_INVAL will be returned.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_LINK:I" title="IMPLEMENTATION">
+      <t>
+        The server MAY impose restrictions on the LINK operation such that
+        LINK may not be done when the file is open or when that open is done
+        by particular protocols, or with particular options or access modes.
+        When LINK is rejected because of such restrictions, the error
+        NFS4ERR_FILE_OPEN is returned.
+      </t>
+
+      <t>
+        If a server does implement such restrictions and those restrictions
+        include cases of NFSv4 opens preventing successful execution of a
+        link, the server needs to recall any delegations that could hide the
+        existence of opens relevant to that decision.  The reason is that
+        when a client holds a delegation, the server might not have an
+        accurate account of the opens for that client, since the client may
+        execute OPENs and CLOSEs locally.  The LINK operation must be delayed
+        only until a definitive result can be obtained.  For example, suppose
+        there are multiple delegations and one of them establishes an open
+        whose presence would prevent the link.  Given the server's semantics,
+        NFS4ERR_FILE_OPEN may be returned to the caller as soon as that
+        delegation is returned without waiting for other delegations to be
+        returned.  Similarly, if such opens are not associated with
+        delegations, NFS4ERR_FILE_OPEN can be returned immediately with no
+        delegation recall being done.
+      </t>
+
+      <t>
+        If the current filehandle designates a directory for which another
+        client holds a directory delegation, then, unless the delegation is
+        such that the situation can be resolved by sending a notification,
+        the delegation MUST be recalled, and the operation cannot be
+        performed successfully until the delegation is returned or revoked.
+        Except where this happens very quickly, one or more NFS4ERR_DELAY
+        errors will be returned to requests made while delegation remains
+        outstanding.
+      </t>
+
+      <t>
+        When the current filehandle designates a directory for which one or
+        more directory delegations exist, then, when those delegations
+        request such notifications, instead of a recall, NOTIFY4_ADD_ENTRY
+        will be generated as a result of the LINK operation.
+      </t>
+
+      <t>
+        If the current file system supports the numlinks attribute, and other
+        clients have delegations to the file being linked, then those
+        delegations MUST be recalled and the LINK operation MUST NOT proceed
+        until all delegations are returned or revoked.  Except where this
+        happens very quickly, one or more NFS4ERR_DELAY errors will be
+        returned to requests made while delegation remains outstanding.
+      </t>
+
+      <t>
+        Changes to any property of the "hard" linked files are reflected in
+        all of the linked files.  When a link is made to a file, the
+        attributes for the file should have a value for numlinks that is one
+        greater than the value before the LINK operation.
+      </t>
+
+      <t>
+        The statement "file and the target directory must reside within the
+        same file system on the server" means that the fsid fields in the
+        attributes for the objects are the same.  If they reside on different
+        file systems, the error NFS4ERR_XDEV is returned.  This error may be
+        returned by some servers when there is an internal partitioning of a
+        file system that the LINK operation would violate.
+      </t>
+
+      <t>
+        On some servers, "." and ".." are illegal values for newname and the
+        error NFS4ERR_BADNAME will be returned if they are specified.
+      </t>
+
+      <t>
+        When the current filehandle designates a named attribute directory
+        and the object to be linked (the saved filehandle) is not a named
+        attribute for the same object, the error NFS4ERR_XDEV MUST be
+        returned.  When the saved filehandle designates a named attribute and
+        the current filehandle is not the appropriate named attribute
+        directory, the error NFS4ERR_XDEV MUST also be returned.
+      </t>
+
+      <t>
+        When the current filehandle designates a named attribute directory
+        and the object to be linked (the saved filehandle) is a named
+        attribute within that directory, the server may return the error
+        NFS4ERR_NOTSUPP.
+      </t>
+
+      <t>
+        In the case that newname is already linked to the file represented by
+        the saved filehandle, the server will return NFS4ERR_EXIST.
+      </t>
+
+      <t>
+        Note that symbolic links are created with the CREATE operation.
+      </t>
+    </section>
+  </section>
+

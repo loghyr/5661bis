@@ -1,0 +1,91 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_CB_NOTIFY_DEVICEID" title="Operation 14: CB_NOTIFY_DEVICEID - Notify Client of Device ID Changes">
+    <section toc='exclude' anchor="ss:op_CB_NOTIFY_DEVICEID:A" title="ARGUMENT">
+      <?rfc include='autogen/cb_notify_deviceid_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_NOTIFY_DEVICEID:R" title="RESULT">
+      <?rfc include='autogen/cb_notify_deviceid_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_NOTIFY_DEVICEID:D" title="DESCRIPTION">
+      <t>
+        The CB_NOTIFY_DEVICEID operation is used by the server to send
+        notifications to clients about changes to pNFS device IDs.  The
+        registration of device ID notifications is optional and is done via
+        GETDEVICEINFO.  These notifications are sent over the backchannel
+        once the original request has been processed on the server.  The
+        server will send an array of notifications, cnda_changes, as a list
+        of pairs of bitmaps and values.  See <xref target="ss:protocol_constants:f1" /> for a description
+        of how NFSv4.1 bitmaps work.
+      </t>
+
+      <t>
+        As with CB_NOTIFY (<xref target="ss:op_CB_NOTIFY:D" />), it is possible the server has
+        more notifications than can fit in a CB_COMPOUND, thus requiring
+        multiple CB_COMPOUNDs.  Unlike CB_NOTIFY, serialization is not an
+        issue because unlike directory entries, device IDs cannot be re-used
+        after being deleted (<xref target="ss:parallel_nfs:DI" />).
+      </t>
+
+      <t>
+        All device ID notifications contain a device ID and a layout type.
+        The layout type is necessary because two different layout types can
+        share the same device ID, and the common device ID can have
+        completely different mappings for each layout type.
+      </t>
+
+      <t>
+        The server will send the following notifications:
+      </t>
+
+      <t>
+        <list style='hanging'>
+          <t hangText='NOTIFY_DEVICEID4_CHANGE'><vspace />
+            A previously provided device-ID-to-device-address mapping has
+            changed and the client uses GETDEVICEINFO to obtain the updated
+            mapping.  The notification is encoded in a value of data type
+            notify_deviceid_change4.  This data type also contains a boolean
+            field, ndc_immediate, which if TRUE indicates that the change will
+            be enforced immediately, and so the client might not be able to
+            complete any pending I/O to the device ID.  If ndc_immediate is
+            FALSE, then for an indefinite time, the client can complete
+            pending I/O.  After pending I/O is complete, the client SHOULD get
+            the new device-ID-to-device-address mappings before sending new
+            I/O requests to the storage devices addressed by the device ID.
+          </t>
+
+          <t hangText='NOTIFY4_DEVICEID_DELETE'><vspace />
+            Deletes a device ID from the mappings.  This notification MUST NOT
+            be sent if the client has a layout that refers to the device ID.
+            In other words, if the server is sending a delete device ID
+            notification, one of the following is true for layouts associated
+            with the layout type:
+
+            <list>
+              <t>
+                The client never had a layout referring to that device ID.
+              </t>
+
+              <t>
+                The client has returned all layouts referring to that device
+                ID.
+              </t>
+
+              <t>
+                The server has revoked all layouts referring to that device ID.
+              </t>
+            </list>
+
+            The notification is encoded in a value of data type
+            notify_deviceid_delete4.  After a server deletes a device ID, it
+            MUST NOT reuse that device ID for the same layout type until the
+            client ID is deleted.
+          </t>
+        </list>
+      </t>
+    </section>
+  </section>
+

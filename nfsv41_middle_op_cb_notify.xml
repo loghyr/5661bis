@@ -1,0 +1,122 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_CB_NOTIFY" title="Operation 6: CB_NOTIFY - Notify Client of Directory Changes">
+    <section toc='exclude' anchor="ss:op_CB_NOTIFY:A" title="ARGUMENT">
+      <?rfc include='autogen/cb_notify_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_NOTIFY:R" title="RESULT">
+      <?rfc include='autogen/cb_notify_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_CB_NOTIFY:D" title="DESCRIPTION">
+      <t>
+        The CB_NOTIFY operation is used by the server to send notifications
+        to clients about changes to delegated directories.  The registration
+        of notifications for the directories occurs when the delegation is
+        established using GET_DIR_DELEGATION.  These notifications are sent
+        over the backchannel.  The notification is sent once the original
+        request has been processed on the server.  The server will send an
+        array of notifications for changes that might have occurred in the
+        directory.  The notifications are sent as list of pairs of bitmaps
+        and values.  See <xref target="ss:protocol_constants:f1" /> for a description of how NFSv4.1
+        bitmaps work.
+      </t>
+
+      <t>
+        If the server has more notifications than can fit in the CB_COMPOUND
+        request, it SHOULD send a sequence of serial CB_COMPOUND requests so
+        that the client's view of the directory does not become confused.
+        For example, if the server indicates that a file named "foo" is added
+        and that the file "foo" is removed, the order in which the client
+        receives these notifications needs to be the same as the order in
+        which the corresponding operations occurred on the server.
+      </t>
+
+      <t>
+        If the client holding the delegation makes any changes in the
+        directory that cause files or sub-directories to be added or removed,
+        the server will notify that client of the resulting change(s).  If
+        the client holding the delegation is making attribute or cookie
+        verifier changes only, the server does not need to send notifications
+        to that client.  The server will send the following information for
+        each operation:
+      </t>
+
+      <t>
+        <list style='hanging'>
+          <t hangText='NOTIFY4_ADD_ENTRY'><vspace />
+            The server will send information about the new directory entry
+            being created along with the cookie for that entry.  The entry
+            information (data type notify_add4) includes the component name of
+            the entry and attributes.  The server will send this type of entry
+            when a file is actually being created, when an entry is being
+            added to a directory as a result of a rename across directories
+            (see below), and when a hard link is being created to an existing
+            file.  If this entry is added to the end of the directory, the
+            server will set the nad_last_entry flag to TRUE.  If the file is
+            added such that there is at least one entry before it, the server
+            will also return the previous entry information (nad_prev_entry, a
+            variable-length array of up to one element.  If the array is of
+            zero length, there is no previous entry), along with its cookie.
+            This is to help clients find the right location in their file name
+            caches and directory caches where this entry should be cached.  If
+            the new entry's cookie is available, it will be in the
+            nad_new_entry_cookie (another variable-length array of up to one
+            element) field.  If the addition of the entry causes another entry
+            to be deleted (which can only happen in the rename case)
+            atomically with the addition, then information on this entry is
+            reported in nad_old_entry.
+          </t>
+
+          <t hangText='NOTIFY4_REMOVE_ENTRY'><vspace />
+            The server will send information about the directory entry being
+            deleted.  The server will also send the cookie value for the
+            deleted entry so that clients can get to the cached information
+            for this entry.
+          </t>
+
+          <t hangText='NOTIFY4_RENAME_ENTRY'><vspace />
+            The server will send information about both the old entry and the
+            new entry.  This includes the name and attributes for each entry.
+            In addition, if the rename causes the deletion of an entry (i.e.,
+            the case of a file renamed over), then this is reported in
+            nrn_new_new_entry.nad_old_entry.  This notification is only sent
+            if both entries are in the same directory.  If the rename is
+            across directories, the server will send a remove notification to
+            one directory and an add notification to the other directory,
+            assuming both have a directory delegation.
+          </t>
+
+          <t hangText='NOTIFY4_CHANGE_CHILD_ATTRS/NOTIFY4_CHANGE_DIR_ATTRS'><vspace />
+            The client will use the attribute mask to inform the server of
+            attributes for which it wants to receive notifications.  This
+            change notification can be requested for changes to the attributes
+            of the directory as well as changes to any file's attributes in
+            the directory by using two separate attribute masks.  The client
+            cannot ask for change attribute notification for a specific file.
+            One attribute mask covers all the files in the directory.  Upon
+            any attribute change, the server will send back the values of
+            changed attributes.  Notifications might not make sense for some
+            file system-wide attributes, and it is up to the server to decide
+            which subset it wants to support.  The client can negotiate the
+            frequency of attribute notifications by letting the server know
+            how often it wants to be notified of an attribute change.  The
+            server will return supported notification frequencies or an
+            indication that no notification is permitted for directory or
+            child attributes by setting the dir_notif_delay and
+            dir_entry_notif_delay attributes, respectively.
+          </t>
+
+          <t hangText='NOTIFY4_CHANGE_COOKIE_VERIFIER'><vspace />
+            If the cookie verifier changes while a client is holding a
+            delegation, the server will notify the client so that it can
+            invalidate its cookies and re-send a READDIR to get the new set of
+            cookies.
+          </t>
+        </list>
+      </t>
+    </section>
+  </section>
+

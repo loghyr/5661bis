@@ -1,0 +1,113 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_READ" title="Operation 25: READ - Read from File">
+    <section toc='exclude' anchor="ss:op_READ:A" title="ARGUMENT">
+      <?rfc include='autogen/read_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_READ:R" title="RESULT">
+      <?rfc include='autogen/read_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_READ:D" title="DESCRIPTION">
+      <t>
+        The READ operation reads data from the regular file identified by the
+        current filehandle.
+      </t>
+
+      <t>
+        The client provides an offset of where the READ is to start and a
+        count of how many bytes are to be read.  An offset of zero means to
+        read data starting at the beginning of the file.  If offset is
+        greater than or equal to the size of the file, the status NFS4_OK is
+        returned with a data length set to zero and eof is set to TRUE.  The
+        READ is subject to access permissions checking.
+      </t>
+
+      <t>
+        If the client specifies a count value of zero, the READ succeeds and
+        returns zero bytes of data again subject to access permissions
+        checking.  The server may choose to return fewer bytes than specified
+        by the client.  The client needs to check for this condition and
+        handle the condition appropriately.
+      </t>
+
+      <t>
+        Except when special stateids are used, the stateid value for a READ
+        request represents a value returned from a previous byte-range lock
+        or share reservation request or the stateid associated with a
+        delegation.  The stateid identifies the associated owners if any and
+        is used by the server to verify that the associated locks are still
+        valid (e.g., have not been revoked).
+      </t>
+
+      <t>
+        If the read ended at the end-of-file (formally, in a correctly formed
+        READ operation, if offset + count is equal to the size of the file),
+        or the READ operation extends beyond the size of the file (if offset
+        + count is greater than the size of the file), eof is returned as
+        TRUE; otherwise, it is FALSE.  A successful READ of an empty file
+        will always return eof as TRUE.
+      </t>
+
+      <t>
+        If the current filehandle is not an ordinary file, an error will be
+        returned to the client.  In the case that the current filehandle
+        represents an object of type NF4DIR, NFS4ERR_ISDIR is returned.  If
+        the current filehandle designates a symbolic link, NFS4ERR_SYMLINK is
+        returned.  In all other cases, NFS4ERR_WRONG_TYPE is returned.
+      </t>
+
+      <t>
+        For a READ with a stateid value of all bits equal to zero, the server
+        MAY allow the READ to be serviced subject to mandatory byte-range
+        locks or the current share deny modes for the file.  For a READ with
+        a stateid value of all bits equal to one, the server MAY allow READ
+        operations to bypass locking checks at the server.
+      </t>
+
+      <t>
+        On success, the current filehandle retains its value.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_READ:I" title="IMPLEMENTATION">
+      <t>
+        If the server returns a "short read" (i.e., fewer data than requested
+        and eof is set to FALSE), the client should send another READ to get
+        the remaining data.  A server may return less data than requested
+        under several circumstances.  The file may have been truncated by
+        another client or perhaps on the server itself, changing the file
+        size from what the requesting client believes to be the case.  This
+        would reduce the actual amount of data available to the client.  It
+        is possible that the server reduce the transfer size and so return a
+        short read result.  Server resource exhaustion may also occur in a
+        short read.
+      </t>
+
+      <t>
+        If mandatory byte-range locking is in effect for the file, and
+        if the byte-range corresponding to the data to be read from the
+        file is WRITE_LT locked by an owner not associated with the
+        stateid, the server will return the NFS4ERR_LOCKED error.  The
+        client should try to get the appropriate READ_LT via the LOCK
+        operation before reattempting the READ.  When the READ completes,
+        the client should release the byte-range lock via LOCKU.
+      </t>
+
+      <t>
+        If another client has an OPEN_DELEGATE_WRITE delegation for the file
+        being read, the delegation must be recalled, and the operation cannot
+        proceed until that delegation is returned or revoked.  Except where
+        this happens very quickly, one or more NFS4ERR_DELAY errors will be
+        returned to requests made while the delegation remains outstanding.
+        Normally, delegations will not be recalled as a result of a READ
+        operation since the recall will occur as a result of an earlier OPEN.
+        However, since it is possible for a READ to be done with a special
+        stateid, the server needs to check for this case even though the
+        client should have done an OPEN previously.
+      </t>
+    </section>
+  </section>
+

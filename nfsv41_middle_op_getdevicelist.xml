@@ -1,0 +1,53 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_GETDEVICELIST" title="Operation 48: GETDEVICELIST - Get All Device Mappings for a File System">
+    <section toc='exclude' anchor="ss:op_GETDEVICELIST:A" title="ARGUMENT">
+      <?rfc include='autogen/getdevicelist_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_GETDEVICELIST:R" title="RESULT">
+      <?rfc include='autogen/getdevicelist_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_GETDEVICELIST:D" title="DESCRIPTION">
+      <t>
+        This operation is used by the client to enumerate all of the device
+        IDs that a server's file system uses.
+      </t>
+
+      <t>
+        The client provides a current filehandle of a file object that
+        belongs to the file system (i.e., all file objects sharing the same
+        fsid as that of the current filehandle) and the layout type in
+        gdia_layout_type.  Since this operation might require multiple calls
+        to enumerate all the device IDs (and is thus similar to the READDIR
+        (<xref target="op_READDIR" />) operation), the client also provides gdia_cookie and
+        gdia_cookieverf to specify the current cursor position in the list.
+        When the client wants to read from the beginning of the file system's
+        device mappings, it sets gdla_cookie to zero.  The field
+        gdla_cookieverf MUST be ignored by the server when gdla_cookie is
+        zero.  The client provides gdla_maxdevices to limit the number of
+        device IDs in the result.  If gdla_maxdevices is zero, the server
+        MUST return NFS4ERR_INVAL.  The server MAY return fewer device IDs.
+      </t>
+
+      <t>
+        The successful response to the operation will contain the cookie,
+        gdlr_cookie, and the cookie verifier, gdlr_cookieverf, to be used on
+        the subsequent GETDEVICELIST.  A gdlr_eof value of TRUE signifies
+        that there are no remaining entries in the server's device list.
+        Each element of gdlr_deviceid_list contains a device ID.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_GETDEVICELIST:I" title="IMPLEMENTATION">
+      <t>
+        An example of the use of this operation is for pNFS clients and
+        servers that use LAYOUT4_BLOCK_VOLUME layouts.  In these environments
+        it may be helpful for a client to determine device accessibility upon
+        first file system access.
+      </t>
+    </section>
+  </section>
+

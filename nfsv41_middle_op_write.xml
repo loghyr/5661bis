@@ -1,0 +1,263 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_WRITE" title="Operation 38: WRITE - Write to File">
+    <section toc='exclude' anchor="ss:op_WRITE:A" title="ARGUMENT">
+      <?rfc include='autogen/write_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_WRITE:R" title="RESULT">
+      <?rfc include='autogen/write_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_WRITE:D" title="DESCRIPTION">
+      <t>
+        The WRITE operation is used to write data to a regular file.  The
+        target file is specified by the current filehandle.  The offset
+        specifies the offset where the data should be written.  An offset of
+        zero specifies that the write should start at the beginning of the
+        file.  The count, as encoded as part of the opaque data parameter,
+        represents the number of bytes of data that are to be written.  If
+        the count is zero, the WRITE will succeed and return a count of zero
+        subject to permissions checking.  The server MAY write fewer bytes
+        than requested by the client.
+      </t>
+
+      <t>
+        The client specifies with the stable parameter the method of how the
+        data is to be processed by the server.  If stable is FILE_SYNC4, the
+        server MUST commit the data written plus all file system metadata to
+        stable storage before returning results.  This corresponds to the
+        NFSv2 protocol semantics.  Any other behavior constitutes a protocol
+        violation.  If stable is DATA_SYNC4, then the server MUST commit all
+        of the data to stable storage and enough of the metadata to retrieve
+        the data before returning.  The server implementor is free to
+        implement DATA_SYNC4 in the same fashion as FILE_SYNC4, but with a
+        possible performance drop.  If stable is UNSTABLE4, the server is
+        free to commit any part of the data and the metadata to stable
+        storage, including all or none, before returning a reply to the
+        client.  There is no guarantee whether or when any uncommitted data
+        will subsequently be committed to stable storage.  The only
+        guarantees made by the server are that it will not destroy any data
+        without changing the value of writeverf and that it will not commit
+        the data and metadata at a level less than that requested by the
+        client.
+      </t>
+
+      <t>
+        Except when special stateids are used, the stateid value for a WRITE
+        request represents a value returned from a previous byte-range LOCK
+        or OPEN request or the stateid associated with a delegation.  The
+        stateid identifies the associated owners if any and is used by the
+        server to verify that the associated locks are still valid (e.g.,
+        have not been revoked).
+      </t>
+
+      <t>
+        Upon successful completion, the following results are returned.  The
+        count result is the number of bytes of data written to the file.  The
+        server may write fewer bytes than requested.  If so, the actual
+        number of bytes written starting at location, offset, is returned.
+      </t>
+
+      <t>
+        The server also returns an indication of the level of commitment of
+        the data and metadata via committed.  Per <xref target="tbl:stable_committed" />,
+      </t>
+
+      <t>
+        <list style='symbols'>
+          <t>
+            The server MAY commit the data at a stronger level than requested.
+          </t>
+
+          <t>
+            The server MUST commit the data at a level at least as high as
+            that committed.
+          </t>
+        </list>
+      </t>
+
+      <texttable anchor="tbl:stable_committed">
+        <preamble>
+          Valid combinations of the fields stable in the request and committed
+          in the reply.
+        </preamble>
+        <ttcol>stable</ttcol>
+        <ttcol>committed</ttcol>
+        <c>UNSTABLE4 </c> <c>FILE_SYNC4, DATA_SYNC4, UNSTABLE4</c>
+        <c>DATA_SYNC4</c> <c>FILE_SYNC4, DATA_SYNC4           </c>
+        <c>FILE_SYNC4</c> <c>FILE_SYNC4                       </c>
+      </texttable>
+
+      <t>
+        The final portion of the result is the field writeverf.  This field
+        is the write verifier and is a cookie that the client can use to
+        determine whether a server has changed instance state (e.g., server
+        restart) between a call to WRITE and a subsequent call to either
+        WRITE or COMMIT.  This cookie MUST be unchanged during a single
+        instance of the NFSv4.1 server and MUST be unique between instances
+        of the NFSv4.1 server.  If the cookie changes, then the client MUST
+        assume that any data written with an UNSTABLE4 value for committed
+        and an old writeverf in the reply has been lost and will need to be
+        recovered.
+      </t>
+
+      <t>
+        If a client writes data to the server with the stable argument set to
+        UNSTABLE4 and the reply yields a committed response of DATA_SYNC4 or
+        UNSTABLE4, the client will follow up some time in the future with a
+        COMMIT operation to synchronize outstanding asynchronous data and
+        metadata with the server's stable storage, barring client error.  It
+        is possible that due to client crash or other error that a subsequent
+        COMMIT will not be received by the server.
+      </t>
+
+      <t>
+        For a WRITE with a stateid value of all bits equal to zero, the
+        server MAY allow the WRITE to be serviced subject to mandatory
+        byte-range locks or the current share deny modes for the file.
+        For a WRITE with a stateid value of all bits equal to 1, the
+        server MUST NOT allow the WRITE operation to bypass locking
+        checks at the server and otherwise is treated as if a stateid
+        of all bits equal to zero were used.
+      </t>
+
+      <t>
+        On success, the current filehandle retains its value.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_WRITE:I" title="IMPLEMENTATION">
+      <t>
+        It is possible for the server to write fewer bytes of data than
+        requested by the client.  In this case, the server SHOULD NOT return
+        an error unless no data was written at all.  If the server writes
+        less than the number of bytes specified, the client will need to send
+        another WRITE to write the remaining data.
+      </t>
+
+      <t>
+        It is assumed that the act of writing data to a file will cause the
+        time_modified and change attributes of the file to be updated.
+        However, these attributes SHOULD NOT be changed unless the contents
+        of the file are changed.  Thus, a WRITE request with count set to
+        zero SHOULD NOT cause the time_modified and change attributes of the
+        file to be updated.
+      </t>
+
+      <t>
+        Stable storage is persistent storage that survives:
+      </t>
+
+      <t>
+        <list style='numbers'>
+          <t>
+            Repeated power failures.
+          </t>
+
+          <t>
+            Hardware failures (of any board, power supply, etc.).
+          </t>
+
+          <t>
+            Repeated software crashes and restarts.
+          </t>
+        </list>
+      </t>
+
+      <t>
+        This definition does not address failure of the stable storage module
+        itself.
+      </t>
+
+      <t>
+        The verifier is defined to allow a client to detect different
+        instances of an NFSv4.1 protocol server over which cached,
+        uncommitted data may be lost.  In the most likely case, the verifier
+        allows the client to detect server restarts.  This information is
+        required so that the client can safely determine whether the server
+        could have lost cached data.  If the server fails unexpectedly and
+        the client has uncommitted data from previous WRITE requests (done
+        with the stable argument set to UNSTABLE4 and in which the result
+        committed was returned as UNSTABLE4 as well), the server might not
+        have flushed cached data to stable storage.  The burden of recovery
+        is on the client, and the client will need to retransmit the data to
+        the server.
+      </t>
+
+      <t>
+        A suggested verifier would be to use the time that the server was
+        last started (if restarting the server results in lost buffers).
+      </t>
+
+      <t>
+        The reply's committed field allows the client to do more effective
+        caching.  If the server is committing all WRITE requests to stable
+        storage, then it SHOULD return with committed set to FILE_SYNC4,
+        regardless of the value of the stable field in the arguments.  A
+        server that uses an NVRAM accelerator may choose to implement this
+        policy.  The client can use this to increase the effectiveness of the
+        cache by discarding cached data that has already been committed on
+        the server.
+      </t>
+
+      <t>
+        Some implementations may return NFS4ERR_NOSPC instead of
+        NFS4ERR_DQUOT when a user's quota is exceeded.
+      </t>
+
+      <t>
+        In the case that the current filehandle is of type NF4DIR, the server
+        will return NFS4ERR_ISDIR.  If the current file is a symbolic link,
+        the error NFS4ERR_SYMLINK will be returned.  Otherwise, if the
+        current filehandle does not designate an ordinary file, the server
+        will return NFS4ERR_WRONG_TYPE.
+      </t>
+
+      <t>
+        If mandatory byte-range locking is in effect for the file, and
+        the corresponding byte-range of the data to be written to the
+        file is READ_LT or WRITE_LT locked by an owner that is not
+        associated with the stateid, the server MUST return NFS4ERR_LOCKED.
+        If so, the client MUST check if the owner corresponding to the
+        stateid used with the WRITE operation has a conflicting READ_LT
+        lock that overlaps with the byte-range that was to be written.
+        If the stateid's owner has no conflicting READ_LT lock, then the
+        client SHOULD try to get the appropriate write byte-range lock
+        via the LOCK operation before reattempting the WRITE.  When the
+        WRITE completes, the client SHOULD release the byte-range lock
+        via LOCKU.
+      </t>
+
+      <t>
+        If the stateid's owner had a conflicting READ_LT lock, then the
+        client has no choice but to return an error to the application
+        that attempted the WRITE.  The reason is that since the stateid's
+        owner had a READ_LT lock, either the server attempted to temporarily
+        effectively upgrade this READ_LT lock to a WRITE_LT lock or the
+        server has no upgrade capability.  If the server attempted to
+        upgrade the READ_LT lock and failed, it is pointless for the
+        client to re-attempt the upgrade via the LOCK operation, because
+        there might be another client also trying to upgrade.  If two
+        clients are blocked
+        trying to upgrade the same lock, the clients deadlock.  If the server
+        has no upgrade capability, then it is pointless to try a LOCK
+        operation to upgrade.
+      </t>
+
+      <t>
+        If one or more other clients have delegations for the file being
+        written, those delegations MUST be recalled, and the operation cannot
+        proceed until those delegations are returned or revoked.  Except
+        where this happens very quickly, one or more NFS4ERR_DELAY errors
+        will be returned to requests made while the delegation remains
+        outstanding.  Normally, delegations will not be recalled as a result
+        of a WRITE operation since the recall will occur as a result of an
+        earlier OPEN.  However, since it is possible for a WRITE to be done
+        with a special stateid, the server needs to check for this case even
+        though the client should have done an OPEN previously.
+      </t>
+    </section>
+  </section>
+

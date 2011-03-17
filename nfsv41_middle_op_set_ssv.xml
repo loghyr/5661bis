@@ -1,0 +1,104 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="op_SET_SSV" title="Operation 54: SET_SSV - Update SSV for a Client ID">
+    <section toc='exclude' anchor="ss:op_SET_SSV:A" title="ARGUMENT">
+      <?rfc include='autogen/set_ssv_args.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_SET_SSV:R" title="RESULT">
+      <?rfc include='autogen/set_ssv_res.xml'?>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_SET_SSV:D" title="DESCRIPTION">
+      <t>
+        This operation is used to update the SSV for a client ID.  Before
+        SET_SSV is called the first time on a client ID, the SSV is zero.
+        The SSV is the key used for the SSV GSS mechanism (<xref target="ss:core_infrastructure:TSSVGM" />)
+      </t>
+
+      <t>
+        SET_SSV MUST be preceded by a SEQUENCE operation in the same
+        COMPOUND.  It MUST NOT be used if the client did not opt for SP4_SSV
+        state protection when the client ID was created (see <xref target="op_EXCHANGE_ID" />);
+        the server returns NFS4ERR_INVAL in that case.
+      </t>
+
+      <t>
+        The field ssa_digest is computed as the output of the HMAC (RFC 2104
+        <xref target="RFC2104" />) using the subkey derived from the SSV4_SUBKEY_MIC_I2T and
+        current SSV as the key (see <xref target="ss:core_infrastructure:TSSVGM" /> for a description of
+        subkeys), and an XDR encoded value of data type ssa_digest_input4.
+        The field sdi_seqargs is equal to the arguments of the SEQUENCE
+        operation for the COMPOUND procedure that SET_SSV is within.
+      </t>
+
+      <t>
+        The argument ssa_ssv is XORed with the current SSV to produce the new
+        SSV.  The argument ssa_ssv SHOULD be generated randomly.
+      </t>
+
+      <t>
+        In the response, ssr_digest is the output of the HMAC using the
+        subkey derived from SSV4_SUBKEY_MIC_T2I and new SSV as the key, and
+        an XDR encoded value of data type ssr_digest_input4.  The field
+        sdi_seqres is equal to the results of the SEQUENCE operation for the
+        COMPOUND procedure that SET_SSV is within.
+      </t>
+
+      <t>
+        As noted in <xref target="op_EXCHANGE_ID" />, the client and server can maintain
+        multiple concurrent versions of the SSV.  The client and server each
+        MUST maintain an internal SSV version number, which is set to one the
+        first time SET_SSV executes on the server and the client receives the
+        first SET_SSV reply.  Each subsequent SET_SSV increases the internal
+        SSV version number by one.  The value of this version number
+        corresponds to the smpt_ssv_seq, smt_ssv_seq, sspt_ssv_seq, and
+        ssct_ssv_seq fields of the SSV GSS mechanism tokens (see
+        <xref target="ss:core_infrastructure:TSSVGM" />).
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:op_SET_SSV:I" title="IMPLEMENTATION">
+      <t>
+        When the server receives ssa_digest, it MUST verify the digest by
+        computing the digest the same way the client did and comparing it
+        with ssa_digest.  If the server gets a different result, this is an
+        error, NFS4ERR_BAD_SESSION_DIGEST.  This error might be the result of
+        another SET_SSV from the same client ID changing the SSV.  If so, the
+        client recovers by sending a SET_SSV operation again with a
+        recomputed digest based on the subkey of the new SSV.  If the
+        transport connection is dropped after the SET_SSV request is sent,
+        but before the SET_SSV reply is received, then there are special
+        considerations for recovery if the client has no more connections
+        associated with sessions associated with the client ID of the SSV.
+        See <xref target="ss:op_BIND_CONN_TO_SESSION:I" />.
+      </t>
+
+      <t>
+        Clients SHOULD NOT send an ssa_ssv that is equal to a previous
+        ssa_ssv, nor equal to a previous or current SSV (including an ssa_ssv
+        equal to zero since the SSV is initialized to zero when the client ID
+        is created).
+      </t>
+
+      <t>
+        Clients SHOULD send SET_SSV with RPCSEC_GSS privacy.  Servers MUST
+        support RPCSEC_GSS with privacy for any COMPOUND that has { SEQUENCE,
+        SET_SSV }.
+      </t>
+
+      <t>
+        A client SHOULD NOT send SET_SSV with the SSV GSS mechanism's
+        credential because the purpose of SET_SSV is to seed the SSV from
+        non-SSV credentials.  Instead, SET_SSV SHOULD be sent with the
+        credential of a user that is accessing the client ID for the first
+        time (<xref target="ss:core_infrastructure:PfUSC" />).  However, if the client does send SET_SSV
+        with SSV credentials, the digest protecting the arguments uses the
+        value of the SSV before ssa_ssv is XORed in, and the digest
+        protecting the results uses the value of the SSV after the ssa_ssv is
+        XORed in.
+      </t>
+    </section>
+  </section>
+

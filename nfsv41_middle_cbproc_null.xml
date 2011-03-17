@@ -1,0 +1,37 @@
+<!-- Copyright (C) The IETF Trust (2011) -->
+<!-- Copyright (C) The Internet Society (2011) -->
+
+  <section anchor="proc_CB_NULL" title="Procedure 0: CB_NULL - No Operation">
+    <section toc='exclude' anchor="ss:proc_CB_NULL:A" title="ARGUMENTS">
+      <figure>
+        <artwork>
+void;
+        </artwork>
+      </figure>
+    </section>
+
+    <section toc='exclude' anchor="ss:proc_CB_NULL:R" title="RESULTS">
+      <figure>
+        <artwork>
+void;
+        </artwork>
+      </figure>
+    </section>
+
+    <section toc='exclude' anchor="ss:proc_CB_NULL:D" title="DESCRIPTION">
+      <t>
+        CB_NULL is the standard ONC RPC NULL procedure, with the standard
+        void argument and void response.  Even though there is no direct
+        functionality associated with this procedure, the server will use
+        CB_NULL to confirm the existence of a path for RPCs from the server
+        to client.
+      </t>
+    </section>
+
+    <section toc='exclude' anchor="ss:proc_CB_NULL:E" title="ERRORS">
+      <t>
+        None.
+      </t>
+    </section>
+  </section>
+
