@@ -47,17 +47,26 @@
 
     <section toc='exclude' anchor="ss:op_COMMIT:I" title="IMPLEMENTATION">
       <t>
-        The COMMIT operation is similar in operation and semantics to
-        the POSIX fsync() <xref target="openg_fsync" /> system interface
-        that synchronizes a file's state with the disk (file data and
-        metadata is flushed to disk or stable storage).  COMMIT performs
-        the same operation for a client, flushing any unsynchronized
-        data and metadata on the server to the server's disk or stable
-        storage for the specified file.  Like fsync(), it may be that
-        there is some modified data or no modified data to synchronize.
-        The data may have been synchronized by the server's normal
-        periodic buffer synchronization activity.  COMMIT should return
-        NFS4_OK, unless there has been an unexpected error.
+        The COMMIT operation is similar in operation and semantics to the
+        POSIX fsync() <xref target='openg_fsync' /> system interface that
+        synchronizes a file's state with the disk (file data and metadata
+        is flushed to disk or stable storage).  COMMIT performs the same
+        operation for a client, flushing any unsynchronized data and metadata
+        on the server to the server's disk or stable storage for the specified
+        file.  When using pNFS, if a WRITE returned UNSTABLE4 and
+        NFL4_UFLG_COMMIT_THRU_MDS is not set, then the client MUST COMMIT
+        to the data server.  The COMMIT may result in flushing the data
+        but not the metadata.  In this case, the metadata MUST be flushed
+        with a subsequent LAYOUTCOMMIT to the metadata server.  A complete
+        set of pNFS rules for flushing data and metadata is described
+        in <xref target='ss:parallel_nfs:imp_lac' />.
+      </t>
+
+      <t>
+        Note that when using pNFS, a COMMIT to a data server will only
+        flush data.  The metadata MUST be flushed with a subsequent
+        LAYOUTCOMMIT to the metadata server as described in
+        <xref target='ss:parallel_nfs:imp_lac' />.
       </t>
 
       <t>
@@ -129,6 +138,11 @@
         The above description applies to page-cache-based systems as well as
         buffer-cache-based systems.  In the former systems, the virtual
         memory system will need to be modified instead of the buffer cache.
+      </t>
+
+      <t>
+        Refer to <xref target='ss:parallel_nfs:imp_lac' /> for a discussion
+        of the effects of data stability levels on data servers or metadata servers.
       </t>
     </section>
   </section>

@@ -718,6 +718,86 @@
         operation.
       </t>
 
+      <section toc='exclude' anchor="ss:parallel_nfs:imp_lac" title='Implications of LAYOUTCOMMIT on file layouts'>
+        <t>
+          For file layouts, WRITEs to a Data Server that return a stable_how4
+          value of FILE_SYNC4 guarantee that data and file system metadata are on
+          stable storage.  This means that a LAYOUTCOMMIT is not needed in order to
+          make the data and metadata visible to the metadata server and other clients.
+        </t>
+          
+        <t>
+          For file layouts, when NFL4_UFLG_COMMIT_THRU_MDS flag is not set, and
+          WRITE or COMMIT to the data server return DATA_SYNC4, the client MUST
+          send the LAYOUTCOMMIT to the metadata server in order to synchronize
+          file metadata.  A successful COMMIT to the
+          metadata server guarantees that data and file system metadata are on
+          stable storage.  Therefore, any time that NFS4_UFLG_COMMIT_THRU_MDS is set,
+          a LAYOUTCOMMIT (of the byte range specified by the layout) is not needed.
+          <xref target='tbl:layoutcommit' /> summarizes the rules for when a LAYOUTCOMMIT
+          is needed.
+        </t>
+          
+<!-- You have to watch the layout of this table, it is tricky! -->
+        <texttable anchor='tbl:layoutcommit'>
+        <preamble>
+          Determining when a LAYOUTCOMMIT is needed and the effects of
+          a COMMIT to a data server and metadata server.
+        </preamble>
+        <ttcol>NFL4 _UFLG _COMMIT _THRU_MDS</ttcol>
+        <ttcol>WRITE to DS returns</ttcol>
+        <ttcol>Meaning of COMMIT to DS</ttcol>
+        <ttcol>Meaning of COMMIT to MDS</ttcol>
+        <ttcol>LAYOUTCOMMIT required?</ttcol>
+          <c>Not Set</c> <c>UNSTABLE4 </c> <c>DATA_SYNC4</c> <c>Nothing   </c> <c>Yes</c>
+          <c>Not Set</c> <c>DATA_SYNC4</c> <c>Nothing   </c> <c>Nothing   </c> <c>Yes</c>
+          <c>Not Set</c> <c>FILE_SYNC4</c> <c>Nothing   </c> <c>Nothing   </c> <c>NO </c>
+          <c>Set    </c> <c>UNSTABLE4 </c> <c>Nothing   </c> <c>FILE_SYNC4</c> <c>NO </c>
+          <c>Set    </c> <c>DATA_SYNC4</c> <c>Nothing   </c> <c>FILE_SYNC4</c> <c>NO </c>
+          <c>Set    </c> <c>FILE_SYNC4</c> <c>Nothing   </c> <c>Nothing   </c> <c>NO </c>
+        </texttable>
+          
+        <t>
+          Note that a client can always demand FILE_SYNC4 or DATA_SYNC4 in WRITE's
+          arguments.  Also note that specifying these stability levels may adversely
+          impact performance.
+        </t>
+          
+        <t>
+          If a LAYOUTCOMMIT is required, it should be sent before CLOSE to maintain
+          close-to-open semantics.  It should also be sent before LOCKU,
+          OPEN_DOWNGRADE, and when the application issues fsync()
+          <xref target='openg_fsync' />.  It should
+          also be sent periodically to keep the file size and modification time
+          synchronized.  This allows use cases like tail -f [56] which copies its
+          input file to the standard output and updates the output as new lines become
+          available in the input file.  It is up to the client implementation to
+          determine how frequently LAYOUTCOMMIT is issued.  Possible policies include
+          every N'th COMMIT to a data server, every N'th unit of time, or after
+          writing a stripe to a set of data servers.
+        </t>
+          
+        <t>
+          Even if a required LAYOUTCOMMIT is not issued by the client, the data server
+          and metadata servers have a set of responsibilities to fulfill in order to
+          guarantee data consistency:
+        </t>
+
+        <t>
+          1) Data servers MUST commit data and synchronize modification and size
+          attributes with the metadata server before a layout is revoked as described
+          in section 12.5.4.
+
+          2) Data servers SHOULD commit data and synchronize modification and size
+          attributes with the metadata server after the metadata server reboots.  In
+          theory the client should commit the data, but this avoids the problem where
+          both the client and metadata server crash at the same time.
+
+          3) The metadata server MAY periodically poll data servers to synchronize
+          modification and size attributes.
+        </t>
+      </section>
+
       <section toc='exclude' anchor="ss:parallel_nfs:Lac" title="LAYOUTCOMMIT and change/time_modify">
         <t>
           The change and time_modify attributes may be updated by the server

@@ -347,7 +347,7 @@
           present the same string.  The consequences of two clients
           presenting the same string range from one client getting an error
           to one client having its leased state abruptly and unexpectedly
-          cancelled.
+          canceled.
         </t>
 
         <t>
@@ -469,7 +469,7 @@
       In the case of the session being persistent, the client will
       re-establish communication using the existing session after the restart.
       This session will be associated with the existing client ID but may
-      only be used to retransmit operations that the client previously
+      only be used to re-transmit operations that the client previously
       transmitted and did not see replies to.  Replies to operations that
       the server previously performed will come from the reply cache;
       otherwise, NFS4ERR_DEADSESSION will be returned.  Hence, such a
@@ -1326,11 +1326,11 @@
           <t>
             RDMA transports use "credits" to enforce flow control, where a
             credit is a right to a peer to transmit a message.  If one peer
-            were to retransmit a request (or reply), it would consume an
-            additional credit.  If the replier retransmitted a reply, it would
+            were to re-transmit a request (or reply), it would consume an
+            additional credit.  If the replier re-transmitted a reply, it would
             certainly result in an RDMA connection loss, since the requester
             would typically only post a single receive buffer for each
-            request.  If the requester retransmitted a request, the additional
+            request.  If the requester re-transmitted a request, the additional
             credit consumed on the server might lead to RDMA connection
             failure unless the client accounted for it and decreased its
             available credit, leading to wasted resources.
@@ -1597,7 +1597,7 @@
         Each session has resources for each channel, including separate reply
         caches (see <xref target="ss:core_infrastructure:SIaRC" />).  Note that even the backchannel
         requires a reply cache (or, at least, a slot table in order to detect
-        retries) because some callback operations are nonidempotent.
+        retries) because some callback operations are non-idempotent.
       </t>
 
       <section toc='exclude' anchor="ss:core_infrastructure:AoCCaS" title="Association of Connections, Channels, and Sessions">
@@ -2138,12 +2138,12 @@
         <t>
           The sequence ID accompanies the slot ID in each request.  It is for
           the critical check at the replier: it used to efficiently determine
-          whether a request using a certain slot ID is a retransmit or a new,
+          whether a request using a certain slot ID is a re-transmit or a new,
           never-before-seen request.  It is not feasible for the requester to
-          assert that it is retransmitting to implement this, because for any
+          assert that it is re-transmitting to implement this, because for any
           given request the requester cannot know whether the replier has seen
           it unless the replier actually replies.  Of course, if the requester
-          has seen the reply, the requester would not retransmit.
+          has seen the reply, the requester would not re-transmit.
         </t>
 
         <t>
@@ -2162,7 +2162,7 @@
             </t>
 
             <t>
-              A retransmitted request, in which the sequence ID is equal to that
+              A re-transmitted request, in which the sequence ID is equal to that
               currently recorded in the slot.  If the original request has
               executed to completion, the replier returns the cached reply.  See
               <xref target="ss:core_infrastructure:RaRoR" /> for direction on how the replier deals with
@@ -2196,7 +2196,7 @@
           which is that unlike XID-indexed reply caches (also known as
           duplicate request caches - DRCs), the slot ID-based reply cache
           cannot be overflowed.  Through use of the sequence ID to identify
-          retransmitted requests, the replier does not need to actually cache
+          re-transmitted requests, the replier does not need to actually cache
           the request itself, reducing the storage requirements of the reply
           cache further.  These facilities make it practical to maintain all
           the required entries for an effective reply cache.

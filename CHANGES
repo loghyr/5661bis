@@ -34,3 +34,5 @@
 
 03/18/2011 - Fixed FREE_STATEID ref to Network Partitions and Recovery - reported by Bryan Schumaker.
 
+03/18/2011 - Added Implications of LAYOUTCOMMIT on file layouts
+

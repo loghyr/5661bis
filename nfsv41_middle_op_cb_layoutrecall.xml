@@ -133,14 +133,14 @@
 
       <t>
         In the case of modified data being written while the layout is held,
-        the client must use LAYOUTCOMMIT operations at the appropriate time;
-        as required LAYOUTCOMMIT must be done before the LAYOUTRETURN.  If a
-        large amount of modified data is outstanding, the client may send
-        LAYOUTRETURNs for portions of the recalled layout; this allows the
-        server to monitor the client's progress and adherence to the original
-        recall request.  However, the last LAYOUTRETURN in a sequence of
-        returns MUST specify the full range being recalled (see
-        <xref target="ss:parallel_nfs:LRCR" /> for details).
+        the client may be required to use LAYOUTCOMMIT operations at the
+        appropriate time; if LAYOUTCOMMIT is required, it must be done
+        before the LAYOUTRETURN.  If a large amount of modified data is
+        outstanding, the client may send LAYOUTRETURNs for portions of the
+        recalled layout; this allows the server to monitor the client's
+        progress and adherence to the original recall request.  However,
+        the last LAYOUTRETURN in a sequence of returns MUST specify the
+        full range being recalled (see <xref target="ss:parallel_nfs:LRCR" /> for details).
       </t>
 
       <t>

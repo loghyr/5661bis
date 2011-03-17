@@ -1391,7 +1391,7 @@
         <t>
           As described earlier, the LAYOUTCOMMIT operation is used to ensure
           that the metadata is synchronized with changes made to the data
-          servers.  For the NFSv4.1-based data storage protocol, it is
+          servers.  For the NFSv4.1-based data storage protocol, it may be
           necessary to re-synchronize state such as the size attribute, and the
           setting of mtime/change/atime.  See <xref target="ss:parallel_nfs:CL" /> for a full
           description of the semantics regarding LAYOUTCOMMIT and attribute
@@ -1458,10 +1458,10 @@
       semantics; meaning that when the file is closed, all modified data is
       written to the server.  When a subsequent OPEN of the file is done,
       the change attribute is inspected for a difference from a cached
-      value for the change attribute.  For the case above, this means that
-      a LAYOUTCOMMIT will be done at close (along with the data WRITEs) and
-      will update the file's size and change attribute.  Access from
-      another client after that point will result in the appropriate size
+      value for the change attribute.  For the case above, this means
+      that, if necessary, a LAYOUTCOMMIT will be done at close (along
+      with the data WRITEs) and will update the file's size and change attribute.
+      Access from another client after that point will result in the appropriate size
       being returned.
     </t>
   </section>

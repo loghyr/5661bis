@@ -104,9 +104,14 @@
         returned to requests made while the delegation remains outstanding.
         Normally, delegations will not be recalled as a result of a READ
         operation since the recall will occur as a result of an earlier OPEN.
-        However, since it is possible for a READ to be done with a special
-        stateid, the server needs to check for this case even though the
-        client should have done an OPEN previously.
+        However, since it is possible for a WRITE to be done
+        with a special stateid, the server needs to check for this case even
+        though the client should have done an OPEN previously.
+      </t>
+
+      <t>
+        Refer to <xref target='ss:parallel_nfs:imp_lac' /> for a discussion of
+        the effects of data stability levels on data servers or metadata servers.
       </t>
     </section>
   </section>
