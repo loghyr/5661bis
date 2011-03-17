@@ -1,0 +1,5 @@
+03/17/2011 - Ported from rfc5661.txt to project format
+
+03/17/2011 - Misc formatting changes
+
+03/17/2011 - Removed PID as a means to differentiate user-level clients, adding UID
