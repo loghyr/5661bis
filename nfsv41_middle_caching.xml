@@ -735,7 +735,7 @@
       that do not deny OPEN4_SHARE_ACCESS_READ access to others.  Multiple
       OPEN_DELEGATE_READ delegations may be outstanding simultaneously and
       do not conflict.  An OPEN_DELEGATE_WRITE delegation allows the client
-      to handle, on its own, all opens.  Only OPEN_DELEGATE_WRITE
+      to handle, on its own, all opens.  Only one OPEN_DELEGATE_WRITE
       delegation may exist for a given file at a given time, and it is
       inconsistent with any OPEN_DELEGATE_READ delegations.
     </t>

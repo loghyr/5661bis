@@ -26,7 +26,7 @@
         by sending the FREE_STATEID operation, the client acknowledges the
         loss of those locks.  This allows the server, once all such revoked
         state is acknowledged, to allow that client again to reclaim locks,
-        without encountering the edge conditions discussed in <xref target="ss:state_management:SFaR" />.
+        without encountering the edge conditions discussed in <xref target="ss:state_management:NPaR" />.
       </t>
 
       <t>

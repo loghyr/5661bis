@@ -319,9 +319,7 @@
       data type:
     </t>
 
-    <t>
-      <?rfc include="autogen/type_client_owner4.xml"?>
-    </t>
+    <?rfc include="autogen/type_client_owner4.xml"?>
 
     <t>
       The first field, co_verifier, is a client incarnation verifier.  The
@@ -2500,7 +2498,7 @@
 
               <t>
                 A reply that consists only of the Sequence operation with the
-                error NFS4ERR_FALSE_RETRY.
+                error NFS4ERR_SEQ_FALSE_RETRY.
               </t>
 
               <t>
@@ -2529,7 +2527,7 @@
               principal in the RPC request's credential field that translates to a
               different user, then this is a false retry.  When the replier detects
               a false retry, it is permitted (but not always obligated) to return
-              NFS4ERR_FALSE_RETRY in response to the Sequence operation when it
+              NFS4ERR_SEQ_FALSE_RETRY in response to the Sequence operation when it
               detects a false retry.
             </t>
 
@@ -2539,19 +2537,19 @@
               the replier, should be applied before determining whether the users
               are the same or different.  If the replier determines the users are
               different between the original request and a retry, then the replier
-              MUST return NFS4ERR_FALSE_RETRY.
+              MUST return NFS4ERR_SEQ_FALSE_RETRY.
             </t>
 
             <t>
               If an operation of the retry is an illegal operation, or an operation
               that was legal in a previous minor version of NFSv4 and MUST NOT be
               supported in the current minor version (e.g., SETCLIENTID), the
-              replier MAY return NFS4ERR_FALSE_RETRY (and MUST do so if the users
+              replier MAY return NFS4ERR_SEQ_FALSE_RETRY (and MUST do so if the users
               of the original request and retry differ).  Otherwise, the replier
               MAY return NFS4ERR_OP_ILLEGAL or NFS4ERR_BADXDR or NFS4ERR_NOTSUPP as
               appropriate.  Note that the handling is in contrast for how the
               replier deals with retries requests with no cached reply.  The
-              difference is due to NFS4ERR_FALSE_RETRY being a valid error for only
+              difference is due to NFS4ERR_SEQ_FALSE_RETRY being a valid error for only
               Sequence operations, whereas NFS4ERR_RETRY_UNCACHED_REP is a valid
               error for all operations except illegal operations and operations
               that MUST NOT be supported in the current minor version of NFSv4.
@@ -2616,8 +2614,8 @@
         <t>
           A retry might be sent while the original request is still in progress
           on the replier.  The replier SHOULD deal with the issue by returning
-          NFS4ERR_DELAY as the reply to SEQUENCE or CB_SEQUENCE operation, but
-          implementations MAY return NFS4ERR_MISORDERED.  Since errors from
+          NFS4ERR_DELAY as the reply to a SEQUENCE or CB_SEQUENCE operation, but
+          implementations MAY return NFS4ERR_SEQ_MISORDERED.  Since errors from
           SEQUENCE and CB_SEQUENCE are never recorded in the reply cache, this
           approach allows the results of the execution of the original request
           to be properly recorded in the reply cache (assuming that the
@@ -3430,9 +3428,7 @@
         <xref target="op_EXCHANGE_ID" />).
       </t>
      
-      <t>
-        <?rfc include="autogen/type_ssv_subkey4.xml"?>
-      </t>
+      <?rfc include="autogen/type_ssv_subkey4.xml"?>
 
       <t>
         The subkey derived from SSV4_SUBKEY_MIC_I2T is used for calculating
@@ -3450,10 +3446,9 @@
         The PerMsgToken description is based on an XDR definition:
       </t>
      
-      <t>
-        <?rfc include="autogen/type_ssv_mic_plain_tkn4.xml"?>
-        <?rfc include="autogen/type_ssv_mic_tkn4.xml"?>
-      </t>
+      <?rfc include="autogen/type_ssv_mic_plain_tkn4.xml"?>
+      <?rfc include="autogen/type_ssv_mic_tkn4.xml"?>
+
       <t>
         The field smt_hmac is an HMAC calculated by using the subkey derived
         from SSV4_SUBKEY_MIC_I2T or SSV4_SUBKEY_MIC_T2I as the key, the
@@ -3490,10 +3485,8 @@
         The SealedMessage description is based on an XDR definition:
       </t>
      
-      <t>
-        <?rfc include="autogen/type_ssv_seal_plain_tkn4.xml"?>
-        <?rfc include="autogen/type_ssv_seal_cipher_tkn4.xml"?>
-      </t>
+      <?rfc include="autogen/type_ssv_seal_plain_tkn4.xml"?>
+      <?rfc include="autogen/type_ssv_seal_cipher_tkn4.xml"?>
 
       <t>
         The token emitted by GSS_Wrap() is XDR encoded and of XDR data type

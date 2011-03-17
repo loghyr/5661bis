@@ -3,3 +3,34 @@
 03/17/2011 - Misc formatting changes
 
 03/17/2011 - Removed PID as a means to differentiate user-level clients, adding UID
+
+03/18/2011 - Fixed Errata ID: 2291
+
+03/18/2011 - Fixed Errata ID: 2005
+
+03/18/2011 - Fixed Errata ID: 2299
+
+03/18/2011 - Fixed Errata ID: 2326
+
+03/18/2011 - Fixed Errata ID: 2327
+
+03/18/2011 - Fixed Errata ID: 2006
+
+03/18/2011 - Fixed Errata ID: 2062
+
+03/18/2011 - Fixed Errata ID: 2249
+
+03/18/2011 - Fixed Errata ID: 2280
+
+03/18/2011 - Fixed Errata ID: 2324
+
+03/18/2011 - Fixed Errata ID: 2328
+
+03/18/2011 - Fixed Errata ID: 2330
+
+03/18/2011 - Fixed Errata ID: 2548
+
+03/18/2011 - Fixed Errata ID: 2505
+
+03/18/2011 - Fixed FREE_STATEID ref to Network Partitions and Recovery - reported by Bryan Schumaker.
+

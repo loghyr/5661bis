@@ -153,7 +153,7 @@
       <section toc='exclude' anchor="ss:error_values:NC12" title="NFS4ERR_DELAY (Error Code 10008)">
         <t>
           For any of a number of reasons, the replier could not process this
-          operation in what was deemed a reasonable time.  The client should
+          operation in what was deemed a reasonable time.  The replier should
           wait and then try the request with a new slot and sequence value.
         </t>
 
@@ -178,15 +178,19 @@
 
         <t>
           In such cases, the error NFS4ERR_DELAY allows these preparatory
-          operations to proceed without holding up client resources such as a
-          session slot.  After delaying for period of time, the client can then
-          re-send the operation in question (but not with the same slot ID and
-          sequence ID; one or both MUST be different on the re-send).
+          operations to proceed without holding up requester resources such as a
+          session slot.  After delaying for period of time, the requester can then
+          re-send the operation in question. If the operation that returned
+          NFS4ERR_DELAY was not a Sequence operation, the initial, preceding
+          Sequence operation of the Compound request MUST NOT be re-sent with same
+          slot ID and sequence ID; one or both MUST be different on the re-send. If
+          the operation that returned NFS4ERR_DELAY was a Sequence operation, then
+          the Sequence MUST be re-sent with the same slot ID and sequence ID.
         </t>
 
         <t>
           Note that without the ability to return NFS4ERR_DELAY and the
-          client's willingness to re-send when receiving it, deadlock might
+          requester's willingness to re-send when receiving it, deadlock might
           result.  For example, if a recall is done, and if the delegation
           return or operations preparatory to delegation return are held up by
           other operations that need the delegation to be returned, session
@@ -236,7 +240,7 @@
         in which the filehandle is a valid filehandle in general but is not
         of the appropriate object type for the current operation.
       </t>
-       
+
       <t>
         Where the error description indicates a problem with the current or
         saved filehandle, it is to be understood that filehandles are only
@@ -327,7 +331,7 @@
         of a Compound request (by which we mean to include both COMPOUND and
         CB_COMPOUND), rather than to particular operations.
       </t>
-     
+
       <t>
         There are a number of basic constraints on the operations that may
         appear in a Compound request.  Sessions add to these basic
@@ -716,13 +720,13 @@
           A READ or WRITE operation was attempted on a file where there was a
           conflict between the I/O and an existing lock:
         </t>
-       
+
         <t>
           <list style='symbols'>
             <t>
               There is a share reservation inconsistent with the I/O being done.
             </t>
-       
+
             <t>
               The range to be read or written intersects an existing mandatory
               byte-range lock.
@@ -751,9 +755,11 @@
           currently held byte-range lock for the current lock-owner and does
           not precisely match a single such byte-range lock where the server
           does not support this type of request, and thus does not implement
-          POSIX locking semantics <xref target="openg_fcntl" />.  See Sections <xref target="ss:op_LOCK:I" format='counter' />,
-          <xref target="ss:op_LOCKT:I" format='counter' />, and <xref target="ss:op_LOCKU:I" format='counter' /> for a discussion of how this applies to LOCK, LOCKT, and
-          LOCKU respectively.
+          POSIX locking semantics <xref target="openg_fcntl" />.  See
+          Sections <xref target="ss:op_LOCK:I" format='counter' />,
+          <xref target="ss:op_LOCKT:I" format='counter' />,
+          and <xref target="ss:op_LOCKU:I" format='counter' /> for a
+          discussion of how this applies to LOCK, LOCKT, and LOCKU respectively.
         </t>
       </section>
 
@@ -943,7 +949,8 @@
       <section toc='exclude' anchor="ss:error_values:NC163" title="NFS4ERR_BAD_HIGH_SLOT (Error Code 10077)">
         <t>
           The highest_slot argument in a Sequence operation exceeds the
-          replier's enforced highest_slotid.
+          replier's enforced highest_slotid. Also, the rsa_target_highest_slotid argument in a CB_RECALL_SLOT
+          operation exceeds maximum enforced slot ID of the session's fore channel.
         </t>
       </section>
 
@@ -1180,11 +1187,18 @@
         </t>
       </section>
 
-      <section toc='exclude' anchor="ss:error_values:NC51" title="NFS4ERR_NXIO (Error Code 5)">
+      <section toc='exclude' anchor="ss:error_values:NC51" title="NFS4ERR_NXIO (Error Code 6)">
         <t>
           I/O error.  No such device or address.  This error is for errors
           involving block and character device access, but because NFSv4.1 is
           not a device-access protocol, this error is not applicable.
+        </t>
+      </section>
+
+      <section toc='exclude' anchor="ss:error_values:NCXXX" title="NFS4ERR_RESOURCE (Error Code 10018)">
+        <t>
+          Resource exhaustion related to the processing of the Compound procedure.
+<cref anchor="Q1" source="TH">But why is it gone?.</cref>
         </t>
       </section>
 

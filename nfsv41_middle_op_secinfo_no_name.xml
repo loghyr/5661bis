@@ -24,7 +24,8 @@
         passed, then SECINFO_NO_NAME is querying for the required security
         for the current filehandle.  If SECINFO_STYLE4_PARENT is passed, then
         SECINFO_NO_NAME is querying for the required security of the current
-        filehandle's parent.  If the style selected is SECINFO_STYLE4_PARENT,
+        filehandle's parentwhere the current filehandle MUST be that of directory
+        (an object of type NF4DIR).  If the style selected is SECINFO_STYLE4_PARENT,
         then SECINFO should apply the same access methodology used for
         LOOKUPP when evaluating the traversal to the parent directory.
         Therefore, if the requester does not have the appropriate access to

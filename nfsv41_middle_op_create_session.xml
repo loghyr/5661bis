@@ -127,7 +127,7 @@
             </list>
           </t>
 
-          <t hangText='csa_fore_chan_attrs, csa_fore_chan_attrs:'><vspace />
+          <t hangText='csa_fore_chan_attrs, csa_back_chan_attrs:'><vspace />
             The csa_fore_chan_attrs and csa_back_chan_attrs fields apply to
             attributes of the fore channel (which conveys requests originating
             from the client to the server), and the backchannel (the channel
@@ -239,7 +239,7 @@
             This is the ONC RPC program number the server MUST use in any
             callbacks sent through the backchannel to the client.  The server
             MUST specify an ONC RPC program number equal to csa_cb_program and
-            an ONC RPC version number equal to 4 in callbacks sent to the
+            an ONC RPC version number equal to 1 in callbacks sent to the
             client.  If a CB_COMPOUND is sent to the client, the server MUST
             use a minor version number of 1.  There is no corresponding
             result.

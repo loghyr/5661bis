@@ -669,7 +669,7 @@
       </t>
 
       <t>
-        Because of this inconsistency, it is necessary to resynchronize the
+        Because of this inconsistency, in general, it is necessary to resynchronize the
         client with the metadata server and its storage devices and make any
         potential changes available to other clients.  This is accomplished
         by use of the LAYOUTCOMMIT operation.
@@ -694,7 +694,12 @@
         block list that comprises the file and committing this layout to
         stable storage.  For file-based layouts, synchronization of
         attributes between the metadata and storage devices, primarily the
-        size attribute, is required.
+        size attribute, is not required, but the use of LAYOUTCOMMIT provides 
+        a way to optimize the synchronization. Indeed, if a LAYOUT4_NFSV4_1_FILES
+        layout is ever revoked, the metadata server MUST direct all data servers to
+        commit any modified data of the file to stable storage, and synchronize 
+        the file's size and time_modify attributes on the metadata server
+        with the those on the data server.
       </t>
 
       <t>
@@ -1308,7 +1313,7 @@
               Once a CB_LAYOUTRECALL of LAYOUTRECALL4_FSID is sent, the server MUST
               NOT allow the client to use any layout stateid that refers to a file
               with the specified fsid except for LAYOUTCOMMIT operations.  Once the
-              client receives a CB_LAYOUTRECALL of LAYOUTRECALL4_ALL, it MUST NOT
+              client receives a CB_LAYOUTRECALL of LAYOUTRECALL4_FSID, it MUST NOT
               use any layout stateid that refers to a file with the specified fsid
               except for LAYOUTCOMMIT operations.  Once a LAYOUTRETURN of
               LAYOUTRETURN4_FSID is sent, all layout stateids granted to the

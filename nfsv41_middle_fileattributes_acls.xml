@@ -1316,7 +1316,7 @@
         <t>
           If the object being created is not a directory, the inherited ACL
           SHOULD NOT inherit ACEs from the parent directory ACL unless the
-          ACE4_FILE_INHERIT_FLAG is set.
+          ACE4_FILE_INHERIT_ACE is set.
         </t>
 
         <t>
