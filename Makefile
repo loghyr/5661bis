@@ -464,6 +464,7 @@ IDXMLSRC_BASE = \
 	nfsv41_middle_op_cb_notify.xml \
 	nfsv41_middle_op_cb_push_deleg.xml \
 	nfsv41_middle_op_cb_recall_any.xml \
+	nfsv41_middle_op_cb_recall_slot.xml \
 	nfsv41_middle_op_cb_recallable_obj_avail.xml \
 	nfsv41_middle_op_cb_sequence.xml \
 	nfsv41_middle_op_cb_wants_cancelled.xml \
