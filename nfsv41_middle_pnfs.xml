@@ -728,9 +728,8 @@
           
         <t>
           For file layouts, when NFL4_UFLG_COMMIT_THRU_MDS flag is not set, and
-          WRITE or COMMIT to the data server return DATA_SYNC4, the client MUST
-          send the LAYOUTCOMMIT to the metadata server in order to synchronize
-          file metadata.  A successful COMMIT to the
+          WRITE or COMMIT to the data server returns DATA_SYNC4, the client MUST
+          send the LAYOUTCOMMIT to the metadata server.  A successful COMMIT to the
           metadata server guarantees that data and file system metadata are on
           stable storage.  Therefore, any time that NFS4_UFLG_COMMIT_THRU_MDS is set,
           a LAYOUTCOMMIT (of the byte range specified by the layout) is not needed.
@@ -767,9 +766,10 @@
           If a LAYOUTCOMMIT is required, it should be sent before CLOSE to maintain
           close-to-open semantics.  It should also be sent before LOCKU,
           OPEN_DOWNGRADE, and when the application issues fsync()
-          <xref target='openg_fsync' />.  It should
+          <xref target='openg_fsync' />.  Again, if LAYOUTCOMMIT is required, it should
           also be sent periodically to keep the file size and modification time
-          synchronized.  This allows use cases like tail -f [56] which copies its
+          synchronized.  This allows use cases like tail -f <xref target='openg_tail' />
+				  which copies its
           input file to the standard output and updates the output as new lines become
           available in the input file.  It is up to the client implementation to
           determine how frequently LAYOUTCOMMIT is issued.  Possible policies include
@@ -784,17 +784,25 @@
         </t>
 
         <t>
-          1) Data servers MUST commit data and synchronize modification and size
-          attributes with the metadata server before a layout is revoked as described
-          in section 12.5.4.
+					<list style='numbers'>
+						<t>
+              Data servers MUST commit data and synchronize modification and size
+              attributes with the metadata server before a layout is revoked as described
+              in <xref target='ss:parallel_nfs:CL' />.
+						</t>
 
-          2) Data servers SHOULD commit data and synchronize modification and size
-          attributes with the metadata server after the metadata server reboots.  In
-          theory the client should commit the data, but this avoids the problem where
-          both the client and metadata server crash at the same time.
+						<t>
+              Data servers SHOULD commit data and synchronize modification and size
+              attributes with the metadata server after the metadata server reboots.  In
+              theory the client should commit the data, but this avoids the problem where
+              both the client and metadata server crash at the same time.
+						</t>
 
-          3) The metadata server MAY periodically poll data servers to synchronize
-          modification and size attributes.
+						<t>
+              The metadata server MAY periodically poll data servers to synchronize
+              modification and size attributes.
+						</t>
+					</list>
         </t>
       </section>
 
@@ -912,7 +920,8 @@
       <section toc='exclude' anchor="ss:parallel_nfs:Lal" title="LAYOUTCOMMIT and layoutupdate">
         <t>
           The LAYOUTCOMMIT argument contains a loca_layoutupdate field
-          (<xref target="ss:op_LAYOUTCOMMIT:A" />) of data type layoutupdate4 (<xref target="ss:protocol_constants:l4" />).  This
+          (<xref target="ss:op_LAYOUTCOMMIT:A" />) of data type
+					layoutupdate4 (<xref target="ss:protocol_constants:l4" />).  This
           argument is a layout-type-specific structure.  The structure can be
           used to pass arbitrary layout-type-specific information from the
           client to the metadata server at LAYOUTCOMMIT time.  For example, if
