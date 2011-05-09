@@ -511,9 +511,32 @@ testx:
 	rm -rf testx.d
 	mkdir testx.d
 	$(MAKE) dotx
-	cp dotx.d/nfsv41.x testx.d
+	# In Linux, authunix is still used.
+	# In Linux, the RPCSEC_GSS library/API has
+	# a conflicting data type.
+	# In Linux, the gssapi and RPCSEC_GSS headers
+	# are placed in bizarre places.
+	# In Linux, rpcgen produces a makefile name that
+	# just *has* to be different from Solaris.
+	( \
+		if [ -f /usr/include/rpc/auth_sys.h ]; then \
+			cp dotx.d/nfsv41.x testx.d ; \
+		else \
+			sed s/authsys/authunix/g < dotx.d/nfsv41.x | \
+			sed s/auth_sys/auth_unix/g | \
+			sed s/AUTH_SYS/AUTH_UNIX/g | \
+			sed s/gss_svc/Gss_Svc/g > testx.d/nfsv41.x ; \
+		fi ; \
+	)
+	( cd testx.d ; \
+		rpcgen -a nfsv41.x ; )
 	( cd testx.d ; \
 		rpcgen -a nfsv41.x ; \
+		if [ ! -f /usr/include/rpc/auth_sys.h ]; then \
+			ln Make* make ; \
+			CFLAGS="-I /usr/include/rpcsecgss -I /usr/include/gssglue" ; export CFLAGS ; \
+			LDLIBS="-lrpcsecgss" ; export LDLIBS ; \
+		fi ; \
 		$(MAKE) -f make* )
 
 spellcheck: $(IDXMLSRC)
@@ -545,4 +568,4 @@ draft-$(VERS).tar: $(IDCONTENTS) $(START_PREGEN) $(FRONT_PREGEN) $(AUXFILES) $(D
 		$(DRAFTFILES) \
 		`cat dotx.d/tmp.filelist` \
 		`cat dotx-id.d/tmp.filelist`; \
-		gzip draft-$(VERS).tar
+		zip draft-$(VERS).tar

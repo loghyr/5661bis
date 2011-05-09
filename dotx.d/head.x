@@ -14,7 +14,7 @@
 %#define _AUTH_SYS_DEFINE_FOR_NFSv41
 %#include <rpc/auth_sys.h>
 %typedef struct authsys_parms authsys_parms;
-%#endif _AUTH_SYS_DEFINE_FOR_NFSv41
+%#endif /* _AUTH_SYS_DEFINE_FOR_NFSv41 */
 
 /*
  * Basic typedefs for RFC 1832 data type definitions
