@@ -618,7 +618,6 @@
                     For example, if a client copies a file that has
                     ACE4_SYNCHRONIZE set from a local file system to an NFSv4.1
                     server, and then later copies the file from the NFSv4.1 server
-                    <vspace blankLines="1"/>
                     to a local file system, it is likely that if ACE4_SYNCHRONIZE
                     was set in the original file, the client will want it set in
                     the second copy.  The first copy will not have the permission
