@@ -679,8 +679,9 @@
         The LAYOUTCOMMIT operation is responsible for committing a modified
         layout to the metadata server.  The data should be written and
         committed to the appropriate storage devices before the LAYOUTCOMMIT
-        occurs.  The scope of the LAYOUTCOMMIT operation depends on the
-        storage protocol in use.  It is important to note that the level of
+        occurs.  The scope of data committed by a LAYOUTCOMMIT operation is
+        specific to the type of layout because that scope depends on the
+        storage protocol in use. It is important to note that the level of
         synchronization is from the point of view of the client that sent the
         LAYOUTCOMMIT.  The updated state on the metadata server need only
         reflect the state as of the client's last operation previous to the
@@ -694,10 +695,10 @@
         block list that comprises the file and committing this layout to
         stable storage.  For file-based layouts, synchronization of
         attributes between the metadata and storage devices, primarily the
-        size attribute, is not required, but the use of LAYOUTCOMMIT provides 
+        size attribute, is not required, but the use of LAYOUTCOMMIT provides
         a way to optimize the synchronization. Indeed, if a LAYOUT4_NFSV4_1_FILES
         layout is ever revoked, the metadata server MUST direct all data servers to
-        commit any modified data of the file to stable storage, and synchronize 
+        commit any modified data of the file to stable storage, and synchronize
         the file's size and time_modify attributes on the metadata server
         with the those on the data server.
       </t>
@@ -725,7 +726,7 @@
           stable storage.  This means that a LAYOUTCOMMIT is not needed in order to
           make the data and metadata visible to the metadata server and other clients.
         </t>
-          
+
         <t>
           For file layouts, when NFL4_UFLG_COMMIT_THRU_MDS flag is not set, and
           WRITE or COMMIT to the data server returns DATA_SYNC4, the client MUST
@@ -736,7 +737,7 @@
           <xref target='tbl:layoutcommit' /> summarizes the rules for when a LAYOUTCOMMIT
           is needed.
         </t>
-          
+
 <!-- You have to watch the layout of this table, it is tricky! -->
         <texttable anchor='tbl:layoutcommit'>
         <preamble>
@@ -755,13 +756,13 @@
           <c>Set    </c> <c>DATA_SYNC4</c> <c>Nothing   </c> <c>FILE_SYNC4</c> <c>NO </c>
           <c>Set    </c> <c>FILE_SYNC4</c> <c>Nothing   </c> <c>Nothing   </c> <c>NO </c>
         </texttable>
-          
+
         <t>
           Note that a client can always demand FILE_SYNC4 or DATA_SYNC4 in WRITE's
           arguments.  Also note that specifying these stability levels may adversely
           impact performance.
         </t>
-          
+
         <t>
           If a LAYOUTCOMMIT is required, it should be sent before CLOSE to maintain
           close-to-open semantics.  It should also be sent before LOCKU,
@@ -776,7 +777,7 @@
           every N'th COMMIT to a data server, every N'th unit of time, or after
           writing a stripe to a set of data servers.
         </t>
-          
+
         <t>
           Even if a required LAYOUTCOMMIT is not issued by the client, the data server
           and metadata servers have a set of responsibilities to fulfill in order to
@@ -1765,21 +1766,22 @@
             of data type layoutupdate4 and contains layout-type-specific
             content (in the lou_body field of loca_layoutupdate).  The layout-
             type-specific information that loca_layoutupdate might have is
-            discussed in <xref target="ss:parallel_nfs:Lal" />.  If the metadata server's
-            consistency checks on loca_layoutupdate succeed, then the metadata
-            server MUST commit the data (as described by the loca_offset,
-            loca_length, and loca_layoutupdate fields of the arguments) that
-            was written to the storage device.  If the metadata server's
-            consistency checks on loca_layoutupdate fail, the metadata server
-            rejects the LAYOUTCOMMIT operation and makes no changes to the
-            file system.  However, any time LAYOUTCOMMIT with loca_reclaim
-            TRUE fails, the pNFS client has lost all the data in the range
-            defined by &lt;loca_offset, loca_length&gt;.  A client can defend
-            against this risk by caching all data, whether written
-            synchronously or asynchronously in its memory, and by not
-            releasing the cached data until a successful LAYOUTCOMMIT.  This
-            condition does not hold true for all layout types; for example,
-            file-based storage devices need not suffer from this limitation.
+            discussed in <xref target="ss:parallel_nfs:Lal" />.
+            If the metadata server's consistency checks on loca_layoutupdate
+            succeed, then the metadata server MUST commit the changed data
+            that was written to the storage device within the scope of the
+            LAYOUTCOMMIT operation.  If the metadata server's consistency
+            checks on loca_layoutupdate fail, the metadata server rejects
+            the LAYOUTCOMMIT operation and makes no changes to the file
+            system.  However, any time LAYOUTCOMMIT with loca_reclaim
+            TRUE fails, the pNFS client may have lost all uncommitted
+            data within the scope of the failed LAYOUTCOMMIT operation.
+            A client can defend against this risk by caching all data,
+            whether written synchronously or asynchronously in its memory,
+            and by not releasing the cached data until a successful
+            LAYOUTCOMMIT.  This condition does not hold true for all
+            layout types; for example, file-based storage devices need
+            not suffer from this limitation.
           </t>
 
           <t>
@@ -1787,9 +1789,9 @@
             metadata server is no longer in its grace period; i.e., the
             metadata server returns NFS4ERR_NO_GRACE.  As with the scenario in
             the above bullet point, the failure of LAYOUTCOMMIT means the data
-            in the range &lt;loca_offset, loca_length&gt; lost.  The defense against
-            the risk is the same -- cache all written data on the client until
-            a successful LAYOUTCOMMIT.
+            in the scope of that LAYOUTCOMMIT may have been lost.  The defense
+            against the risk is the same -- cache all written data on the client
+            until a successful LAYOUTCOMMIT.
           </t>
         </list>
       </t>

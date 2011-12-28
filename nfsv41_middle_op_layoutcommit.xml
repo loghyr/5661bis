@@ -12,19 +12,29 @@
 
     <section toc='exclude' anchor="ss:op_LAYOUTCOMMIT:D" title="DESCRIPTION">
       <t>
-        The LAYOUTCOMMIT operation commits changes in the layout represented
-        by the current filehandle, client ID (derived from the session ID in
-        the preceding SEQUENCE operation), byte-range, and stateid.  Since
-        layouts are sub-dividable, a smaller portion of a layout, retrieved
-        via LAYOUTGET, can be committed.  The byte-range being committed is
-        specified through the byte-range (loca_offset and loca_length).  This
-        byte-range MUST overlap with one or more existing layouts previously
-        granted via LAYOUTGET (<xref target="op_LAYOUTGET" />), each with an iomode of
-        LAYOUTIOMODE4_RW.  In the case where the iomode of any held layout
-        segment is not LAYOUTIOMODE4_RW, the server should return the error
-        NFS4ERR_BAD_IOMODE.  For the case where the client does not hold
-        matching layout segment(s) for the defined byte-range, the server
-        should return the error NFS4ERR_BAD_LAYOUT.
+         The LAYOUTCOMMIT operation commits changes in the layout represented
+         by the current filehandle, client ID (derived from the session ID in
+         the preceding SEQUENCE operation), and stateid.  As a layout-independent
+         operation, LAYOUTCOMMIT commits the entire layout; layout type-specific
+         data (loca_layoutupdate) may specify a smaller scope of data that is to
+         be committed (e.g., for the block layout, see <xref target="RFC5663" />).
+      </t>
+
+      <t>
+         The loca_offset and loca_length arguments have been deprecated.  The
+         client SHOULD set both loca_offset and loca_length to 0.
+         The server MUST ignore the loca_offset and loca_length arguments.
+         The client MUST hold one or more existing layouts
+         previously granted via LAYOUTGET (<xref target="op_LAYOUTGET" />), with an iomode of
+         LAYOUTIOMODE4_RW.  If layout type-specific data (loca_layoutupdate)
+         restricts the scope of the LAYOUTCOMMIT to less than the entire layout,
+         the client MUST hold one or more existing layouts with an iomode
+         of LAYOUTIOMODE4_RW fully covering the committed byte ranges.
+         In the case where no previously granted layout
+         has an iomode of LAYOUTIOMODE4_RW, the server should return the error
+         NFS4ERR_BAD_IOMODE.  For the case where the client does not hold
+         any previously granted layout, the server should return the error
+         NFS4ERR_BAD_LAYOUT.
       </t>
 
       <t>
@@ -83,8 +93,7 @@
         byte written by the client previous to the LAYOUTCOMMIT.  Note that
         this value is never equal to the file's size (at most it is one byte
         less than the file's size) and MUST be less than or equal to
-        NFS4_MAXFILEOFF.  Also, loca_last_write_offset MUST overlap the range
-        described by loca_offset and loca_length.  The metadata server may
+        NFS4_MAXFILEOFF.  The metadata server may
         use this information to determine whether the file's size needs to be
         updated.  If the metadata server updates the file's size as the
         result of the LAYOUTCOMMIT operation, it must return the new size
