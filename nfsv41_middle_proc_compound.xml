@@ -181,7 +181,7 @@
             stateid, the current stateid MUST NOT be changed.  For example,
             PUTFH, PUTROOTFH, and PUTPUBFH will change the current server state
             from {ocfh, (osid)} to {cfh, (0, 0)}, while LOCK will change the
-            current state from {cfh, (osid} to {cfh, (nsid)}.  Operations like
+            current state from {cfh, (osid)} to {cfh, (nsid)}.  Operations like
             LOOKUP that transform a current filehandle and component name into a
             new current filehandle will also change the current state to {0, 0}.
             The SAVEFH and RESTOREFH operations will save and restore both the
@@ -256,7 +256,7 @@
           <t>
             The final example shows a disallowed use of the current stateid.  The
             client is attempting to implicitly pass an anonymous special stateid,
-            (0,0), to the READ operation.  The server MUST return
+            (0, 0), to the READ operation.  The server MUST return
             NFS4ERR_BAD_STATEID in the reply to the READ operation.
           </t>
 
