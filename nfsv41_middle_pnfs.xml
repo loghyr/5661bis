@@ -549,7 +549,12 @@
         MUST have the "seqid" field of the layout stateid in the response set
         to one.  Thereafter, the client MUST use a layout stateid (see
         <xref target="ss:parallel_nfs:LS1" />) on future invocations of LAYOUTGET on the file, and
-        the "seqid" MUST NOT be set to zero.  Once the layout has been
+        the "seqid" MUST NOT be set to zero.
+        The client MUST serialize LAYOUTGET operations using a non-layout
+        stateid with any other operation affecting the layout state on the file,
+        including CB_LAYOUTRECALL, to allow consistent initialization of the
+        layout state.
+        Once the layout has been
         retrieved, it can be held across multiple OPEN and CLOSE sequences.
         Therefore, a client may hold a layout for a file that is not
         currently open by any user on the client.  This allows for the
@@ -653,6 +658,15 @@
         Once a client has no more layouts on a file, the layout stateid is no
         longer valid and MUST NOT be used.  Any attempt to use such a layout
         stateid will result in NFS4ERR_BAD_STATEID.
+      </t>
+
+      <t>
+        A client MAY always forget its layout state and associated
+        layout stateid at any time (See also section 12.5.5.1).
+        In such case, the client MUST use a non-layout stateid for the next
+        LAYOUTGET operation.  This will signal the server that the client has
+        no more layouts on the file and its respective layout state can be
+        released before issuing a new layout in response to LAYOUTGET.
       </t>
     </section>
 
@@ -1141,7 +1155,9 @@
             such a CB_LAYOUTRECALL by examining the "seqid" field of the recall's
             layout stateid.  If the "seqid" is not exactly one higher than what
             the client currently has recorded, and the client has at least one
-            LAYOUTGET and/or LAYOUTRETURN operation outstanding, the client knows
+            LAYOUTGET and/or LAYOUTRETURN operation outstanding,
+            or if the client has a outstanding LAYOUTGET with a non-layout
+            stateid, the client knows
             the server sent the CB_LAYOUTRECALL after sending a response to an
             outstanding LAYOUTGET or LAYOUTRETURN.  The client MUST wait before
             processing such a CB_LAYOUTRECALL until it processes all replies for
@@ -1180,7 +1196,8 @@
 
             <t>
               It is permissible for the client to send multiple parallel LAYOUTGET
-              operations for the same file or multiple parallel LAYOUTRETURN
+              operations for the same file using the layout stateid
+              or multiple parallel LAYOUTRETURN
               operations for the same file or a mix of both.
             </t>
 
@@ -1235,7 +1252,10 @@
               processing the recall in the first case, but that response will not
               arrive until after the recall is processed in the second case.  Note
               that in the first case, the "seqid" in the layout stateid of the
-              recall is two greater than what the client has recorded; in the
+              recall is two greater than what the client has recorded,
+              or the client has an outstanding LAYOUTGET using a non-layout
+              stateid;
+              in the
               second case, the "seqid" is one greater than what the client has
               recorded.  This allows the client to disambiguate between the two
               cases.  The client thus knows precisely which possibility applies.

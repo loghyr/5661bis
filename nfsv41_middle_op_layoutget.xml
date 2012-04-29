@@ -162,6 +162,19 @@
       </t>
 
       <t>
+        When loga_stateid represents a non-layout stateid the server MUST
+        release any layout state previously held by the client as if the client
+        explicitly returned the layout using a corresponding LAYOUTRETURN
+        with lora_iomode of LAYOUTIOMODE4_ANY, lr_returntype of LAYOUTRETURN4_FILE,
+        lrf_offset value 0, and lrf_length value NFS4_UINT64_MAX. This is
+        particularly useful to clients implementing the forgetful model (Section
+        12.5.5.1) when acquiring a layout after unilaterally forgetting the layout
+        state.  This requirement mandates that the client serializes sending
+        a LAYOUTGET with non-layout statid with any other layout operation on
+        the file (See section 12.5.2).
+      </t>
+
+      <t>
         The loga_maxcount field specifies the maximum layout size (in bytes)
         that the client can handle.  If the size of the layout structure
         exceeds the size specified by maxcount, the metadata server will
