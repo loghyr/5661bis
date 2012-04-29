@@ -456,32 +456,32 @@
       <figure>
         <artwork>
     stripe_count = number of elements in nflda_stripe_indices;
-    
+
     j = (SUi + nfl_first_stripe_index) % stripe_count;
-    
+
     idx = nflda_stripe_indices[j];
-    
+
     fh_count = number of elements in nfl_fh_list;
     ds_count = number of elements in nflda_multipath_ds_list;
-    
+
     switch (fh_count) {
       case ds_count:
         fh = nfl_fh_list[idx];
         break;
-    
+
       case 1:
         fh = nfl_fh_list[0];
         break;
-    
+
       case 0:
         fh = filehandle returned by OPEN;
         break;
-    
+
       default:
         throw a fatal exception;
         break;
     }
-    
+
     address_list = nflda_multipath_ds_list[idx];
         </artwork>
       </figure>
@@ -636,7 +636,7 @@
         <c>11</c> <c>36</c> <c>A,B,C,D</c>
         <c>12</c> <c>87</c> <c>E</c>
       </texttable>
-    
+
     </section>
 
     <section toc='exclude' anchor="ss:nfsv4.1_as:ItFLUDP" title="Interpreting the File Layout Using Dense Packing">
@@ -649,24 +649,24 @@
       <figure>
         <artwork>
     stripe_count = number of elements in nflda_stripe_indices;
-    
+
     j = (SUi + nfl_first_stripe_index) % stripe_count;
-    
+
     idx = nflda_stripe_indices[j];
-    
+
     fh_count = number of elements in nfl_fh_list;
     ds_count = number of elements in nflda_multipath_ds_list;
-    
+
     switch (fh_count) {
       case stripe_count:
         fh = nfl_fh_list[j];
         break;
-    
+
       default:
         throw a fatal exception;
         break;
     }
-    
+
     address_list = nflda_multipath_ds_list[idx];
         </artwork>
       </figure>
@@ -800,7 +800,6 @@
     nfl_fh_list[3] = { 0x36 }
         </artwork>
       </figure>
-      
 
       <t>
         The client can thus write SU1 to { 0x36, { A, B, C, D } }.

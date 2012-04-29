@@ -23,14 +23,14 @@
     <xref target="ss:core_infrastructure:RaSS" />.  There are specific considerations when using
     Kerberos V5 as described in <xref target="ss:core_infrastructure:SCfCAiKV" />.
   </t>
- 
+
   <t>
     Note that being REQUIRED to implement does not mean REQUIRED to use;
     AUTH_SYS can be used by NFSv4.1 clients and servers.  However,
     AUTH_SYS is merely an OPTIONAL security flavor in NFSv4.1, and so
     interoperability via AUTH_SYS is not assured.
   </t>
- 
+
   <t>
     For reasons of reduced administration overhead, better performance,
     and/or reduction of CPU utilization, users of NFSv4.1 implementations
@@ -43,7 +43,7 @@
     are three operations in particular that warrant the implementation
     overriding user choices.
   </t>
- 
+
   <t>
     <list style='symbols'>
       <t>
@@ -58,7 +58,7 @@
         the server, making the client and/or server vulnerable to further
         attacks.
       </t>
- 
+
       <t>
         The third operation that SHOULD use integrity protection is any
         GETATTR for the fs_locations and fs_locations_info attributes, in
@@ -73,7 +73,7 @@
       </t>
     </list>
   </t>
- 
+
   <t>
     Relative to previous NFS versions, NFSv4.1 has additional security
     considerations for pNFS (see Sections <xref target="ss:parallel_nfs:SCfp" format='counter' />

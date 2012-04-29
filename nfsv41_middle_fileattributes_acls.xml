@@ -212,14 +212,14 @@
           The bitmask constants used to represent the above definitions within
           the aclsupport attribute are as follows:
         </t>
-  
+
         <?rfc include='autogen/const_aclsupport4.xml'?>
-  
+
         <t>
           Servers that support either the ALLOW or DENY ACE type SHOULD support
           both ALLOW and DENY ACE types.
         </t>
-  
+
         <t>
           Clients should not attempt to set an ACE unless the server claims
           support for that ACE type.  If the server receives a request to set
@@ -228,7 +228,7 @@
           that it can store but cannot enforce, the server SHOULD reject the
           request with NFS4ERR_ATTRNOTSUPP.
         </t>
-  
+
         <t>
           Support for any of the ACL attributes is optional (albeit
           RECOMMENDED).  However, a server that supports either of the new ACL
@@ -239,14 +239,14 @@
           support the sacl attribute.
         </t>
       </section>
-  
+
       <section toc='exclude' anchor="ss:access_control:AAM" title="ACE Access Mask">
         <t>
           The bitmask constants used for the access mask field are as follows:
         </t>
-  
+
         <?rfc include='autogen/const_acemask4.xml'?>
-  
+
         <t>
           Note that some masks have coincident values, for example,
           ACE4_READ_DATA and ACE4_LIST_DIRECTORY.  The mask entries
@@ -810,7 +810,7 @@
           user or a group, with the flag bit ACE4_IDENTIFIER_GROUP specifying
           which.
         </t>
-       
+
         <t>
           There are several special identifiers that need to be understood
           universally, rather than in the context of a particular DNS domain.
@@ -820,7 +820,7 @@
           permitted over NFS, even if none of the access methods on the server
           understands the identifiers.
         </t>
-       
+
         <texttable anchor="tbl:specialwho">
           <ttcol>Who</ttcol>
           <ttcol>Description</ttcol>
@@ -835,13 +835,13 @@
           <c>AUTHENTICATED</c> <c>Any authenticated user (opposite of ANONYMOUS).  </c>
           <c>SERVICE      </c> <c>Access from a system service.                    </c>
         </texttable>
-       
+
         <t>
           To avoid conflict, these special identifiers are distinguished by an
           appended "@" and should appear in the form "xxxx@" (with no domain
           name after the "@"), for example, ANONYMOUS@.
         </t>
-       
+
         <t>
           The ACE4_IDENTIFIER_GROUP flag MUST be ignored on entries with these
           special identifiers.  When encoding entries with these special
@@ -1351,46 +1351,46 @@
           (<xref target="ss:access_control:A5s" />) and dacl (<xref target="ss:access_control:A5d" />) attributes also include an
           additional flag field.
         </t>
-  
+
         <?rfc include='autogen/type_nfsacl41.xml'?>
-  
+
         <t>
           The flag field applies to the entire sacl or dacl; three flag values
           are defined:
         </t>
-  
+
         <?rfc include='autogen/const_aclflag4.xml'?>
-  
+
         <t>
           and all other bits must be cleared.  The ACE4_INHERITED_ACE flag may
           be set in the ACEs of the sacl or dacl (whereas it must always be
           cleared in the acl).
         </t>
-  
+
         <t>
           Together these features allow a server to support automatic
           inheritance, which we now explain in more detail.
         </t>
-  
+
         <t>
           Inheritable ACEs are normally inherited by child objects only at the
           time that the child objects are created; later modifications to
           inheritable ACEs do not result in modifications to inherited ACEs on
           descendants.
         </t>
-  
+
         <t>
           However, the dacl and sacl provide an OPTIONAL mechanism that allows
           a client application to propagate changes to inheritable ACEs to an
           entire directory hierarchy.
         </t>
-  
+
         <t>
           A server that supports this performs inheritance at object creation
           time in the normal way, and SHOULD set the ACE4_INHERITED_ACE flag on
           any inherited ACEs as they are added to the new object.
         </t>
-  
+
         <t>
           A client application such as an ACL editor may then propagate changes
           to inheritable ACEs on a directory by recursively traversing that
@@ -1403,7 +1403,7 @@
           those will also need to be taken into account when propagating
           inheritable ACEs to further descendants.)
         </t>
-  
+
         <t>
           The reach of this propagation may be limited in two ways: first,
           automatic inheritance is not performed from any directory ACL that
@@ -1412,7 +1412,7 @@
           set, preventing modification of that ACL and also (if the ACL is set
           on a directory) of the ACL on any of the object's descendants.
         </t>
-  
+
         <t>
           This propagation is performed independently for the sacl and the dacl
           attributes; thus, the ACL4_AUTO_INHERIT and ACL4_PROTECTED flags may
@@ -1420,19 +1420,19 @@
           one type of acl may continue down a hierarchy even where propagation
           of the other acl has stopped.
         </t>
-  
+
         <t>
           New objects should be created with a dacl and a sacl that both have
           the ACL4_PROTECTED flag cleared and the ACL4_AUTO_INHERIT flag set to
           the same value as that on, respectively, the sacl or dacl of the
           parent object.
         </t>
-  
+
         <t>
           Both the dacl and sacl attributes are RECOMMENDED, and a server may
           support one without supporting the other.
         </t>
-  
+
         <t>
           A server that supports both the old acl attribute and one or both of
           the new dacl or sacl attributes must do so in such a way as to keep
@@ -1443,7 +1443,7 @@
           And of course a client that queries only the acl will be unable to
           determine the values of the sacl or dacl flag fields.
         </t>
-  
+
         <t>
           When a client performs a SETATTR for the acl attribute, the server
           SHOULD set the ACL4_PROTECTED flag to true on both the sacl and the
@@ -1452,7 +1452,7 @@
           inheritance, and thus cannot be trusted to set an ACL for which
           automatic inheritance would make sense.
         </t>
-  
+
         <t>
           When a client application queries an ACL, modifies it, and sets it
           again, it should leave any ACEs marked with ACE4_INHERITED_ACE
@@ -1462,14 +1462,14 @@
           this rule may lead to unexpected results when applications perform
           automatic inheritance.
         </t>
-  
+
         <t>
           If a server also supports the mode attribute, it SHOULD set the mode
           in such a way that leaves inherited ACEs unchanged, in their original
           order, at the end of the ACL.  If it is unable to do so, it SHOULD
           set the ACL4_PROTECTED flag on the file's dacl.
         </t>
-  
+
         <t>
           Finally, in the case where the request that creates a new file or
           directory does not also set permissions for that file or directory,

@@ -17,7 +17,7 @@
       the mechanism of translating a string-based file system pathname to a
       filehandle, which can then be used by the NFS protocols.
     </t>
-   
+
     <t>
       The MOUNT protocol has deficiencies in the area of security and use
       via firewalls.  This is one reason that the use of the public
@@ -27,7 +27,7 @@
       MOUNT protocol is unnecessary for viable interaction between NFS
       client and server.
     </t>
-   
+
     <t>
       Therefore, the NFSv4.1 protocol will not use an ancillary protocol
       for translation from string-based pathnames to a filehandle.  Two
@@ -74,7 +74,7 @@
       "volatile" filehandle, which attempts to accommodate certain server
       environments.
     </t>
-   
+
     <t>
       The volatile filehandle type was introduced to address server
       functionality or implementation issues that make correct
@@ -88,7 +88,7 @@
       system reorganization or migration.  However, the volatile filehandle
       increases the implementation burden for the client.
     </t>
-   
+
     <t>
       Since the client will need to handle persistent and volatile
       filehandles differently, a file attribute is defined that may be used
@@ -115,7 +115,7 @@
         comparison in the context of data caching is presented in
         <xref target="ss:client-side_caching:DCaFI" />.
       </t>
-     
+
       <t>
         As an example, in the case that two different pathnames when
         traversed at the server terminate at the same file system object, the
@@ -139,7 +139,7 @@
         instantiation.  Similarly, if the file system is migrated, the new
         NFS server MUST honor the same filehandle as the old NFS server.
       </t>
-     
+
       <t>
         The persistent filehandle will be become stale or invalid when the
         file system object is removed.  When the server is presented with a
@@ -165,14 +165,14 @@
         determines that a volatile filehandle can no longer be used, it
         should return an error of NFS4ERR_FHEXPIRED.
       </t>
-     
+
       <t>
         The REQUIRED attribute "fh_expire_type" is used by the client to
         determine what type of filehandle the server is providing for a
         particular file system.  This attribute is a bitmask with the
         following values:
       </t>
-     
+
       <t>
         <list style='hanging'>
           <t hangText='FH4_PERSISTENT'>
@@ -182,19 +182,19 @@
             NFS4ERR_FHEXPIRED for this filehandle.  FH4_PERSISTENT is defined
             as a value in which none of the bits specified below are set.
           </t>
-     
+
           <t hangText='FH4_VOLATILE_ANY'>
             The filehandle may expire at any time, except as
             specifically excluded (i.e., FH4_NO_EXPIRE_WITH_OPEN).
           </t>
-     
+
           <t hangText='FH4_NOEXPIRE_WITH_OPEN'>
             May only be set when FH4_VOLATILE_ANY is set.
             If this bit is set, then the meaning of FH4_VOLATILE_ANY is
             qualified to exclude any expiration of the filehandle when it is
             open.
           </t>
-     
+
           <t hangText='FH4_VOL_MIGRATION'>
             The filehandle will expire as a result of a file
             system transition (migration or replication), in those cases in
@@ -204,7 +204,7 @@
             information should assume that filehandles will expire on file
             system transitions.
           </t>
-     
+
           <t hangText='FH4_VOL_RENAME'>
             The filehandle will expire during rename.  This
             includes a rename by the requesting client or a rename by any
@@ -212,7 +212,7 @@
           </t>
         </list>
       </t>
-     
+
       <t>
         Servers that provide volatile filehandles that can expire while open
         require special care as regards handling of RENAMEs and REMOVEs.
@@ -226,7 +226,7 @@
         to make sure that reclaims of files where filehandles may have
         expired do not do a reclaim for the wrong file.
       </t>
-     
+
       <t>
         Volatile filehandles are especially suitable for implementation of
         the pseudo file systems used to bridge exports.  See <xref target="ss:single-server_namespace:FV" /> for

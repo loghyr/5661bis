@@ -13,7 +13,7 @@
     specifications, and it is often unclear what is valid or invalid
     client behavior.
   </t>
- 
+
   <t>
     The NFSv4.1 protocol uses many techniques similar to those that have
     been used in previous protocol versions.  The NFSv4.1 protocol does
@@ -22,7 +22,7 @@
     reservations to be used without destructive interference from
     client-side caching.
   </t>
- 
+
   <t>
     In addition, the NFSv4.1 protocol introduces a delegation mechanism,
     which allows many decisions normally made by the server to be made
@@ -106,7 +106,7 @@
       responsibilities when another client engages in sharing of a
       delegated file.
     </t>
-    
+
     <t>
       A delegation is passed from the server to the client, specifying the
       object of the delegation and the type of delegation.  There are
@@ -119,7 +119,7 @@
       delegation is made to the client as a whole and not to any specific
       process or thread of control within it.
     </t>
-    
+
     <t>
       The backchannel is established by CREATE_SESSION and
       BIND_CONN_TO_SESSION, and the client is required to maintain it.
@@ -135,7 +135,7 @@
       GET_DIR_DELEGATIONs to be processed without any delegations being
       granted.
     </t>
-    
+
     <t>
       Unlike locks, an operation by a second client to a delegated file
       will cause the server to recall a delegation through a callback.  For
@@ -143,7 +143,7 @@
       such operations are required to effect a recall.  A number of points
       should be noted, however.
     </t>
-    
+
     <t>
       <list style='symbols'>
         <t>
@@ -151,7 +151,7 @@
           desirable and may do so even if no operations requiring recall are
           being done.
         </t>
-    
+
         <t>
           Operations done outside the NFSv4.1 protocol, due to, for example,
           access by other protocols, or by local access, also need to result
@@ -161,7 +161,7 @@
           the delegation needs to be recalled and MUST be returned or
           revoked before allowing the operation to proceed.
         </t>
-    
+
         <t>
           The semantics of the file system are crucial in defining when
           delegation recall is required.  If a particular change within a
@@ -173,45 +173,45 @@
         </t>
       </list>
     </t>
-    
+
     <t>
       Despite those caveats, the implementation sections for a number of
       operations describe situations in which delegation recall would be
       required under some common circumstances:
     </t>
-    
+
     <t>
       <list style='symbols'>
         <t>
           For GETATTR, see <xref target="ss:op_GETATTR:I" />.
         </t>
-    
+
         <t>
           For OPEN, see <xref target="ss:op_OPEN:I" />.
         </t>
-    
+
         <t>
           For READ, see <xref target="ss:op_READ:I" />.
         </t>
-    
+
         <t>
           For REMOVE, see <xref target="ss:op_REMOVE:I" />.
         </t>
-    
+
         <t>
           For RENAME, see <xref target="ss:op_RENAME:I" />.
         </t>
-    
+
         <t>
           For SETATTR, see <xref target="ss:op_SETATTR:I" />.
         </t>
-    
+
         <t>
           For WRITE, see <xref target="ss:op_WRITE:I" />.
         </t>
       </list>
     </t>
-    
+
     <t>
       On recall, the client holding the delegation needs to flush modified
       state (such as modified data) to the server and return the
@@ -224,7 +224,7 @@
       Following the resolution of the recall, the server has the
       information necessary to grant or deny the second client's request.
     </t>
-    
+
     <t>
       At the time the client receives a delegation recall, it may have
       substantial state that needs to be flushed to the server.  Therefore,
@@ -235,7 +235,7 @@
       the usual time allowed for a recall.  However, the time allowed for
       recall completion should not be unbounded.
     </t>
-    
+
     <t>
       An example of this is when responsibility to mediate opens on a given
       file is delegated to a client (see <xref target="ss:client-side_caching:OD" />).  The server will
@@ -244,7 +244,7 @@
       deny states for the file allow any particular open until the
       delegation for the file has been returned.
     </t>
-    
+
     <t>
       A client failure or a network partition can result in failure to
       respond to a recall callback.  In this case, the server will revoke
@@ -504,11 +504,11 @@
         file system.  However, they may not work with the NFSv4.1 protocol
         unless clients refrain from data caching.
       </t>
-     
+
       <t>
         The rules for data caching in the byte-range locking environment are:
       </t>
-     
+
       <t>
         <list style='symbols'>
           <t>
@@ -522,7 +522,7 @@
             has for the file, but the only requirement for correct operation
             is to invalidate all of the data in the newly locked byte-range.
           </t>
-     
+
           <t>
             Second, before releasing a WRITE_LT lock for a byte-range, all
             modified data for that byte-range must be flushed to the server.
@@ -530,7 +530,7 @@
           </t>
         </list>
       </t>
-     
+
       <t>
         Note that flushing data to the server and the invalidation of cached
         data must reflect the actual byte-ranges locked or unlocked.
@@ -547,7 +547,7 @@
         server if the revalidation procedure shows that the data that the
         client possesses may not be valid.
       </t>
-     
+
       <t>
         The data that is written to the server as a prerequisite to the
         unlocking of a byte-range must be written, at the server, to stable
@@ -556,7 +556,7 @@
         This is required because retransmission of the modified data after a
         server restart might conflict with a lock held by another client.
       </t>
-     
+
       <t>
         A client implementation may choose to accommodate applications that
         use byte-range locking in non-standard ways (e.g., using a byte-range
@@ -610,7 +610,7 @@
         system objects.  The client then has the choice to organize and
         maintain the data cache on this basis.
       </t>
-     
+
       <t>
         In the NFSv4.1 protocol, there is now the possibility to have
         significant deviations from a "one filehandle per object" model
@@ -622,7 +622,7 @@
         inconsistencies would arise between the distinct client-side objects
         that mapped to the same server-side object.
       </t>
-     
+
       <t>
         By providing a method to differentiate filehandles, the NFSv4.1
         protocol alleviates a potential functional regression in comparison
@@ -632,13 +632,13 @@
         is possible to have such inconsistencies with applications executing
         on multiple clients, but that is not the issue being addressed here.
       </t>
-     
+
       <t>
         For the purposes of data caching, the following steps allow an
         NFSv4.1 client to determine whether two distinct filehandles denote
         the same server-side object:
       </t>
-     
+
       <t>
         <list style='symbols'>
           <t>
@@ -646,13 +646,13 @@
             the fsid attribute, then the filehandles represent distinct
             objects.
           </t>
-     
+
           <t>
             If GETATTR for any file with an fsid that matches the fsid of the
             two filehandles in question returns a unique_handles attribute
             with a value of TRUE, then the two objects are distinct.
           </t>
-     
+
           <t>
             If GETATTR directed to the two filehandles does not return the
             fileid attribute for both of the handles, then it cannot be
@@ -663,12 +663,12 @@
             it for neither of the filehandles, since the fsid for both
             filehandles is the same.
           </t>
-     
+
           <t>
             If GETATTR directed to the two filehandles returns different
             values for the fileid attribute, then they are distinct objects.
           </t>
-     
+
           <t>
             Otherwise, they are the same object.
           </t>
@@ -691,7 +691,7 @@
       set of conditions that servers might use in deciding whether an OPEN
       should be delegated:
     </t>
-   
+
     <t>
       <list style='symbols'>
         <t>
@@ -700,26 +700,26 @@
           send a CB_COMPOUND request, containing a single operation,
           CB_SEQUENCE, for a test of backchannel availability.
         </t>
-   
+
         <t>
           The client must have responded properly to previous recalls.
         </t>
-   
+
         <t>
           There must be no current OPEN conflicting with the requested
           delegation.
         </t>
-   
+
         <t>
           There should be no current delegation that conflicts with the
           delegation being requested.
         </t>
-   
+
         <t>
           The probability of future conflicting open requests should be low
           based on the recent history of the file.
         </t>
-   
+
         <t>
           The existence of any server-specific semantics of OPEN/CLOSE that
           would make the required handling incompatible with the prescribed
@@ -727,7 +727,7 @@
         </t>
       </list>
     </t>
-   
+
     <t>
       There are two types of OPEN delegations: OPEN_DELEGATE_READ and
       OPEN_DELEGATE_WRITE.  An OPEN_DELEGATE_READ delegation allows a
@@ -739,7 +739,7 @@
       delegation may exist for a given file at a given time, and it is
       inconsistent with any OPEN_DELEGATE_READ delegations.
     </t>
-   
+
     <t>
       When a client has an OPEN_DELEGATE_READ delegation, it is assured
       that neither the contents, the attributes (with the exception of
@@ -752,7 +752,7 @@
       data: size, change, time_access, time_metadata, and time_modify.  All
       other attributes must be reflected on the server.
     </t>
-   
+
     <t>
       When a client has an OPEN delegation, it does not need to send OPENs
       or CLOSEs to the server.  Instead, the client may update the
@@ -761,34 +761,34 @@
       OPEN4_SHARE_ACCESS_WRITE/OPEN4_SHARE_ACCESS_BOTH or that deny
       OPEN4_SHARE_ACCESS_READ access) must be sent to the server.
     </t>
-   
+
     <t>
       When an OPEN delegation is made, the reply to the OPEN contains an
       OPEN delegation structure that specifies the following:
     </t>
-   
+
     <t>
       <list style='symbols'>
         <t>
           the type of delegation (OPEN_DELEGATE_READ or
           OPEN_DELEGATE_WRITE).
         </t>
-   
+
         <t>
           space limitation information to control flushing of data on close
           (OPEN_DELEGATE_WRITE delegation only; see <xref target="ss:client-side_caching:ODaDC" />)
         </t>
-   
+
         <t>
           an nfsace4 specifying read and write permissions
         </t>
-   
+
         <t>
           a stateid to represent the delegation
         </t>
       </list>
     </t>
-   
+
     <t>
       The delegation stateid is separate and distinct from the stateid for
       the OPEN proper.  The standard stateid, unlike the delegation
@@ -796,7 +796,7 @@
       to be valid after the delegation is recalled and the file remains
       open.
     </t>
-   
+
     <t>
       When a request internal to the client is made to open a file and an
       OPEN delegation is in effect, it will be accepted or rejected solely
@@ -805,32 +805,32 @@
       delegation being denied so that the checks can be made by the server
       itself.
     </t>
-   
+
     <t>
       <list style='symbols'>
         <t>
           The access and deny bits for the request and the file as described
           in <xref target="ss:file_locking:SR" />.
         </t>
-   
+
         <t>
           The read and write permissions as determined below.
         </t>
       </list>
     </t>
-   
+
     <t>
       The nfsace4 passed with delegation can be used to avoid frequent
       ACCESS calls.  The permission check should be as follows:
     </t>
-   
+
     <t>
       <list style='symbols'>
         <t>
           If the nfsace4 indicates that the open may be done, then it should
           be granted without reference to the server.
         </t>
-   
+
         <t>
           If the nfsace4 indicates that the open may not be done, then an
           ACCESS request must be sent to the server to obtain the definitive
@@ -838,7 +838,7 @@
         </t>
       </list>
     </t>
-   
+
     <t>
       The server may return an nfsace4 that is more restrictive than the
       actual ACL of the file.  This includes an nfsace4 that specifies
@@ -847,7 +847,7 @@
       <xref target="ss:file_attributes:Ioao" />) may make it incorrect to return the actual ACL of the
       file in the delegation response.
     </t>
-   
+
     <t>
       The use of a delegation together with various other forms of caching
       creates the possibility that no server authentication and
@@ -877,7 +877,7 @@
         guarantee that no open, and thus no READ or WRITE, has been done by
         another client.
       </t>
-     
+
       <t>
         For the purposes of OPEN delegation, READs and WRITEs done without an
         OPEN are treated as the functional equivalents of a corresponding
@@ -889,7 +889,7 @@
         delegation must be recalled and I/O not proceed until the delegation
         is recalled or revoked).
       </t>
-     
+
       <t>
         With delegations, a client is able to avoid writing data to the
         server when the CLOSE of a file is serviced.  The file close system
@@ -903,7 +903,7 @@
         alternative method be in place for the same type of communication to
         occur between client and server.
       </t>
-     
+
       <t>
         In the delegation response, the server provides either the limit of
         the size of the file or the number of modified blocks and associated
@@ -918,7 +918,7 @@
         state space limits for delegations.  If the client exceeds the stated
         limits for the delegation, the server's behavior is undefined.
       </t>
-     
+
       <t>
         Based on server conditions, quotas, or available file system space,
         the server may grant OPEN_DELEGATE_WRITE delegations with very
@@ -926,7 +926,7 @@
         way that will always force modified data to be flushed to the server
         on close.
       </t>
-     
+
       <t>
         With respect to authentication, flushing modified data to the server
         after a CLOSE has occurred may be problematic.  For example, the user

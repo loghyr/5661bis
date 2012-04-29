@@ -182,18 +182,18 @@
           named attribute directory, so no hierarchical structure of named
           attributes for a single object is allowed.
         </t>
- 
+
         <t>
           If OPENATTR is done on a named attribute directory or on a named
           attribute, the server MUST return NFS4ERR_WRONG_TYPE.
         </t>
- 
+
         <t>
           Doing a RENAME of a named attribute to a different named attribute
           directory or to an ordinary (i.e., non-named-attribute) directory
           is not allowed.
         </t>
- 
+
         <t>
           Creating hard links between named attribute directories or between
           named attribute directories and ordinary directories is not
@@ -1411,7 +1411,7 @@
         specification.
       </t>
     </section>
-  
+
     <section toc='exclude' anchor="ss:file_attributes:A7r2" title="Attribute 72: retentevt_set">
       <t>
         Sets the event-based retention duration, and optionally enables
@@ -1430,13 +1430,13 @@
         retention_hold attribute.
       </t>
     </section>
-  
+
     <section toc='exclude' anchor="ss:file_attributes:A7r3" title="Attribute 73: retention_hold">
       <t>
         Gets or sets administrative retention holds, one hold per bit
         position.
       </t>
-  
+
       <t>
         This attribute allows one to 64 administrative holds, one hold per
         bit on the attribute.  If retention_hold is not zero, then the file
@@ -1447,7 +1447,7 @@
         administration retention holds does not prevent the enabling of
         event-based or non-event-based retention.
       </t>
-  
+
       <t>
         If the principal attempting to change retention_hold does not have
         ACE4_WRITE_RETENTION_HOLD permissions, the attempt MUST fail with

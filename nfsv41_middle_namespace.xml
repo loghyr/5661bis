@@ -38,7 +38,7 @@
       export to another export via single-component, progressive LOOKUP
       operations.
     </t>
-   
+
     <t>
       This style of browsing is not well supported by the NFSv3 protocol.
       In NFSv3, the client expects all LOOKUP operations to remain within a
@@ -46,7 +46,7 @@
       not change.  This prevents a client from taking namespace paths that
       span exports.
     </t>
-   
+
     <t>
       In the case of NFSv3, an automounter on the client can obtain a
       snapshot of the server's namespace using the EXPORTS procedure of the
@@ -69,7 +69,7 @@
       namespace for that server.  An NFSv4.1 client uses LOOKUP and READDIR
       operations to browse seamlessly from one export to another.
     </t>
-   
+
     <t>
       Where there are portions of the server namespace that are not
       exported, clients require some way of traversing those portions to
@@ -79,12 +79,12 @@
       directories only.  A pseudo file system has a unique fsid and behaves
       like a normal, read-only file system.
     </t>
-   
+
     <t>
       Based on the construction of the server's namespace, it is possible
       that multiple pseudo file systems may exist.  For example,
     </t>
-   
+
     <figure>
       <artwork>
     /a              pseudo file system
@@ -93,7 +93,7 @@
     /a/b/c/d        real file system
       </artwork>
     </figure>
-   
+
     <t>
       Each of the pseudo file systems is considered a separate entity and
       therefore MUST have its own fsid, unique among all the fsids for that

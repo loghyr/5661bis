@@ -194,7 +194,7 @@
                 of ca_maxresponsesize of the same channel, then this is an
                 indication to the requester that it needs to be selective about
                 which replies it directs the replier to cache; for example,
-                large replies from nonidempotent operations (e.g., COMPOUND
+                large replies from non-idempotent operations (e.g., COMPOUND
                 requests with a READ operation) should not be cached.  The
                 requester decides which replies to cache via an argument to the
                 SEQUENCE (the sa_cachethis field, see <xref target="op_SEQUENCE" />) or

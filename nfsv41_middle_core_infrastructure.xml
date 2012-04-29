@@ -1,5 +1,5 @@
-<!-- Copyright (C) The IETF Trust (2011) -->
-<!-- Copyright (C) The Internet Society (2011) -->
+<!-- Copyright (C) The IETF Trust (2011-2012) -->
+<!-- Copyright (C) The Internet Society (2011-2012) -->
 
 <section anchor="sec:core_infrastructure" title="Core Infrastructure">
   <section anchor="ss:core_infrastructure:I" title="Introduction">
@@ -258,7 +258,7 @@
       Except for a small number of operations needed for session creation,
       server requests and callback requests are performed within the
       context of a session.  Sessions provide a client context for every
-      request and support robust reply protection for non-idempotent
+      request and support robust reply protection for no-nidempotent
       requests.
     </t>
   </section>
@@ -469,7 +469,7 @@
       In the case of the session being persistent, the client will
       re-establish communication using the existing session after the restart.
       This session will be associated with the existing client ID but may
-      only be used to re-transmit operations that the client previously
+      only be used to retransmit operations that the client previously
       transmitted and did not see replies to.  Replies to operations that
       the server previously performed will come from the reply cache;
       otherwise, NFS4ERR_DEADSESSION will be returned.  Hence, such a
@@ -1326,11 +1326,11 @@
           <t>
             RDMA transports use "credits" to enforce flow control, where a
             credit is a right to a peer to transmit a message.  If one peer
-            were to re-transmit a request (or reply), it would consume an
-            additional credit.  If the replier re-transmitted a reply, it would
+            were to retransmit a request (or reply), it would consume an
+            additional credit.  If the replier retransmitted a reply, it would
             certainly result in an RDMA connection loss, since the requester
             would typically only post a single receive buffer for each
-            request.  If the requester re-transmitted a request, the additional
+            request.  If the requester retransmitted a request, the additional
             credit consumed on the server might lead to RDMA connection
             failure unless the client accounted for it and decreased its
             available credit, leading to wasted resources.
@@ -2138,12 +2138,12 @@
         <t>
           The sequence ID accompanies the slot ID in each request.  It is for
           the critical check at the replier: it used to efficiently determine
-          whether a request using a certain slot ID is a re-transmit or a new,
+          whether a request using a certain slot ID is a retransmit or a new,
           never-before-seen request.  It is not feasible for the requester to
-          assert that it is re-transmitting to implement this, because for any
+          assert that it is retransmitting to implement this, because for any
           given request the requester cannot know whether the replier has seen
           it unless the replier actually replies.  Of course, if the requester
-          has seen the reply, the requester would not re-transmit.
+          has seen the reply, the requester would not retransmit.
         </t>
 
         <t>
@@ -2162,7 +2162,7 @@
             </t>
 
             <t>
-              A re-transmitted request, in which the sequence ID is equal to that
+              A retransmitted request, in which the sequence ID is equal to that
               currently recorded in the slot.  If the original request has
               executed to completion, the replier returns the cached reply.  See
               <xref target="ss:core_infrastructure:RaRoR" /> for direction on how the replier deals with
@@ -2196,7 +2196,7 @@
           which is that unlike XID-indexed reply caches (also known as
           duplicate request caches - DRCs), the slot ID-based reply cache
           cannot be overflowed.  Through use of the sequence ID to identify
-          re-transmitted requests, the replier does not need to actually cache
+          retransmitted requests, the replier does not need to actually cache
           the request itself, reducing the storage requirements of the reply
           cache further.  These facilities make it practical to maintain all
           the required entries for an effective reply cache.
@@ -2806,20 +2806,20 @@
           following information if it agreed to persist the session (when the
           session was created; see <xref target="op_CREATE_SESSION" />):
         </t>
-  
+
         <t>
           <list style='symbols'>
             <t>
               The session ID.
             </t>
-  
+
             <t>
               The slot table including the sequence ID and cached reply for each
               slot.
             </t>
           </list>
         </t>
-  
+
         <t>
           The above are sufficient for a replier to provide EOS semantics for
           any requests that were sent and executed before the server restarted.
@@ -2838,38 +2838,38 @@
           server needs to persist additional information through server
           restart:
         </t>
-  
+
         <t>
           <list style='symbols'>
             <t>
               The client ID.  This is a prerequisite to let the client create
               more sessions associated with the same client ID as the reanimated session.
             </t>
-  
+
             <t>
               The client ID's sequence ID that is used for creating sessions
               (see Sections <xref target="op_EXCHANGE_ID" format='counter' /> and <xref target="op_CREATE_SESSION" format='counter' />).  This is a prerequisite to let the
               client create more sessions.
             </t>
-  
+
             <t>
               The principal that created the client ID.  This allows the server
               to authenticate the client when it sends EXCHANGE_ID.
             </t>
-  
+
             <t>
               The SSV, if SP4_SSV state protection was specified when the client
               ID was created (see <xref target="op_EXCHANGE_ID" />).  This lets the client create
               new sessions, and associate connections with the new and existing
               sessions.
             </t>
-  
+
             <t>
               The properties of the client ID as defined in <xref target="op_EXCHANGE_ID" />.
             </t>
           </list>
         </t>
-  
+
         <t>
           A persistent reply cache places certain demands on the server.  The
           execution of the sequence of operations (starting with SEQUENCE) and
@@ -2881,7 +2881,7 @@
           session that has been deleted because the client failed to use the
           session for an extended period of time).
         </t>
-  
+
         <t>
           A server could fail and restart in the middle of a COMPOUND procedure
           that contains one or more non-idempotent or idempotent-but-modifying
@@ -2895,7 +2895,7 @@
           restarts, its recovery logic could roll back the transaction before
           starting the NFSv4.1 server.
         </t>
-  
+
         <t>
           While the description of the implementation for atomic execution of
           the request and caching of the reply is beyond the scope of this
@@ -2904,7 +2904,7 @@
         </t>
       </section>
     </section>
-  
+
     <section toc='exclude' anchor="ss:core_infrastructure:RC" title="RDMA Considerations">
       <t>
         A complete discussion of the operation of RPC-based protocols over
@@ -2913,13 +2913,13 @@
         this specification assumes the use of such a layering; it addresses
         only the upper-layer issues relevant to making best use of RPC/RDMA.
       </t>
-  
+
       <section toc='exclude' anchor="ss:core_infrastructure:RCR" title="RDMA Connection Resources">
         <t>
           RDMA requires its consumers to register memory and post buffers of a
           specific size and number for receive operations.
         </t>
-  
+
         <t>
           Registration of memory can be a relatively high-overhead operation,
           since it requires pinning of buffers, assignment of attributes (e.g.,
@@ -2929,7 +2929,7 @@
           endpoints; therefore, negotiation of their limits is desirable to
           manage resources effectively.
         </t>
-  
+
         <t>
           Following basic registration, these buffers must be posted by the RPC
           layer to handle receives.  These buffers remain in use by the RPC/
@@ -2937,7 +2937,7 @@
           the remote peer in order to avoid RDMA errors that would cause a
           fatal error on the RDMA connection.
         </t>
-  
+
         <t>
           NFSv4.1 manages slots as resources on a per-session basis (see
           <xref target="ss:core_infrastructure:S" />), while RDMA connections
@@ -2950,7 +2950,7 @@
           is the lesser of X and Y.
         </t>
       </section>
-  
+
       <section toc='exclude' anchor="ss:core_infrastructure:FC" title="Flow Control">
         <t>
           Previous versions of NFS do not provide flow control; instead, they
@@ -2969,7 +2969,7 @@
           across all connections associated with the replier's channel does
           exceed the channel's maximum number of outstanding requests.
         </t>
-  
+
         <t>
           The limits may also be modified dynamically at the replier's choosing
           by manipulating certain parameters present in each NFSv4.1 reply.  In
@@ -2979,7 +2979,7 @@
           have outstanding to the server.
         </t>
       </section>
-  
+
       <section toc='exclude' anchor="ss:core_infrastructure:P2" title="Padding">
         <t>
           Header padding is requested by each peer at session initiation (see
@@ -2987,7 +2987,7 @@
           and subsequently used by the RPC RDMA layer, as described in <xref target="RFC5666" />.
           Zero padding is permitted.
         </t>
-  
+
         <t>
           Padding leverages the useful property that RDMA preserve alignment of
           data, even when they are placed into anonymous (untagged) buffers.
@@ -3007,7 +3007,7 @@
           message round trips on the network -- a potentially good trade, where
           latency is present.
         </t>
-  
+
         <t>
           The value to choose for padding is subject to a number of criteria.
           A primary source of variable-length data in the RPC header is the
@@ -3020,7 +3020,7 @@
           versa.  The benefit of an appropriate padding value is higher
           performance.
         </t>
-  
+
         <figure>
           <artwork>
 <![CDATA[
@@ -3399,7 +3399,7 @@
         (emitted by GSS_GetMIC) and the SealedMessage token (emitted by
         GSS_Wrap).
       </t>
-     
+
       <t>
         The mechanism OID for the SSV mechanism is
         iso.org.dod.internet.private.enterprise.Michael Eisler.nfs.ssv_mech
@@ -3408,7 +3408,7 @@
         that the SSV mechanism is acceptable whenever the client sends a
         SECINFO or SECINFO_NO_NAME operation (see <xref target="ss:core_infrastructure:SSN" />).
       </t>
-     
+
       <t>
         The SSV mechanism defines four subkeys derived from the SSV value.
         Each time SET_SSV is invoked, the subkeys are recalculated by the
@@ -3427,7 +3427,7 @@
         than the length of subkey needed for the encryption algorithm (see
         <xref target="op_EXCHANGE_ID" />).
       </t>
-     
+
       <?rfc include="autogen/type_ssv_subkey4.xml"?>
 
       <t>
@@ -3441,11 +3441,11 @@
         derived from SSV4_SUBKEY_SEAL_T2I is used for encryption text
         originating from the NFSv4.1 server.
       </t>
-     
+
       <t>
         The PerMsgToken description is based on an XDR definition:
       </t>
-     
+
       <?rfc include="autogen/type_ssv_mic_plain_tkn4.xml"?>
       <?rfc include="autogen/type_ssv_mic_tkn4.xml"?>
 
@@ -3464,7 +3464,7 @@
         making up an XDR encoding of a value of data type ssv_mic_plain_tkn4,
         which in turn is the input into the HMAC.
       </t>
-     
+
       <t>
         The token emitted by GSS_GetMIC() is XDR encoded and of XDR data type
         ssv_mic_tkn4.  The field smt_ssv_seq comes from the SSV sequence
@@ -3480,11 +3480,11 @@
         necessary padding.  Prepended to this will be the XDR encoded value
         of smt_ssv_seq.
       </t>
-     
+
       <t>
         The SealedMessage description is based on an XDR definition:
       </t>
-     
+
       <?rfc include="autogen/type_ssv_seal_plain_tkn4.xml"?>
       <?rfc include="autogen/type_ssv_seal_cipher_tkn4.xml"?>
 
@@ -3492,18 +3492,18 @@
         The token emitted by GSS_Wrap() is XDR encoded and of XDR data type
         ssv_seal_cipher_tkn4.
       </t>
-     
+
       <t>
         The ssct_ssv_seq field has the same meaning as smt_ssv_seq.
       </t>
-     
+
       <t>
         The ssct_encr_data field is the result of encrypting a value of the
         XDR encoded data type ssv_seal_plain_tkn4.  The encryption key is the
         subkey derived from SSV4_SUBKEY_SEAL_I2T or SSV4_SUBKEY_SEAL_T2I, and
         the encryption algorithm is that negotiated by EXCHANGE_ID.
       </t>
-     
+
       <t>
         The ssct_iv field is the initialization vector (IV) for the
         encryption algorithm (if applicable) and is sent in clear text.  The
@@ -3513,7 +3513,7 @@
         for each instance of a value of data type ssv_seal_plain_tkn4 that is
         encrypted with a particular SSV key.
       </t>
-     
+
       <t>
         The ssct_hmac field is the result of computing an HMAC using the
         value of the XDR encoded data type ssv_seal_plain_tkn4 as the input
@@ -3521,15 +3521,15 @@
         SSV4_SUBKEY_MIC_T2I, and the one-way hash algorithm is that
         negotiated by EXCHANGE_ID.
       </t>
-     
+
       <t>
         The sspt_confounder field is a random value.
       </t>
-     
+
       <t>
         The sspt_ssv_seq field is the same as ssvt_ssv_seq.
       </t>
-     
+
       <t>
         The field sspt_orig_plain field is the original plaintext and is the
         "input_message" input passed to GSS_Wrap() (see Section 2.3.3 of
@@ -3539,7 +3539,7 @@
         sspt_orig_plain representing the plain text, along with the other
         fields of an instance of data type ssv_seal_plain_tkn4.
       </t>
-     
+
       <t>
         The sspt_pad field is present to support encryption algorithms that
         require inputs to be in fixed-sized blocks.  The content of sspt_pad
@@ -3549,7 +3549,7 @@
         that follows the length is always padded to a multiple of four bytes
         per the XDR standard.
       </t>
-     
+
       <t>
         For example, suppose the encryption algorithm uses 16-byte blocks,
         and the sspt_confounder is three bytes long, and the sspt_orig_plain
@@ -3562,7 +3562,7 @@
         bytes, or a total encoding of 16 bytes.  The total number of XDR
         encoded bytes is thus 8 + 4 + 20 + 16 = 48.
       </t>
-     
+
       <t>
         GSS_Wrap() emits a token that is an XDR encoding of a value of data
         type ssv_seal_cipher_tkn4.  Note that regardless of whether or not
@@ -3571,7 +3571,7 @@
         RPCSEC_GSS, and RPCSEC_GSS never produces GSS_wrap() tokens without
         confidentiality.
       </t>
-     
+
       <t>
         There is one SSV per client ID.  There is a single GSS context for a
         client ID / SSV pair.  All SSV mechanism RPCSEC_GSS handles of a
@@ -3585,21 +3585,21 @@
         RPCSEC_GSS credentials.  This way, the SSV is replaced without
         destroying the SSV's GSS contexts.
       </t>
-     
+
       <t>
         SSV RPCSEC_GSS handles can be expired or deleted by the server at any
         time, and the EXCHANGE_ID operation can be used to create more SSV
         RPCSEC_GSS handles.  Expiration of SSV RPCSEC_GSS handles does not
         imply that the SSV or its GSS context has expired.
       </t>
-     
+
       <t>
         The client MUST establish an SSV via SET_SSV before the SSV GSS
         context can be used to emit tokens from GSS_Wrap() and GSS_GetMIC().
         If SET_SSV has not been successfully called, attempts to emit tokens
         MUST fail.
       </t>
-     
+
       <t>
         The SSV mechanism does not support replay detection and sequencing in
         its tokens because RPCSEC_GSS does not use those features (See

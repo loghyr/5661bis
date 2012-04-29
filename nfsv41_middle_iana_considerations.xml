@@ -108,7 +108,7 @@
       IANA created a registry called the "NFSv4 Device ID Notifications
       Registry".
     </t>
-   
+
     <t>
       The potential exists for new notification types to be added to the
       CB_NOTIFY_DEVICEID operation (see <xref target="op_CB_NOTIFY_DEVICEID" />).  This can be done
@@ -118,12 +118,12 @@
       Another way to add a notification is to specify a new layout type
       (see <xref target="ss:iana_considerations:LT" />).
     </t>
-   
+
     <t>
       Hence, all assignments to the registry are made on a Standards Action
       basis per Section 4.1 of <xref target="RFC5226" />, with Expert Review required.
     </t>
-   
+
     <t>
       The registry is a list of assignments, each containing five fields
       per assignment.
@@ -446,12 +446,12 @@
                   <t>
                     Failure and restart for client, server, storage device.
                   </t>
-         
+
                   <t>
                     Lease expiration from perspective of the active client,
                     server, storage device.
                   </t>
-         
+
                   <t>
                     Loss of layout state resulting in fencing of client access
                     to storage devices (for an example, see <xref target="ss:parallel_nfs:DwLoLSotMS" />).
@@ -564,7 +564,7 @@
           registrant also wants IANA to establish a registry for the values of
           the registered variable.
         </t>
-       
+
         <t>
           The registry is a list of assignments, each containing three fields.
         </t>
@@ -697,13 +697,13 @@
         IANA created a registry called the "NFSv4 ${ietf.org:OS_TYPE} Value
         Registry".
       </t>
-     
+
       <t>
         Assignments to the registry are made on a First Come First Serve
         basis.  The zero-length value of ${ietf.org:OS_TYPE} is Reserved.
         Values with a prefix of "PRIV" are designated for Private Use.
       </t>
-     
+
       <t>
         The registry is a list of assignments, each containing three fields.
       </t>

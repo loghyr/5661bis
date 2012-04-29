@@ -35,7 +35,7 @@
         the owner of a lock managed by the client.  This may be a thread ID,
         process ID, or other unique value.
       </t>
-     
+
       <t>
         Owners of opens and owners of byte-range locks are separate entities
         and remain separate even if the same opaque arrays are used to
@@ -43,7 +43,7 @@
         open-owners (represented by open_owner4 structures) and lock-owners
         (represented by lock_owner4 structures).
       </t>
-     
+
       <t>
         Each open is associated with a specific open-owner while each
         byte-range lock is associated with a lock-owner and an open-owner, the
@@ -66,7 +66,7 @@
         locks, or a delegation, or it may be a special stateid representing
         anonymous access or the special bypass stateid.
       </t>
-     
+
       <t>
         If the state-owner performs a READ or WRITE operation in a situation
         in which it has established a byte-range lock or share reservation on
@@ -82,7 +82,7 @@
         share reservation or mandatory byte-range lock held on the file, the
         server MUST refuse to service the READ or WRITE operation.
       </t>
-     
+
       <t>
         Share reservations are established by OPEN operations and by their
         nature are mandatory in that when the OPEN denies READ or WRITE
@@ -104,7 +104,7 @@
         locktype field of the LOCK operation's arguments (i.e., READ*_LT for
         a READ operation, WRITE*_LT for a WRITE operation).
       </t>
-     
+
       <t>
         Note that for UNIX environments that support mandatory byte-range
         locking, the distinction between advisory and mandatory locking is
@@ -120,26 +120,26 @@
         operation is done), and if there is, the server returns
         NFS4ERR_LOCKED.
       </t>
-     
+
       <t>
         For Windows environments, byte-range locks are always mandatory, so
         the server always checks for byte-range locks during I/O requests.
       </t>
-     
+
       <t>
         Thus, the LOCK operation does not need to distinguish between
         advisory and mandatory byte-range locks.  It is the server's
         processing of the READ and WRITE operations that introduces the
         distinction.
       </t>
-     
+
       <t>
         Every stateid that is validly passed to READ, WRITE, or SETATTR, with
         the exception of special stateid values, defines an access mode for
         the file (i.e., OPEN4_SHARE_ACCESS_READ, OPEN4_SHARE_ACCESS_WRITE, or
         OPEN4_SHARE_ACCESS_BOTH).
       </t>
-     
+
       <t>
         <list style='symbols'>
           <t>
@@ -148,27 +148,27 @@
             and as modified by subsequent OPENs and OPEN_DOWNGRADEs for the
             same open-owner/file pair.
           </t>
-     
+
           <t>
             For stateids returned by byte-range LOCK operations, the
             appropriate mode is the access mode for the OPEN stateid
             associated with the lock set represented by the stateid.
           </t>
-     
+
           <t>
             For delegation stateids, the access mode is based on the type of
             delegation.
           </t>
         </list>
       </t>
-     
+
       <t>
         When a READ, WRITE, or SETATTR (that specifies the size attribute)
         operation is done, the operation is subject to checking against the
         access mode to verify that the operation is appropriate given the
         stateid with which the operation is associated.
       </t>
-     
+
       <t>
         In the case of WRITE-type operations (i.e., WRITEs and SETATTRs that
         set size), the server MUST verify that the access mode allows writing
@@ -186,7 +186,7 @@
         OPEN4_SHARE_ACCESS_READ guarantees that no conflicting share
         reservation can exist.
       </t>
-     
+
       <t>
         The READ bypass special stateid (all bits of "other" and "seqid" set
         to one) indicates a desire to bypass locking checks.  The server MAY
@@ -196,14 +196,14 @@
         exactly the same as if a special stateid for anonymous state were
         used.
       </t>
-     
+
       <t>
         A lock may not be granted while a READ or WRITE operation using one
         of the special stateids is being performed and the scope of the lock
         to be granted would conflict with the READ or WRITE operation.  This
         can occur when:
       </t>
-     
+
       <t>
         <list style='symbols'>
           <t>
@@ -214,12 +214,12 @@
             exclusive lock is requested and either a READ or a WRITE operation
             is being performed.
           </t>
-     
+
           <t>
             A share reservation is requested that denies reading and/or
             writing and the corresponding operation is being performed.
           </t>
-     
+
           <t>
             A delegation is to be granted and the delegation type would
             prevent the I/O operation, i.e., READ and WRITE conflict with an
@@ -228,7 +228,7 @@
           </t>
         </list>
       </t>
-     
+
       <t>
         When a client holds a delegation, it needs to ensure that the stateid
         sent conveys the association of operation with the delegation, to

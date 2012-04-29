@@ -1,5 +1,5 @@
-<!-- Copyright (C) The IETF Trust (2011) -->
-<!-- Copyright (C) The Internet Society (2011) -->
+<!-- Copyright (C) The IETF Trust (2011-2012) -->
+<!-- Copyright (C) The Internet Society (2011-2012) -->
 
   <references title="Normative References">
 
@@ -134,12 +134,12 @@ IANA Considerations for RPC Net Identifiers and Universal Address Formats.
   <date year='2007' month='October' />
   <abstract>
   <t>
-  This document defines a Remote Direct Memory Access Protocol 
-  (RDMAP) that operates over the Direct Data Placement Protocol (DDP 
-  protocol).  RDMAP provides read and write services directly to 
-  applications and enables data to be transferred directly into 
-  Upper Layer Protocol (ULP) buffers without intermediate data 
-  copies. It also enables a kernel bypass implementation. 
+  This document defines a Remote Direct Memory Access Protocol
+  (RDMAP) that operates over the Direct Data Placement Protocol (DDP
+  protocol).  RDMAP provides read and write services directly to
+  applications and enables data to be transferred directly into
+  Upper Layer Protocol (ULP) buffers without intermediate data
+  copies. It also enables a kernel bypass implementation.
   </t></abstract></front>
 
       <seriesInfo name='RFC' value='5040' />
@@ -199,7 +199,7 @@ IANA Considerations for RPC Net Identifiers and Universal Address Formats.
     </reference>
 
     <reference anchor='RFC4121'>
-    
+
       <front>
         <title>The Kerberos Version 5 Generic Security Service Application Program Interface (GSS-API) Mechanism Version 2</title>
 
@@ -271,7 +271,7 @@ IANA Considerations for RPC Net Identifiers and Universal Address Formats.
     </reference>
 
     <reference anchor='RFC2203'>
-   
+
       <front>
       <title>RPCSEC_GSS Protocol Specification</title>
 
@@ -285,7 +285,7 @@ IANA Considerations for RPC Net Identifiers and Universal Address Formats.
         <street>CA 94043</street></postal>
         <phone>+1 (719) 599-9026</phone>
         <email>mre@eng.sun.com</email></address></author>
- 
+
         <author initials='A.' surname='Chiu' fullname='Alex Chiu'>
         <organization>Sun Microsystems, Inc.</organization>
         <address>
@@ -296,7 +296,7 @@ IANA Considerations for RPC Net Identifiers and Universal Address Formats.
         <street>CA 94043</street></postal>
         <phone>+1 (415) 786-6465</phone>
         <email>hacker@eng.sun.com</email></address></author>
- 
+
         <author initials='L.' surname='Ling' fullname='Lin Ling'>
         <organization>Sun Microsystems, Inc.</organization>
         <address>
@@ -333,10 +333,10 @@ IANA Considerations for RPC Net Identifiers and Universal Address Formats.
         <author initials='M.' surname='Eisler' fullname='Michael Eisler'>
         <organization>NetApp</organization>
         </author>
-  
+
       <date year='2009' month='February' />
       </front>
-      
+
       <seriesInfo name='RFC' value='5403' />
       <format type='TXT' octets='50937' target='ftp://ftp.isi.edu/in-notes/rfc5403.txt' />
     </reference>
@@ -346,7 +346,7 @@ IANA Considerations for RPC Net Identifiers and Universal Address Formats.
       <front>
   <title abbrev='Charset Policy'>
   IETF Policy on Character Sets and Languages</title>
-  <author initials='H.T.' surname='Alvestrand' 
+  <author initials='H.T.' surname='Alvestrand'
     fullname='Harald Tveit Alvestrand'>
     <organization>UNINETT</organization>
     <address>
@@ -363,11 +363,11 @@ IANA Considerations for RPC Net Identifiers and Universal Address Formats.
 
       <seriesInfo name='BCP' value='18' />
       <seriesInfo name='RFC' value='2277' />
-      <format type='TXT' octets='16622' 
+      <format type='TXT' octets='16622'
         target='ftp://ftp.isi.edu/in-notes/rfc2277.txt' />
-      <format type='HTML' octets='26556' 
+      <format type='HTML' octets='26556'
         target='http://xml.resource.org/public/rfc/html/rfc2277.html' />
-      <format type='XML' octets='15544' 
+      <format type='XML' octets='15544'
         target='http://xml.resource.org/public/rfc/xml/rfc2277.xml' />
     </reference>
 
@@ -461,7 +461,7 @@ IANA Considerations for RPC Net Identifiers and Universal Address Formats.
     standards track.</t></abstract></front>
 
       <seriesInfo name='RFC' value='2743' />
-      <format type='TXT' octets='229418' 
+      <format type='TXT' octets='229418'
         target='ftp://ftp.isi.edu/in-notes/rfc2743.txt' />
     </reference>
 
@@ -758,7 +758,7 @@ IANA Considerations for RPC Net Identifiers and Universal Address Formats.
 
 
     <reference anchor='RFC2847'>
-    
+
       <front>
       <title>LIPKEY - A Low Infrastructure Public Key Mechanism Using SPKM</title>
         <author initials='M.' surname='Eisler' fullname='M. Eisler'>
@@ -774,7 +774,7 @@ IANA Considerations for RPC Net Identifiers and Universal Address Formats.
           &lt;/p></t>
   </abstract>
       </front>
-        
+
       <seriesInfo name='RFC' value='2847' />
       <format type='TXT' octets='50045' target='ftp://ftp.isi.edu/in-notes/rfc2847.txt' />
     </reference>
@@ -895,7 +895,7 @@ IANA Considerations for RPC Net Identifiers and Universal Address Formats.
     </reference>
 
     <reference anchor='RFC2623'>
-    
+
       <front>
       <title abbrev='NFS Security, RPCSEC_GSS, and Kerberos V5'>NFS Version 2 and Version 3 Security Issues and the NFS Protocol's Use of RPCSEC_GSS and Kerberos V5</title>
 
@@ -923,7 +923,7 @@ IANA Considerations for RPC Net Identifiers and Universal Address Formats.
         implementations.</t>
       </abstract>
       </front>
-      
+
       <seriesInfo name='RFC' value='2623' />
       <format type='TXT' octets='42521' target='ftp://ftp.isi.edu/in-notes/rfc2623.txt' />
     </reference>
@@ -1071,7 +1071,7 @@ document are to be interpreted as described in RFC
 </reference>
 
     <reference anchor='RFC3232'>
-    
+
       <front>
         <title>Assigned Numbers: RFC 1700 is Replaced by an On-line Database</title>
         <author initials='J.' surname='Reynolds' fullname='J. Reynolds'>
@@ -1083,7 +1083,7 @@ document are to be interpreted as described in RFC
           Internet protocol parameters. This memo provides information
           for the Internet community. &lt;/p></t>
   </abstract></front>
-    
+
       <seriesInfo name='RFC' value='3232' />
       <format type='TXT' octets='3849' target='ftp://ftp.isi.edu/in-notes/rfc3232.txt' />
     </reference>
@@ -1115,7 +1115,7 @@ document are to be interpreted as described in RFC
   <date year="2003" month="April"/>
       </front>
       <seriesInfo name="RFC" value="3530"/>
-      <format type="TXT" octets="600988" 
+      <format type="TXT" octets="600988"
         target="ftp://ftp.isi.edu/in-notes/rfc3530.txt"/>
     </reference>
 
@@ -1312,7 +1312,7 @@ document are to be interpreted as described in RFC
   <date year="2004" />
         <abstract>
           <t>
-          The description of the access() function states: "If the process has appropriate privileges, an implementation may indicate success for X_OK even if none of the execute file permission bits are set." 
+          The description of the access() function states: "If the process has appropriate privileges, an implementation may indicate success for X_OK even if none of the execute file permission bits are set."
           </t>
         </abstract>
 

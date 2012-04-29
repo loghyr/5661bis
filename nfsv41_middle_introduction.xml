@@ -194,7 +194,7 @@
           lease period, locks may be revoked if the lease has not been
           extended.  A lock must be revoked if a conflicting lock has been
           granted after the lease interval.
-          <vspace blankLines="1"/> 
+          <vspace blankLines="1"/>
           A server grants a client a single lease for all state.
         </t>
 
@@ -342,7 +342,7 @@
     <section toc='exclude' anchor="ss:introduction:PS" title="Protocol Structure">
       <section anchor="ss:introduction:CP" title="Core Protocol">
         <t>
-          Unlike NFSv3, which used a series of ancillary protocols (e.g., 
+          Unlike NFSv3, which used a series of ancillary protocols (e.g.,
           Network Lock Manager (NLM), Network Status Monitor (NSM), MOUNT),
           within all minor versions of NFSv4 a single RPC protocol is used to
           make requests to the server.  Facilities that had been separate

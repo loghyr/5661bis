@@ -428,7 +428,7 @@
         establishment of site-wide or organization-wide namespaces, or even
         knitting such together into a truly global namespace.
       </t>
-     
+
       <t>
         Referrals occur when a client determines, upon first referencing a
         position in the current namespace, that it is part of a new file
@@ -437,7 +437,7 @@
         or locations of the file system can be determined by fetching the
         fs_locations or fs_locations_info attribute.
       </t>
-     
+
       <t>
         The locations-related attribute may designate a single file system
         location or multiple file system locations, to be selected based on
@@ -454,7 +454,7 @@
         systems (with different data contents) based on client attributes
         such as CPU architecture.
       </t>
-     
+
       <t>
         When the fs_locations_info attribute indicates that there are
         multiple possible targets listed, the relationships among them may be
@@ -468,14 +468,14 @@
         by the current client, since the current client has not accessed the
         file system in question.
       </t>
-     
+
       <t>
         Use of multi-server namespaces is enabled by NFSv4.1 but is not
         required.  The use of multi-server namespaces and their scope will
         depend on the applications used and system administration
         preferences.
       </t>
-     
+
       <t>
         Multi-server namespaces can be established by a single server
         providing a large set of referrals to all of the included file
@@ -485,7 +485,7 @@
         namespace.  The top-level referral file system or any segment may use
         replicated referral file systems for higher availability.
       </t>
-     
+
       <t>
         Generally, multi-server namespaces are for the most part uniform, in
         that the same data made available to one client at a given location

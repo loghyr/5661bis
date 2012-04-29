@@ -82,7 +82,7 @@
       <t>
         <?rfc include='autogen/type_nfstime4.xml'?>
       </t>
-     
+
       <t>
         The nfstime4 data type gives the number of seconds and nanoseconds
         since midnight or zero hour January 1, 1970 Coordinated Universal
@@ -96,7 +96,7 @@
         nseconds field would have a value of one-half second (500000000).
         Values greater than 999,999,999 for nseconds are invalid.
       </t>
-     
+
       <t>
         This data type is used to pass time and date information.  A server
         converts to and from its local representation of time when processing
@@ -164,7 +164,7 @@
         The fattr4 data type is used to represent file and directory
         attributes.
       </t>
-     
+
       <t>
         The bitmap is a counted array of 32-bit integers used to contain bit
         values.  The position of the integer in the array that contains bit n
@@ -186,7 +186,7 @@
       <t>
         <?rfc include='autogen/type_change_info4.xml'?>
       </t>
-  
+
       <t>
         This data type is used with the CREATE, LINK, OPEN, REMOVE, and
         RENAME operations to let the client know the value of the change
@@ -194,12 +194,12 @@
         resides.
       </t>
     </section>
-  
+
     <section toc='exclude' anchor="ss:protocol_constants:n1" title="netaddr4">
       <t>
         <?rfc include='autogen/type_netaddr4.xml'?>
       </t>
-  
+
       <t>
          The netaddr4 data type is used to identify network transport
          endpoints.  The r_netid and r_addr fields respectively contain a
@@ -209,22 +209,22 @@
          5.2.3.4.
       </t>
     </section>
-  
+
     <section toc='exclude' anchor="ss:protocol_constants:s2" title="state_owner4">
       <?rfc include='autogen/type_state_owner4.xml'?>
-  
+
       <t>
         The state_owner4 data type is the base type for the open_owner4
         (<xref target="ss:protocol_constants:o" />) and lock_owner4
         (<xref target="ss:protocol_constants:l" />).
       </t>
-  
+
       <section toc='exclude' anchor="ss:protocol_constants:o" title="open_owner4">
         <t>
           This data type is used to identify the owner of OPEN state.
         </t>
       </section>
-  
+
       <section toc='exclude' anchor="ss:protocol_constants:l" title="lock_owner4">
         <t>
           This structure is used to identify the owner of byte-range locking
@@ -232,12 +232,12 @@
         </t>
       </section>
     </section>
-  
+
     <section toc='exclude' anchor="ss:protocol_constants:o1" title="open_to_lock_owner4">
       <t>
         <?rfc include='autogen/type_open_to_lock_owner4.xml'?>
       </t>
-  
+
       <t>
         This data type is used for the first LOCK operation done for an
         open_owner4.  It provides both the open_stateid and lock_owner, such
@@ -247,12 +247,12 @@
         to established state in the form of the open_stateid/open_seqid.
       </t>
     </section>
-  
+
     <section toc='exclude' anchor="ss:protocol_constants:s3" title="stateid4">
       <t>
         <?rfc include='autogen/type_stateid4.xml'?>
       </t>
-  
+
       <t>
         This data type is used for the various state sharing mechanisms
         between the client and server.  The client never modifies a value of
@@ -263,12 +263,12 @@
         of OPEN processing done by the server.
       </t>
     </section>
-  
+
     <section toc='exclude' anchor="ss:protocol_constants:l1" title="layouttype4">
       <t>
         <?rfc include='autogen/type_layouttype4.xml'?>
       </t>
-  
+
       <t>
         This data type indicates what type of layout is being used.  The file
         server advertises the layout types it supports through the
@@ -276,7 +276,7 @@
         for layouts of a particular type in LAYOUTGET, and processes those
         layouts in its layout-type-specific logic.
       </t>
-  
+
       <t>
         The layouttype4 data type is 32 bits in length.  The range
         represented by the layout type is split into three parts.  Type 0x0
@@ -285,7 +285,7 @@
         <xref target="ss:iana_considerations:LT" />; they are maintained by IANA.  Types within the range
         0x80000000-0xFFFFFFFF are site specific and for private use only.
       </t>
-  
+
       <t>
         The LAYOUT4_NFSV4_1_FILES enumeration specifies that the NFSv4.1 file
         layout type, as defined in <xref target="sec:nfsv4.1_as" />, is to be used.  The
@@ -295,12 +295,12 @@
         <xref target="RFC5663" />, is to be used.
       </t>
     </section>
-  
+
     <section toc='exclude' anchor="ss:protocol_constants:d" title="deviceid4">
       <t>
         <?rfc include='autogen/type_deviceid4.xml'?>
       </t>
-  
+
       <t>
         Layout information includes device IDs that specify a storage device
         through a compact handle.  Addressing and type information is
@@ -310,12 +310,12 @@
         more details.
       </t>
     </section>
-  
+
     <section toc='exclude' anchor="ss:protocol_constants:d1" title="device_addr4">
       <t>
         <?rfc include='autogen/type_device_addr4.xml'?>
       </t>
-  
+
       <t>
         The device address is used to set up a communication channel with the
         storage device.  Different layout types will require different data
@@ -323,7 +323,7 @@
         opaque da_addr_body field is interpreted based on the specified
         da_layout_type field.
       </t>
-     
+
       <t>
         This document defines the device address for the NFSv4.1 file layout
         (see <xref target="ss:nfsv4.1_as:FLDT" />), which identifies a storage device by network IP
@@ -335,24 +335,24 @@
         respective layout specifications.
       </t>
     </section>
-  
+
     <section toc='exclude' anchor="ss:protocol_constants:l2" title="layout_content4">
       <t>
         <?rfc include='autogen/type_layout_content4.xml'?>
       </t>
-  
+
       <t>
         The loc_body field is interpreted based on the layout type
         (loc_type).  This document defines the loc_body for the NFSv4.1 file
         layout type; see <xref target="ss:nfsv4.1_as:FLDT" /> for its definition.
       </t>
     </section>
-  
+
     <section toc='exclude' anchor="ss:protocol_constants:l3" title="layout4">
       <t>
         <?rfc include='autogen/type_layout4.xml'?>
       </t>
-  
+
       <t>
         The layout4 data type defines a layout for a file.  The layout type
         specific data is opaque within lo_content.  Since layouts are
@@ -360,12 +360,12 @@
         the client ID, iomode, and layout type identify the layout.
       </t>
     </section>
-  
+
     <section toc='exclude' anchor="ss:protocol_constants:l4" title="layoutupdate4">
       <t>
         <?rfc include='autogen/type_layoutupdate4.xml'?>
       </t>
-  
+
       <t>
         The layoutupdate4 data type is used by the client to return
         updated layout information to the metadata server via the
@@ -379,12 +379,12 @@
         LAYOUT4_NFSV4_1_FILES, the lou_body field MUST have a zero length.
       </t>
     </section>
-  
+
     <section toc='exclude' anchor="ss:protocol_constants:l5" title="layouthint4">
       <t>
         <?rfc include='autogen/type_layouthint4.xml'?>
       </t>
-  
+
       <t>
         The layouthint4 data type is used by the client to pass in a hint
         about the type of layout it would like created for a particular file.
@@ -397,12 +397,12 @@
         nfsv4_1_file_layouthint4 data type as defined in <xref target="ss:nfsv4.1_as:FLDT" />.
       </t>
     </section>
-  
+
     <section toc='exclude' anchor="ss:protocol_constants:l6" title="layoutiomode4">
       <t>
         <?rfc include='autogen/type_layoutiomode4.xml'?>
       </t>
-  
+
       <t>
         The iomode specifies whether the client intends to just read or both
         read and write the data represented by the layout.  While the
@@ -416,12 +416,12 @@
         accesses against the iomode and reject invalid accesses.
       </t>
     </section>
-  
+
     <section toc='exclude' anchor="ss:protocol_constants:n2" title="nfs_impl_id4">
       <t>
         <?rfc include='autogen/type_nfs_impl_id4.xml'?>
       </t>
-  
+
       <t>
         This data type is used to identify client and server implementation
         details.  The nii_domain field is the DNS domain name with which the
@@ -433,12 +433,12 @@
         published or built.
       </t>
     </section>
-  
+
     <section toc='exclude' anchor="ss:protocol_constants:t1" title="threshold_item4">
       <t>
         <?rfc include='autogen/type_threshold_item4.xml'?>
       </t>
-  
+
       <t>
         This data type contains a list of hints specific to a layout type for
         helping the client determine when it should send I/O directly through
@@ -449,17 +449,17 @@
         content is determined by the hintset bitmap.  See the mdsthreshold
         attribute for more details.
       </t>
-  
+
       <t>
         The thi_hintset field is a bitmap of the following values:
       </t>
-  
+
       <texttable>
         <ttcol align="left">name</ttcol>
         <ttcol align="left">#</ttcol>
         <ttcol align="left">Data Type</ttcol>
         <ttcol align="left">Description</ttcol>
-  
+
         <c>threshold4_read_size</c>
         <c>0</c>
         <c>length4</c>
@@ -467,7 +467,7 @@
           If a file's length is less than the value of threshold4_read_size, then it is RECOMMENDED
           that the client read from the file via the MDS and not a storage device.
         </c>
-  
+
         <c>threshold4_write_size</c>
         <c>1</c>
         <c>length4</c>
@@ -475,14 +475,14 @@
           If a file's length is less than the value of threshold4_write_size, then it is RECOMMENDED
           that the client write to the file via the MDS and not a storage device.
         </c>
-  
+
         <c>threshold4_read_iosize</c>
         <c>2</c>
         <c>length4</c>
         <c>
           For read I/O sizes below this threshold, it is RECOMMENDED to read data through the MDS.
         </c>
-  
+
         <c>threshold4_write_iosize</c>
         <c>3</c>
         <c>length4</c>
@@ -491,12 +491,12 @@
         </c>
       </texttable>
     </section>
-  
+
     <section toc='exclude' anchor="ss:protocol_constants:m" title="mdsthreshold4">
       <t>
         <?rfc include='autogen/type_mdsthreshold4.xml'?>
       </t>
-  
+
       <t>
         This data type holds an array of elements of data type
         threshold_item4, each of which is valid for a particular layout type.

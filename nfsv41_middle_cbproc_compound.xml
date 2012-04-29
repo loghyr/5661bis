@@ -3,8 +3,8 @@
 
   <section anchor="proc_CB_COMPOUND" title="Procedure 1: CB_COMPOUND - Compound Operations">
     <section toc='exclude' anchor="ss:proc_CB_COMPOUND:A" title="ARGUMENTS">
-      <?rfc include='autogen/type_nfs_cb_opnum4.xml'?> 
-      <?rfc include='autogen/type_nfs_cb_argop4.xml'?> 
+      <?rfc include='autogen/type_nfs_cb_opnum4.xml'?>
+      <?rfc include='autogen/type_nfs_cb_argop4.xml'?>
       <?rfc include='autogen/type_CB_COMPOUND4args.xml'?>
     </section>
 

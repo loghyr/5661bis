@@ -30,7 +30,7 @@
 
 <!-- create table of contents (set it options).
      Note the table of contents may be omitted
-     for very short documents --> 
+     for very short documents -->
 
 <?rfc toc="yes"?>
 <?rfc tocompact="yes"?>
@@ -38,7 +38,7 @@
 
 <!-- choose the options for the references. Some like
      symbolic tags in the references (and citations)
-     and others prefer numbers. --> 
+     and others prefer numbers. -->
 
 <?rfc symrefs="no"?>
 <?rfc sortrefs="yes" ?>
