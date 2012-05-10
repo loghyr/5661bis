@@ -267,14 +267,19 @@
       </t>
 
       <t>
-        The logr_return_on_close result field is a directive to return the
-        layout before closing the file.  When the metadata server sets this
-        return value to TRUE, it MUST be prepared to recall the layout in the
-        case in which the client fails to return the layout before close.
-        For the metadata server that knows a layout must be returned before a
-        close of the file, this return value can be used to communicate the
-        desired behavior to the client and thus remove one extra step from
-        the client's and metadata server's interaction.
+        The logr_return_on_close result field is a directive to return or forget
+        the layout before closing the file. When the metadata server sets this
+        return value to TRUE, the client MUST NOT use the layout and the respective
+        layout stateid after sending the last CLOSE of that file. Any outstanding
+        COMMIT to the data servers or LAYOUTCOMMIT to the metadata server MUST be
+        sent prior to closing the file. This return value is used to communicate to
+        the client that any layout or segment of a layout that were given with
+        logr_return_on_close set to TRUE will result in the server invalidating all
+        layouts of layouttype4 of loga_layout_type for the file after it was closed.
+        Once the server returns logr_return_on_close set to TRUE to a client for a
+        given file it MUST set logr_return_on_close to TRUE for all subsequent
+        layouts or segments of layoutype4 of the respective loga_layout_type for
+        that file and client until that file is closed.
       </t>
 
       <t>
