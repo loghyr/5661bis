@@ -7,5 +7,19 @@ NOTE: The drafts contained here may change after they are posted to the IETF sit
 
 SECRET NOTE: While these documents can serve as 5661bis, they are mainly being used to track changes to 5661 before the bis work starts. The issue board and the tasklist for 3530bis were cumbersome. The intent here is to make changes right away instead of issuing vague AIs.
 
-For comparative purposes, the orginal rfc5661.txt and rfc5661bis.txt are also stored here, mainly to show the set of diffs from the cuttin. (Although now I think of it, D'oh!, version control!)
+For comparative purposes, the orginal rfc5661.txt and rfc5661bis.txt are also stored here, mainly to show the set of diffs from the cut-in. (Although now I think of it, D'oh!, version control!)
 
+To compile the XML files into text files:
+
+1. Install xml2rfc 
+   http://xml.resource.org/
+
+   These instructions have been tested with version 1.34pre3
+
+2. Place xml2rfc in your path
+
+   For example, setenv PATH $PATH":/Users/thomas/Documents/ietf/bin/xml2rfc-1.36"
+
+3. Build
+
+   > make

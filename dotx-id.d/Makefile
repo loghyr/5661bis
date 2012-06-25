@@ -9,6 +9,8 @@ PREVVERS=00
 VERS=00
 VPATH = ../../dotx.d
 
+XML2RFC = xml2rfc.tcl
+
 all: txt filelist
 
 txt: draft-ietf-nfsv4-rfc5662bis-dot-x-$(VERS).txt
@@ -46,7 +48,7 @@ tmp.x:	tmp.txt
 
 tmp.txt: draft-ietf-nfsv4-rfc5662bis-dot-x-$(VERS).xml
 	rm -f tmp.txt tmp2.txt
-	XML2RFCDOT="." sh ../xml2rfc_wrapper.sh draft-ietf-nfsv4-rfc5662bis-dot-x-$(VERS).xml tmp2.txt
+	$(XML2RFC) draft-ietf-nfsv4-rfc5662bis-dot-x-$(VERS).xml tmp2.txt
 	mv -f tmp2.txt tmp.txt
 
 draft-ietf-nfsv4-rfc5662bis-dot-x-$(VERS).txt: tmp.txt tmp.x
@@ -63,7 +65,7 @@ draft-ietf-nfsv4-rfc5662bis-dot-x-$(VERS).txt: tmp.txt tmp.x
 	cp tmp.txt $@
 
 draft-ietf-nfsv4-rfc5662bis-dot-x-$(VERS).nr: draft-ietf-nfsv4-rfc5662bis-dot-x-$(VERS).xml
-	XML2RFCDOT="." sh ../xml2rfc_wrapper.sh draft-ietf-nfsv4-rfc5662bis-dot-x-$(VERS).xml $@
+	$(XML2RFC) draft-ietf-nfsv4-rfc5662bis-dot-x-$(VERS).xml $@
 
 dotx_front_autogen.xml: dotx_front.xml Makefile
 	sed -e s/DAYVAR/${DAY}/g -e s/MONTHVAR/${MONTH}/g -e s/YEARVAR/${YEAR}/g < dotx_front.xml > dotx_front_autogen.xml

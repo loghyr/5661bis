@@ -10,6 +10,8 @@ PREVVERS=00
 VERS=00
 VPATH = dotx.d
 
+XML2RFC = xml2rfc.tcl
+
 autogen/%.xml : %.x
 	@mkdir -p autogen
 	@rm -f $@.tmp $@
@@ -72,17 +74,17 @@ pall:
 
 draft-ietf-nfsv4-rfc5661bis-$(VERS).txt: draft-ietf-nfsv4-rfc5661bis-$(VERS).xml
 	rm -f $@ draft-tmp.txt
-	sh xml2rfc_wrapper.sh draft-ietf-nfsv4-rfc5661bis-$(VERS).xml draft-tmp.txt
+	$(XML2RFC) draft-ietf-nfsv4-rfc5661bis-$(VERS).xml draft-tmp.txt
 	mv draft-tmp.txt $@
 
 draft-ietf-nfsv4-rfc5661bis-$(VERS).html: draft-ietf-nfsv4-rfc5661bis-$(VERS).xml
 	rm -f $@ draft-tmp.html
-	sh xml2rfc_wrapper.sh draft-ietf-nfsv4-rfc5661bis-$(VERS).xml draft-tmp.html
+	$(XML2RFC) draft-ietf-nfsv4-rfc5661bis-$(VERS).xml draft-tmp.html
 	mv draft-tmp.html $@
 
 draft-ietf-nfsv4-rfc5661bis-$(VERS).nr: draft-ietf-nfsv4-rfc5661bis-$(VERS).xml
 	rm -f $@ draft-tmp.nr
-	sh xml2rfc_wrapper.sh draft-ietf-nfsv4-rfc5661bis-$(VERS).xml $@.tmp
+	$(XML2RFC) draft-ietf-nfsv4-rfc5661bis-$(VERS).xml $@.tmp
 	mv draft-tmp.nr $@
 
 nfsv41_middle_errortoop_autogen.xml: nfsv41_middle_errors.xml
