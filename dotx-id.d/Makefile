@@ -1,4 +1,4 @@
-# Copyright (C) The IETF Trust (2011)
+# Copyright (C) The IETF Trust (2011-2012)
 # Manage the .xml for the NFSv4 minor version document.
 #
 
@@ -7,9 +7,9 @@ MONTH=`date +%B`
 DAY=`date +%d`
 PREVVERS=00
 VERS=00
-VPATH = ../../dotx.d
+VPATH=../../dotx.d
 
-XML2RFC = xml2rfc.tcl
+XML2RFC=xml2rfc.tcl
 
 all: txt filelist
 
