@@ -14,7 +14,7 @@
       <t>
         The DESTROY_CLIENTID operation destroys the client ID.  If there are
         sessions (both idle and non-idle), opens, locks, delegations,
-        layouts, and/or wants (<xref target="op_WANT_DELEGATION" />) associated with the unexpired
+        and/or wants (<xref target="op_WANT_DELEGATION" />) associated with the unexpired
         lease of the client ID, the server MUST return NFS4ERR_CLIENTID_BUSY.
         DESTROY_CLIENTID MAY be preceded with a SEQUENCE operation as long as
         the client ID derived from the session ID of SEQUENCE is not the same
