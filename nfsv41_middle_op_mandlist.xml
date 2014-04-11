@@ -1,7 +1,7 @@
 <!-- Copyright (C) The IETF Trust (2011) -->
 <!-- Copyright (C) The Internet Society (2011) -->
 
-<section anchor="sec:operations:_required," title="Operations: REQUIRED, RECOMMENDED, or OPTIONAL">
+<section anchor="sec:operations:required" title="Operations: REQUIRED, RECOMMENDED, or OPTIONAL">
   <t>
     The following tables summarize the operations of the NFSv4.1 protocol
     and the corresponding designation of REQUIRED, RECOMMENDED, and

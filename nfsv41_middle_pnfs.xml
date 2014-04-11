@@ -385,7 +385,7 @@
       regardless of layout type or storage protocol.  These operations are
       all sent to a metadata server and summarized here.  While pNFS is an
       OPTIONAL feature, if pNFS is implemented, some operations are
-      REQUIRED in order to comply with pNFS.  See <xref target="sec:operations:_required," />.
+      REQUIRED in order to comply with pNFS.  See <xref target="sec:operations:required" />.
     </t>
 
     <t>

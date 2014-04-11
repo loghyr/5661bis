@@ -10,7 +10,9 @@ PREVVERS=00
 VERS=00
 VPATH=dotx.d
 
-XML2RFC=xml2rfc.tcl
+XML2RFC=xml2rfc
+DRAFT_BASE=draft-ietf-nfsv4-rfc5661bis
+DOC_PREFIX=nfsv41
 
 autogen/%.xml : %.x
 	@mkdir -p autogen
@@ -30,11 +32,11 @@ all: html txt dotx dotx-txt
 # Build the stuff needed to ensure integrity of document.
 common: testx dotx html dotx-txt
 
-txt: draft-ietf-nfsv4-rfc5661bis-$(VERS).txt
+txt: ${DRAFT_BASE}-$(VERS).txt
 
-html: draft-ietf-nfsv4-rfc5661bis-$(VERS).html
+html: ${DRAFT_BASE}-$(VERS).html
 
-nr: draft-ietf-nfsv4-rfc5661bis-$(VERS).nr
+nr: ${DRAFT_BASE}-$(VERS).nr
 
 dotx:
 	cd dotx.d ; VERS=$(VERS) $(MAKE) all
@@ -45,19 +47,19 @@ dotx:
 dotx-txt:
 	cd dotx-id.d ; SPECVERS=$(VERS) $(MAKE) all
 
-xml: draft-ietf-nfsv4-rfc5661bis-$(VERS).xml
+xml: ${DRAFT_BASE}-$(VERS).xml
 
 clobber:
-	$(RM) draft-ietf-nfsv4-rfc5661bis-$(VERS).txt \
-		draft-ietf-nfsv4-rfc5661bis-$(VERS).html \
-		draft-ietf-nfsv4-rfc5661bis-$(VERS).nr
+	$(RM) ${DRAFT_BASE}-$(VERS).txt \
+		${DRAFT_BASE}-$(VERS).html \
+		${DRAFT_BASE}-$(VERS).nr
 	cd dotx-id.d ; SPECVERS=$(VERS) $(MAKE) clobber
 	cd dotx.d ; VERS=$(VERS) $(MAKE) clobber
 
 clean:
 	rm -f $(AUTOGEN)
 	rm -rf autogen
-	rm -f draft-ietf-nfsv4-rfc5661bis-$(VERS).xml
+	rm -f ${DRAFT_BASE}-$(VERS).xml
 	rm -rf draft-$(VERS)
 	rm -f draft-$(VERS).tar.gz
 	rm -rf testx.d
@@ -72,29 +74,23 @@ pall:
 	( $(MAKE) html ; echo .html done ) & \
 	wait
 
-draft-ietf-nfsv4-rfc5661bis-$(VERS).txt: draft-ietf-nfsv4-rfc5661bis-$(VERS).xml
-	rm -f $@ draft-tmp.txt
-	$(XML2RFC) draft-ietf-nfsv4-rfc5661bis-$(VERS).xml draft-tmp.txt
-	mv draft-tmp.txt $@
+${DRAFT_BASE}-$(VERS).txt: ${DRAFT_BASE}-$(VERS).xml
+	$(XML2RFC) --text ${DRAFT_BASE}-$(VERS).xml -o $@
 
-draft-ietf-nfsv4-rfc5661bis-$(VERS).html: draft-ietf-nfsv4-rfc5661bis-$(VERS).xml
-	rm -f $@ draft-tmp.html
-	$(XML2RFC) draft-ietf-nfsv4-rfc5661bis-$(VERS).xml draft-tmp.html
-	mv draft-tmp.html $@
+${DRAFT_BASE}-$(VERS).html: ${DRAFT_BASE}-$(VERS).xml
+	$(XML2RFC) --html ${DRAFT_BASE}-$(VERS).xml -o $@
 
-draft-ietf-nfsv4-rfc5661bis-$(VERS).nr: draft-ietf-nfsv4-rfc5661bis-$(VERS).xml
-	rm -f $@ draft-tmp.nr
-	$(XML2RFC) draft-ietf-nfsv4-rfc5661bis-$(VERS).xml $@.tmp
-	mv draft-tmp.nr $@
+${DRAFT_BASE}-$(VERS).nr: ${DRAFT_BASE}-$(VERS).xml
+	$(XML2RFC) --nroff ${DRAFT_BASE}-$(VERS).xml -o $@
 
-nfsv41_middle_errortoop_autogen.xml: nfsv41_middle_errors.xml
-	./errortbl < nfsv41_middle_errors.xml > nfsv41_middle_errortoop_autogen.xml
+${DOC_PREFIX}_middle_errortoop_autogen.xml: ${DOC_PREFIX}_middle_errors.xml
+	./errortbl < ${DOC_PREFIX}_middle_errors.xml > ${DOC_PREFIX}_middle_errortoop_autogen.xml
 
-nfsv41_front_autogen.xml: nfsv41_front.xml Makefile
-	sed -e s/DAYVAR/${DAY}/g -e s/MONTHVAR/${MONTH}/g -e s/YEARVAR/${YEAR}/g < nfsv41_front.xml > nfsv41_front_autogen.xml
+${DOC_PREFIX}_front_autogen.xml: ${DOC_PREFIX}_front.xml Makefile
+	sed -e s/DAYVAR/${DAY}/g -e s/MONTHVAR/${MONTH}/g -e s/YEARVAR/${YEAR}/g < ${DOC_PREFIX}_front.xml > ${DOC_PREFIX}_front_autogen.xml
 
-nfsv41_rfc_start_autogen.xml: nfsv41_rfc_start.xml Makefile
-	sed -e s/VERSIONVAR/${VERS}/g < nfsv41_rfc_start.xml > nfsv41_rfc_start_autogen.xml
+${DOC_PREFIX}_rfc_start_autogen.xml: ${DOC_PREFIX}_rfc_start.xml Makefile
+	sed -e s/VERSIONVAR/${VERS}/g < ${DOC_PREFIX}_rfc_start.xml > ${DOC_PREFIX}_rfc_start_autogen.xml
 
 autogen/basic_types.xml: dotx.d/spit_types.sh
 	sh dotx.d/spit_types.sh $@
@@ -237,9 +233,9 @@ dotx.d/open_args_gen.x: dotx.d/open_args.x dotx.d/const_access_deny.x
 	cd dotx.d ; VERS=$(VERS) $(MAKE) `basename $@`
 
 AUTOGEN =	\
-		nfsv41_front_autogen.xml \
-		nfsv41_rfc_start_autogen.xml \
-		nfsv41_middle_errortoop_autogen.xml \
+		${DOC_PREFIX}_front_autogen.xml \
+		${DOC_PREFIX}_rfc_start_autogen.xml \
+		${DOC_PREFIX}_middle_errortoop_autogen.xml \
 		autogen/basic_types.xml \
 		$(SPITGEN) \
 		$(SPITGENXML) \
@@ -367,146 +363,150 @@ AUTOGEN =	\
 		autogen/write_res.xml
 
 VESTIGIAL = \
-	nfsv41_middle_op_open_confirm.xml \
-	nfsv41_middle_op_renew.xml \
-	nfsv41_middle_op_setclientid.xml \
-	nfsv41_middle_op_setclientid_confirm.xml \
-	nfsv41_middle_op_release_lockowner.xml
+	${DOC_PREFIX}_middle_op_open_confirm.xml \
+	${DOC_PREFIX}_middle_op_renew.xml \
+	${DOC_PREFIX}_middle_op_setclientid.xml \
+	${DOC_PREFIX}_middle_op_setclientid_confirm.xml \
+	${DOC_PREFIX}_middle_op_release_lockowner.xml
 
-START_PREGEN = nfsv41_rfc_start.xml
-START=	nfsv41_rfc_start_autogen.xml
-END=	nfsv41_rfc_end.xml
+START_PREGEN = ${DOC_PREFIX}_rfc_start.xml
+START=	${DOC_PREFIX}_rfc_start_autogen.xml
+END=	${DOC_PREFIX}_rfc_end.xml
 
-FRONT_PREGEN = nfsv41_front.xml
+FRONT_PREGEN = ${DOC_PREFIX}_front.xml
 
 IDXMLSRC_BASE = \
-	nfsv41_middle_start.xml \
-	nfsv41_middle_introduction.xml \
-	nfsv41_middle_core_infrastructure.xml \
-	nfsv41_middle_datatypes.xml \
-	nfsv41_middle_filehandles.xml \
-	nfsv41_middle_fileattributes.xml \
-	nfsv41_middle_fileattributes_acls.xml \
-	nfsv41_middle_namespace.xml \
-	nfsv41_middle_state_mgmt.xml \
-	nfsv41_middle_filelocking.xml \
-	nfsv41_middle_caching.xml \
-	nfsv41_middle_multi_server_ns.xml \
-	nfsv41_middle_pnfs.xml \
-	nfsv41_middle_file_layout.xml \
-	nfsv41_middle_i18n.xml \
-	nfsv41_middle_errors.xml \
-	nfsv41_middle_proc_aaa.xml \
-	nfsv41_middle_proc_null.xml \
-	nfsv41_middle_proc_compound.xml \
-	nfsv41_middle_proc_zzz.xml \
-	nfsv41_middle_op_mandlist.xml \
-	nfsv41_middle_op_aaa.xml \
-	nfsv41_middle_op_access.xml \
-	nfsv41_middle_op_close.xml \
-	nfsv41_middle_op_commit.xml \
-	nfsv41_middle_op_create.xml \
-	nfsv41_middle_op_delegpurge.xml \
-	nfsv41_middle_op_delegreturn.xml \
-	nfsv41_middle_op_getattr.xml \
-	nfsv41_middle_op_getfh.xml \
-	nfsv41_middle_op_link.xml \
-	nfsv41_middle_op_lock.xml \
-	nfsv41_middle_op_lockt.xml \
-	nfsv41_middle_op_locku.xml \
-	nfsv41_middle_op_lookup.xml \
-	nfsv41_middle_op_lookupp.xml \
-	nfsv41_middle_op_nverify.xml \
-	nfsv41_middle_op_open.xml \
-	nfsv41_middle_op_openattr.xml \
-	nfsv41_middle_op_open_downgrade.xml \
-	nfsv41_middle_op_putfh.xml \
-	nfsv41_middle_op_putpubfh.xml \
-	nfsv41_middle_op_putrootfh.xml \
-	nfsv41_middle_op_read.xml \
-	nfsv41_middle_op_readdir.xml \
-	nfsv41_middle_op_readlink.xml \
-	nfsv41_middle_op_remove.xml \
-	nfsv41_middle_op_rename.xml \
-	nfsv41_middle_op_restorefh.xml \
-	nfsv41_middle_op_savefh.xml \
-	nfsv41_middle_op_secinfo.xml \
-	nfsv41_middle_op_setattr.xml \
-	nfsv41_middle_op_verify.xml \
-	nfsv41_middle_op_write.xml \
-	nfsv41_middle_op_backchannel_ctl.xml \
-	nfsv41_middle_op_bind_conn_to_session.xml \
-	nfsv41_middle_op_exchange_id.xml \
-	nfsv41_middle_op_create_session.xml \
-	nfsv41_middle_op_destroy_session.xml \
-	nfsv41_middle_op_free_stateid.xml \
-	nfsv41_middle_op_get_dir_delegation.xml \
-	nfsv41_middle_op_getdeviceinfo.xml \
-	nfsv41_middle_op_getdevicelist.xml \
-	nfsv41_middle_op_layoutcommit.xml \
-	nfsv41_middle_op_layoutget.xml \
-	nfsv41_middle_op_layoutreturn.xml \
-	nfsv41_middle_op_secinfo_no_name.xml \
-	nfsv41_middle_op_sequence.xml \
-	nfsv41_middle_op_set_ssv.xml \
-	nfsv41_middle_op_test_stateid.xml \
-	nfsv41_middle_op_want_delegation.xml \
-	nfsv41_middle_op_destroy_clientid.xml \
-	nfsv41_middle_op_reclaim_complete.xml \
-	nfsv41_middle_op_illegal.xml \
-	nfsv41_middle_op_zzz.xml \
-	nfsv41_middle_cbproc_aaa.xml \
-	nfsv41_middle_cbproc_null.xml \
-	nfsv41_middle_cbproc_compound.xml \
-	nfsv41_middle_cbproc_zzz.xml \
-	nfsv41_middle_op_cb_aaa.xml \
-	nfsv41_middle_op_cb_getattr.xml \
-	nfsv41_middle_op_cb_recall.xml \
-	nfsv41_middle_op_cb_layoutrecall.xml \
-	nfsv41_middle_op_cb_notify.xml \
-	nfsv41_middle_op_cb_push_deleg.xml \
-	nfsv41_middle_op_cb_recall_any.xml \
-	nfsv41_middle_op_cb_recall_slot.xml \
-	nfsv41_middle_op_cb_recallable_obj_avail.xml \
-	nfsv41_middle_op_cb_sequence.xml \
-	nfsv41_middle_op_cb_wants_cancelled.xml \
-	nfsv41_middle_op_cb_notify_lock.xml \
-	nfsv41_middle_op_cb_notify_deviceid.xml \
-	nfsv41_middle_op_cb_illegal.xml \
-	nfsv41_middle_op_cb_zzz.xml \
-	nfsv41_middle_security_considerations.xml \
-	nfsv41_middle_iana_considerations.xml \
-	nfsv41_middle_end.xml \
-	nfsv41_back_front.xml \
-	nfsv41_back_references.xml \
-	nfsv41_back_acks.xml \
-	nfsv41_back_back.xml
+	${DOC_PREFIX}_middle_start.xml \
+	${DOC_PREFIX}_middle_introduction.xml \
+	${DOC_PREFIX}_middle_core_infrastructure.xml \
+	${DOC_PREFIX}_middle_datatypes.xml \
+	${DOC_PREFIX}_middle_filehandles.xml \
+	${DOC_PREFIX}_middle_fileattributes.xml \
+	${DOC_PREFIX}_middle_fileattributes_acls.xml \
+	${DOC_PREFIX}_middle_namespace.xml \
+	${DOC_PREFIX}_middle_state_mgmt.xml \
+	${DOC_PREFIX}_middle_filelocking.xml \
+	${DOC_PREFIX}_middle_caching.xml \
+	${DOC_PREFIX}_middle_multi_server_ns.xml \
+	${DOC_PREFIX}_middle_pnfs.xml \
+	${DOC_PREFIX}_middle_file_layout.xml \
+	${DOC_PREFIX}_middle_i18n.xml \
+	${DOC_PREFIX}_middle_errors.xml \
+	${DOC_PREFIX}_middle_proc_aaa.xml \
+	${DOC_PREFIX}_middle_proc_null.xml \
+	${DOC_PREFIX}_middle_proc_compound.xml \
+	${DOC_PREFIX}_middle_proc_zzz.xml \
+	${DOC_PREFIX}_middle_op_mandlist.xml \
+	${DOC_PREFIX}_middle_op_aaa.xml \
+	${DOC_PREFIX}_middle_op_access.xml \
+	${DOC_PREFIX}_middle_op_close.xml \
+	${DOC_PREFIX}_middle_op_commit.xml \
+	${DOC_PREFIX}_middle_op_create.xml \
+	${DOC_PREFIX}_middle_op_delegpurge.xml \
+	${DOC_PREFIX}_middle_op_delegreturn.xml \
+	${DOC_PREFIX}_middle_op_getattr.xml \
+	${DOC_PREFIX}_middle_op_getfh.xml \
+	${DOC_PREFIX}_middle_op_link.xml \
+	${DOC_PREFIX}_middle_op_lock.xml \
+	${DOC_PREFIX}_middle_op_lockt.xml \
+	${DOC_PREFIX}_middle_op_locku.xml \
+	${DOC_PREFIX}_middle_op_lookup.xml \
+	${DOC_PREFIX}_middle_op_lookupp.xml \
+	${DOC_PREFIX}_middle_op_nverify.xml \
+	${DOC_PREFIX}_middle_op_open.xml \
+	${DOC_PREFIX}_middle_op_openattr.xml \
+	${DOC_PREFIX}_middle_op_open_downgrade.xml \
+	${DOC_PREFIX}_middle_op_putfh.xml \
+	${DOC_PREFIX}_middle_op_putpubfh.xml \
+	${DOC_PREFIX}_middle_op_putrootfh.xml \
+	${DOC_PREFIX}_middle_op_read.xml \
+	${DOC_PREFIX}_middle_op_readdir.xml \
+	${DOC_PREFIX}_middle_op_readlink.xml \
+	${DOC_PREFIX}_middle_op_remove.xml \
+	${DOC_PREFIX}_middle_op_rename.xml \
+	${DOC_PREFIX}_middle_op_restorefh.xml \
+	${DOC_PREFIX}_middle_op_savefh.xml \
+	${DOC_PREFIX}_middle_op_secinfo.xml \
+	${DOC_PREFIX}_middle_op_setattr.xml \
+	${DOC_PREFIX}_middle_op_verify.xml \
+	${DOC_PREFIX}_middle_op_write.xml \
+	${DOC_PREFIX}_middle_op_backchannel_ctl.xml \
+	${DOC_PREFIX}_middle_op_bind_conn_to_session.xml \
+	${DOC_PREFIX}_middle_op_exchange_id.xml \
+	${DOC_PREFIX}_middle_op_create_session.xml \
+	${DOC_PREFIX}_middle_op_destroy_session.xml \
+	${DOC_PREFIX}_middle_op_free_stateid.xml \
+	${DOC_PREFIX}_middle_op_get_dir_delegation.xml \
+	${DOC_PREFIX}_middle_op_getdeviceinfo.xml \
+	${DOC_PREFIX}_middle_op_getdevicelist.xml \
+	${DOC_PREFIX}_middle_op_layoutcommit.xml \
+	${DOC_PREFIX}_middle_op_layoutget.xml \
+	${DOC_PREFIX}_middle_op_layoutreturn.xml \
+	${DOC_PREFIX}_middle_op_secinfo_no_name.xml \
+	${DOC_PREFIX}_middle_op_sequence.xml \
+	${DOC_PREFIX}_middle_op_set_ssv.xml \
+	${DOC_PREFIX}_middle_op_test_stateid.xml \
+	${DOC_PREFIX}_middle_op_want_delegation.xml \
+	${DOC_PREFIX}_middle_op_destroy_clientid.xml \
+	${DOC_PREFIX}_middle_op_reclaim_complete.xml \
+	${DOC_PREFIX}_middle_op_illegal.xml \
+	${DOC_PREFIX}_middle_op_zzz.xml \
+	${DOC_PREFIX}_middle_cbproc_aaa.xml \
+	${DOC_PREFIX}_middle_cbproc_null.xml \
+	${DOC_PREFIX}_middle_cbproc_compound.xml \
+	${DOC_PREFIX}_middle_cbproc_zzz.xml \
+	${DOC_PREFIX}_middle_op_cb_aaa.xml \
+	${DOC_PREFIX}_middle_op_cb_getattr.xml \
+	${DOC_PREFIX}_middle_op_cb_recall.xml \
+	${DOC_PREFIX}_middle_op_cb_layoutrecall.xml \
+	${DOC_PREFIX}_middle_op_cb_notify.xml \
+	${DOC_PREFIX}_middle_op_cb_push_deleg.xml \
+	${DOC_PREFIX}_middle_op_cb_recall_any.xml \
+	${DOC_PREFIX}_middle_op_cb_recall_slot.xml \
+	${DOC_PREFIX}_middle_op_cb_recallable_obj_avail.xml \
+	${DOC_PREFIX}_middle_op_cb_sequence.xml \
+	${DOC_PREFIX}_middle_op_cb_wants_cancelled.xml \
+	${DOC_PREFIX}_middle_op_cb_notify_lock.xml \
+	${DOC_PREFIX}_middle_op_cb_notify_deviceid.xml \
+	${DOC_PREFIX}_middle_op_cb_illegal.xml \
+	${DOC_PREFIX}_middle_op_cb_zzz.xml \
+	${DOC_PREFIX}_middle_security_considerations.xml \
+	${DOC_PREFIX}_middle_iana_considerations.xml \
+	${DOC_PREFIX}_middle_end.xml \
+	${DOC_PREFIX}_back_front.xml \
+	${DOC_PREFIX}_back_references.xml \
+	${DOC_PREFIX}_back_acks.xml \
+	${DOC_PREFIX}_back_back.xml
 
-IDCONTENTS = nfsv41_front_autogen.xml $(IDXMLSRC_BASE)
+IDCONTENTS = ${DOC_PREFIX}_front_autogen.xml $(IDXMLSRC_BASE)
 
-IDXMLSRC = nfsv41_front.xml $(IDXMLSRC_BASE)
+IDXMLSRC = ${DOC_PREFIX}_front.xml $(IDXMLSRC_BASE)
 
-draft-tmp.xml: $(START) Makefile $(END)
+draft-tmp.xml: $(START) ${DOC_PREFIX}_front_autogen.xml Makefile $(END)
 		rm -f $@ $@.tmp
 		cp $(START) $@.tmp
 		chmod +w $@.tmp
-		for i in $(IDCONTENTS) ; do echo '<?rfc include="'$$i'"?>' >> $@.tmp ; done
+		for i in $(IDCONTENTS) ; do cat $$i >> $@.tmp ; done
 		cat $(END) >> $@.tmp
 		mv $@.tmp $@
 
-draft-ietf-nfsv4-rfc5661bis-$(VERS).xml: draft-tmp.xml $(IDCONTENTS) $(AUTOGEN)
+${DRAFT_BASE}-$(VERS).xml: draft-tmp.xml $(IDCONTENTS) $(AUTOGEN)
 		rm -f $@
 		cp draft-tmp.xml $@
 
+${DRAFT_BASE}-$(VERS).xml: draft-tmp.xml $(IDCONTENTS) $(AUTOGEN)
+	rm -f $@
+	./rfcincfill.pl draft-tmp.xml $@
+
 genhtml: Makefile gendraft html txt dotx dotx-txt draft-$(VERS).tar
 	./gendraft draft-$(PREVVERS) \
-		draft-ietf-nfsv4-rfc5661bis-$(PREVVERS).txt \
+		${DRAFT_BASE}-$(PREVVERS).txt \
 		draft-$(VERS) \
-		draft-ietf-nfsv4-rfc5661bis-$(VERS).txt \
-		draft-ietf-nfsv4-rfc5661bis-$(VERS).html \
-		dotx.d/nfsv41.x \
-		draft-ietf-nfsv4-rfc5661bis-dot-x-04.txt \
-		draft-ietf-nfsv4-rfc5661bis-dot-x-05.txt \
+		${DRAFT_BASE}-$(VERS).txt \
+		${DRAFT_BASE}-$(VERS).html \
+		dotx.d/${DOC_PREFIX}.x \
+		${DRAFT_BASE}-dot-x-04.txt \
+		${DRAFT_BASE}-dot-x-05.txt \
 		draft-$(VERS).tar.gz
 
 testx: 
@@ -522,18 +522,18 @@ testx:
 	# just *has* to be different from Solaris.
 	( \
 		if [ -f /usr/include/rpc/auth_sys.h ]; then \
-			cp dotx.d/nfsv41.x testx.d ; \
+			cp dotx.d/${DOC_PREFIX}.x testx.d ; \
 		else \
-			sed s/authsys/authunix/g < dotx.d/nfsv41.x | \
+			sed s/authsys/authunix/g < dotx.d/${DOC_PREFIX}.x | \
 			sed s/auth_sys/auth_unix/g | \
 			sed s/AUTH_SYS/AUTH_UNIX/g | \
-			sed s/gss_svc/Gss_Svc/g > testx.d/nfsv41.x ; \
+			sed s/gss_svc/Gss_Svc/g > testx.d/${DOC_PREFIX}.x ; \
 		fi ; \
 	)
 	( cd testx.d ; \
-		rpcgen -a nfsv41.x ; )
+		rpcgen -a ${DOC_PREFIX}.x ; )
 	( cd testx.d ; \
-		rpcgen -a nfsv41.x ; \
+		rpcgen -a ${DOC_PREFIX}.x ; \
 		if [ ! -f /usr/include/rpc/auth_sys.h ]; then \
 			ln Make* make ; \
 			CFLAGS="-I /usr/include/rpcsecgss -I /usr/include/gssglue" ; export CFLAGS ; \
@@ -555,11 +555,11 @@ AUXFILES = \
 	xml2rfc
 
 DRAFTFILES = \
-	draft-ietf-nfsv4-rfc5661bis-$(VERS).txt \
-	draft-ietf-nfsv4-rfc5661bis-$(VERS).html \
-	draft-ietf-nfsv4-rfc5661bis-$(VERS).xml
+	${DRAFT_BASE}-$(VERS).txt \
+	${DRAFT_BASE}-$(VERS).html \
+	${DRAFT_BASE}-$(VERS).xml
 
-draft-$(VERS).tar: $(IDCONTENTS) $(START_PREGEN) $(FRONT_PREGEN) $(AUXFILES) $(DRAFTFILES) dotx.d/nfsv41.x
+draft-$(VERS).tar: $(IDCONTENTS) $(START_PREGEN) $(FRONT_PREGEN) $(AUXFILES) $(DRAFTFILES) dotx.d/${DOC_PREFIX}.x
 	rm -f draft-$(VERS).tar.gz
 	tar -cvf draft-$(VERS).tar \
 		$(START_PREGEN) \
