@@ -40,8 +40,8 @@
         notification request to have affect.  The notification mask is
         composed in the same manner as the bitmap for file attributes
         (<xref target="ss:protocol_constants:f1" />).  The numbers of bit positions are listed in the
-        notify_device_type4 enumeration type (<xref target="op_CB_NOTIFY_DEVICEID" />).  Only two
-        enumerated values of notify_device_type4 currently apply to
+        notify_deviceid_type4 enumeration type (<xref target="op_CB_NOTIFY_DEVICEID" />).  Only two
+        enumerated values of notify_deviceid_type4 currently apply to
         GETDEVICEINFO: NOTIFY_DEVICEID4_CHANGE and NOTIFY_DEVICEID4_DELETE
         (see <xref target="op_CB_NOTIFY_DEVICEID" />).
       </t>
