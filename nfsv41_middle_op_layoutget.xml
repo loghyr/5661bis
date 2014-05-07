@@ -333,8 +333,8 @@
 
       <t>
         If client sets loga_signal_layout_avail to TRUE, then it is
-        registering with the client a "want" for a layout in the event the
-        layout cannot be obtained due to resource exhaustion.  If the
+        registering with the metadata server a "want" for a layout in the
+        event the layout cannot be obtained due to resource exhaustion.  If the
         metadata server supports and will honor the "want", the results will
         have logr_will_signal_layout_avail set to TRUE.  If so, the client
         should expect a CB_RECALLABLE_OBJ_AVAIL operation to indicate that a
