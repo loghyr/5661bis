@@ -250,7 +250,7 @@
       particular object in the server's namespace to include the union of
       all security mechanisms of all direct descendants.  A common and
       convenient practice, unless strong security requirements dictate
-      otherwise, is to make the entire the pseudo file system accessible by
+      otherwise, is to make the entire pseudo file system accessible by
       all of the valid security mechanisms.
     </t>
 
